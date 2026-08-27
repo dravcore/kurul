@@ -235,16 +235,12 @@ describe('dead animation utility classes', () => {
  * recreated by hand instead of named, off the theme's own line-height and unable to move with it.
  *
  * `font-semibold` (600) is in this set too, per the brief's literal "font-thin through
- * font-black": Tailwind's own weight-scale order places `semibold` inside that range. Every
- * real call site pairs it with a step (`text-title`, `text-title-lg` or `text-display`) whose
- * own `@theme inline` variable already carries `font-weight: 600` (compiled and confirmed against
- * `app/globals.css`; `globals-css-layers.test.ts`'s "keeps text-title(-lg) at 600 when paired with
- * font-semibold" test measures the same 600, arrived at redundantly). The six below are pinned
- * rather than banned outright: scratchpad/plans/P8.md's Task 5 audited the tree this gate found
- * and dropped the other eight, `dashboard/stat-tile.tsx`'s pair included once
- * `--text-stat--font-weight` gave that figure a named step to be redundant with; the six left
- * sit outside that task's own file list, so this gate's job on them is only to stop a seventh
- * from landing unaudited.
+ * font-black": Tailwind's own weight-scale order places `semibold` inside that range. Every call
+ * site this gate found paired it with a step (`text-title`, `text-title-lg` or `text-display`)
+ * whose own `@theme inline` variable already carries `font-weight: 600` (compiled and confirmed
+ * against `app/globals.css`; `globals-css-layers.test.ts`'s "keeps text-title(-lg) at 600 when
+ * paired with font-semibold" test measures the same 600, arrived at redundantly). All fourteen
+ * are gone, so the ban is unconditional: it has no exception to carry.
  */
 const BANNED_SIZE_AND_WEIGHT_CLASSES = new Set([
   'text-xs',
@@ -284,14 +280,12 @@ interface SizeWeightException {
  * once the viewport is wide enough that the zoom guard no longer applies (docs/design.md §4).
  * The three form primitives are the whole of it; nothing else carries a field's own text.
  *
- * The `font-semibold` entries below are what is left of the fourteen this gate originally found:
- * six headings pairing it with `text-title`, `text-title-lg` or `text-display`, whose own
- * `--text-*--font-weight` theme variable already compiles to 600, the same 600 `font-semibold`
- * names again on top of it. scratchpad/plans/P8.md's Task 5 audited that whole set and dropped
- * the other eight (five component headings plus `dashboard/stat-tile.tsx`'s pair, once that
- * figure's arbitrary `text-[28px]` became the named `text-stat` step and stopped being the only
- * place its weight came from). These six sit outside Task 5's own file list and stay pinned
- * rather than rewritten here; this gate only has to stop a seventh from landing unaudited.
+ * No `font-semibold` row: all fourteen this gate originally found are gone from the tree. Each
+ * was a heading pairing it with `text-title`, `text-title-lg` or `text-display`, whose own
+ * `--text-*--font-weight` theme variable already compiles to the same 600, so every one was a
+ * one-word deletion. An exception list that is really a list of things still to do would weaken
+ * the gate: a pin carries a file and a line, and the line drifts on the first unrelated edit
+ * above it.
  */
 const SIZE_WEIGHT_EXCEPTIONS: SizeWeightException[] = [
   {
@@ -311,42 +305,6 @@ const SIZE_WEIGHT_EXCEPTIONS: SizeWeightException[] = [
     line: 18,
     bareClass: 'text-base',
     reason: 'the same iOS zoom floor, on the shared field base',
-  },
-  {
-    file: 'app/not-found.tsx',
-    line: 18,
-    bareClass: 'font-semibold',
-    reason: "redundant with text-title-lg's own 600; outside Task 5's file list",
-  },
-  {
-    file: 'app/(app)/workspaces/new/page.tsx',
-    line: 39,
-    bareClass: 'font-semibold',
-    reason: "redundant with text-title's own 600; outside Task 5's file list",
-  },
-  {
-    file: 'components/board/board-list.tsx',
-    line: 300,
-    bareClass: 'font-semibold',
-    reason: "redundant with text-title-lg's own 600; outside Task 5's file list",
-  },
-  {
-    file: 'components/board/board-placeholders.tsx',
-    line: 71,
-    bareClass: 'font-semibold',
-    reason: "redundant with text-title-lg's own 600; outside Task 5's file list",
-  },
-  {
-    file: 'components/layout/sidebar-body.tsx',
-    line: 93,
-    bareClass: 'font-semibold',
-    reason: "redundant with text-title's own 600; outside Task 5's file list",
-  },
-  {
-    file: 'components/dashboard/dashboard-summary.tsx',
-    line: 126,
-    bareClass: 'font-semibold',
-    reason: "redundant with text-title-lg's own 600; outside Task 5's file list",
   },
 ];
 

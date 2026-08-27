@@ -217,8 +217,10 @@ birini build'i kırarak yakalıyor: bu bir typo'dur, asla canlı bir Tailwind va
 çünkü bir varsayılan temiz derlenir ve bu kapıyı sessizce geçerdi. Diğeri, Tailwind'in kendi
 size ve weight skalasını (`text-xs`'ten `text-9xl`'e, `font-thin`'den `font-black`'e) kısa,
 gerekçeli bir istisna listesine karşı isim bazında yasaklıyor, böylece geri dönen bir varsayılan
-derlense bile yakalanıyor: aşağıdaki üç mobil form field'inde `text-base`, ve kendi
-`--text-*--font-weight`'i zaten aynı 600'ü taşıyan altı heading'de `font-semibold`. `text-lg`, her çağrı
+derlense bile yakalanıyor. O liste üç satır ve üçü de aynı satır: aşağıdaki üç mobil form
+field'inde `text-base`. `font-semibold`'ün on dört çağrı yeri vardı, hepsi kendi
+`--text-*--font-weight`'inin zaten taşıdığı 600'ü tekrar eden bir heading'di ve on dördü de
+kalktı, dolayısıyla ona konan yasağın hiç istisnası yok. `text-lg`, her çağrı
 yerinde `title` (16/24) oluyor, `DialogTitle` dahil: bir dialog'un başlığı bir section
 başlığıdır, kendine ait bir boyut değil, ve zaten `18px`'lik bir adım hiç olmadı. `text-xs`,
 `small` (12/16) oluyor, asla `micro` (11/14) değil: iki çağrı yeri de bir button label'ı ve bir

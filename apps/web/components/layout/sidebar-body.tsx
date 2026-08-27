@@ -90,7 +90,7 @@ export function SidebarBody({
         )}
       >
         {!collapsed ? (
-          <p className="font-display text-title font-semibold tracking-tight text-foreground">
+          <p className="font-display text-title tracking-tight text-foreground">
             {t('shell.title')}
           </p>
         ) : null}

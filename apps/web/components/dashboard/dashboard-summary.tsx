@@ -123,7 +123,7 @@ export function DashboardSummary(): React.ReactElement | null {
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
         <DamgaMark size={64} />
-        <h2 className="font-display text-title-lg font-semibold">{t('emptyTitle')}</h2>
+        <h2 className="font-display text-title-lg">{t('emptyTitle')}</h2>
         <p className="max-w-md text-body text-muted-foreground">{t('emptyBody')}</p>
         {boards[0] ? (
           // Outline, not the fill: the board list under this section carries "Create board" in

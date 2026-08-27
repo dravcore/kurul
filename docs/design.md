@@ -207,9 +207,11 @@ This is the whole scale, with no gap left for a Tailwind default to fill unnotic
 resolves to nothing: a typo, never a live Tailwind default, since a default compiles clean and
 would pass that gate quietly. The other denies Tailwind's own size and weight scale by name
 (`text-xs` through `text-9xl`, `font-thin` through `font-black`) against a short, reasoned
-exception list, so a reintroduced default is caught even though it compiles: `text-base` on the
-three mobile form fields below, and `font-semibold` on six headings whose own
-`--text-*--font-weight` already carries the same 600 it restates. `text-lg` becomes `title` (16/24) at every call site, `DialogTitle`
+exception list, so a reintroduced default is caught even though it compiles. That list is three
+rows and they are all the same row: `text-base` on the three mobile form fields below.
+`font-semibold` had fourteen call sites, every one a heading restating the 600 its own
+`--text-*--font-weight` already carried, and all fourteen are gone, so the ban on it carries no
+exception at all. `text-lg` becomes `title` (16/24) at every call site, `DialogTitle`
 included: a dialog's title is a section title, not a size of its own, and there is no `18px`
 step for it to have kept. `text-xs` becomes `small` (12/16), never `micro` (11/14): its two call
 sites were a button label and a keyboard-shortcut hint, neither one metadata small enough for the
