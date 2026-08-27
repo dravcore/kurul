@@ -20,14 +20,6 @@ const NO_CEILINGS: WorkspacePlanDto = {
   usage: { seats: 0, boards: 0, storageBytes: 0 },
 };
 
-/** The workspace's resolved ceilings and current usage (ADR 0032). */
-export function fetchWorkspacePlan(
-  workspaceId: string,
-  init?: RequestInit,
-): Promise<WorkspacePlanDto> {
-  return api.get<WorkspacePlanDto>(`/workspaces/${workspaceId}/plan`, init);
-}
-
 /**
  * The plan of the active workspace, as a hook with no error surface of its own.
  *
@@ -41,7 +33,7 @@ export function useWorkspacePlan(workspaceId: string | null): WorkspacePlanDto {
     () =>
       workspaceId
         ? (signal: AbortSignal): Promise<WorkspacePlanDto> =>
-            fetchWorkspacePlan(workspaceId, { signal })
+            api.get<WorkspacePlanDto>(`/workspaces/${workspaceId}/plan`, { signal })
         : null,
     [workspaceId],
   );
