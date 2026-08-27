@@ -521,10 +521,16 @@ disabled element, which drops a keyboard user onto `<body>` in the middle of the
 While a write is out: a text field goes `readOnly`; a native `<select>` and a checkbox, neither
 of which has a `readOnly`, stay enabled, carry `aria-disabled` and let their change handler
 refuse the change, which React puts back so a refused choice is never left on screen as a saved
-one; and the busy state is announced by a sibling live region (`role="status"` with `aria-busy`,
-mounted while idle too) rather than by the control itself. Pending state is scoped to the one
-control in flight, never shared across a section: a save on one field may not lock the field
-beside it. `Button`'s `loading` is the single exception, and only because it disables the
+one; and `aria-busy` marks the region being written (the properties panel's fields, the member
+row, the composer's and the inline rename's own `<form>`), never the control the reader is
+standing on. Where the write has no other visible mark, because no pressed button is carrying
+`Button`'s `loading`, a sibling `role="status"` region mounted while idle carries the saving
+line: the task properties panel and the member row are the two places that need one. That region
+takes no `aria-busy` of its own,
+because `aria-busy` on a live region lets assistive tech defer the region's update until busy
+clears, and here that is the same moment the line goes empty again. Pending state is scoped to
+the one control in flight, never shared across a section: a save on one field may not lock the
+field beside it. `Button`'s `loading` is the single exception, and only because it disables the
 control the press already came from.
 
 **Errors** derive from the problem-JSON shape in [api-conventions.md](api-conventions.md#errors).

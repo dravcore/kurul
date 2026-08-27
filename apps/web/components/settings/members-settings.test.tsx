@@ -379,15 +379,19 @@ describe('MembersSettings — changing a role', () => {
     expect(roleSelectFor('Bora').disabled).toBe(false);
     expect(roleSelectFor('Bora').getAttribute('aria-disabled')).toBe('true');
     // The busy state moved off the control the reader is holding and onto a live region of
-    // its own, which is the only thing left saying the write is happening.
+    // its own, which is the only thing left saying the write is happening. The row carries
+    // `aria-busy`, never the region: on the region it would license assistive tech to defer
+    // the update until busy clears, and by then the text is empty again.
     const busy = within(rowFor('Bora')).getByRole('status');
-    expect(busy.getAttribute('aria-busy')).toBe('true');
     expect(busy.textContent).toBe(copy.savingRole);
+    expect(busy.getAttribute('aria-busy')).toBeNull();
+    expect(rowFor('Bora').getAttribute('aria-busy')).toBe('true');
     expect(roleSelectFor('Bora').getAttribute('aria-busy')).toBeNull();
 
     resolvePatch(member(BORA_ID, 'Bora', MemberRole.ADMIN));
     await waitFor(() => expect(roleSelectFor('Bora').getAttribute('aria-disabled')).toBeNull());
     expect(within(rowFor('Bora')).getByRole('status').textContent).toBe('');
+    expect(rowFor('Bora').getAttribute('aria-busy')).toBeNull();
   });
 
   it('refuses a second choice while the first patch is still out', async () => {

@@ -209,6 +209,12 @@ describe('TaskPropertiesPanel while a write is out', () => {
   const due = (): HTMLInputElement => screen.getByLabelText(messages.app.board.task.dueDate);
   const estimate = (): HTMLInputElement => screen.getByLabelText(messages.app.board.task.estimate);
   const liveRegion = (): HTMLElement => within(propertiesRegion()).getByRole('status');
+  /** What the busy mark sits on: the fields being written, not the region announcing them. */
+  const fields = (): HTMLElement => {
+    const found = propertiesRegion().querySelector('[data-slot="task-properties-fields"]');
+    if (!found) throw new Error('the properties fields wrapper is gone');
+    return found as HTMLElement;
+  };
 
   it('keeps the priority select focused instead of disabling it', async () => {
     neverSettles(mocks.patch);
@@ -279,17 +285,24 @@ describe('TaskPropertiesPanel while a write is out', () => {
     expect(box.getAttribute('aria-disabled')).toBe('true');
   });
 
+  /**
+   * `aria-busy="true"` on a live region lets assistive tech hold the region's own updates back
+   * until busy clears, which here is the same moment its text goes empty again: the one
+   * announcement of the write would be deferred into nothing. So the region carries the text
+   * and the fields around it carry the mark.
+   */
   it('announces the write from a section live region rather than from the control', async () => {
     neverSettles(mocks.patch);
     renderPanel();
 
     expect(liveRegion().textContent).toBe('');
-    expect(liveRegion().getAttribute('aria-busy')).toBeNull();
+    expect(fields().getAttribute('aria-busy')).toBeNull();
 
     fireEvent.change(priority(), { target: { value: Priority.URGENT } });
 
-    await waitFor(() => expect(liveRegion().getAttribute('aria-busy')).toBe('true'));
-    expect(liveRegion().textContent).toBe(messages.app.board.task.saving);
+    await waitFor(() => expect(liveRegion().textContent).toBe(messages.app.board.task.saving));
+    expect(fields().getAttribute('aria-busy')).toBe('true');
+    expect(liveRegion().getAttribute('aria-busy')).toBeNull();
     expect(priority().getAttribute('aria-busy')).toBeNull();
   });
 

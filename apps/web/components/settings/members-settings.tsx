@@ -426,7 +426,7 @@ function MemberRow({
   const shownRole = confirmRole ?? role;
 
   return (
-    <li className="flex flex-col gap-1 py-1.5">
+    <li className="flex flex-col gap-1 py-1.5" aria-busy={pending || undefined}>
       <div className="flex min-h-9 items-center justify-between gap-3">
         <p className="min-w-0 truncate text-body text-foreground">{member.name}</p>
         <div className="flex shrink-0 items-center gap-2">
@@ -466,10 +466,13 @@ function MemberRow({
         <p id={roleHintId} className="text-small text-muted-foreground">
           {t(`roleHints.${shownRole}`)}
         </p>
-        {/* The busy mark sits here rather than on the `<select>`: the control has to stay the
-            plain, focusable thing the reader is standing on, and this is what says the write
-            is out. Mounted while idle too, so the insertion is what announces. */}
-        <p role="status" aria-busy={pending || undefined} className="sr-only">
+        {/* The saving line sits here rather than on the `<select>`: the control has to stay the
+            plain, focusable thing the reader is standing on, and this is what says the write is
+            out. Mounted while idle too, so the insertion is what announces, and with no
+            `aria-busy` of its own, which would license assistive tech to defer the region until
+            busy clears and by then its text is empty again. The row above carries the busy
+            mark, since the row is what is being written. */}
+        <p role="status" className="sr-only">
           {pending ? t('savingRole') : ''}
         </p>
         {/* Focus stays on the row's own control rather than jumping here: the reader just

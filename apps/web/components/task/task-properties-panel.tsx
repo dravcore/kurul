@@ -220,12 +220,22 @@ export function TaskPropertiesPanel({
 
       {/* Mounted whether or not anything is in flight: a `role="status"` inserted at the same
           moment as its own text is announced unevenly across screen readers, and with no
-          control going disabled this region is the only thing that says a write is out. */}
-      <p role="status" aria-busy={busy || undefined} className="sr-only">
+          control going disabled this region is the only thing that says a write is out.
+
+          No `aria-busy` on the region itself. `aria-busy="true"` on a live region licenses
+          assistive tech to hold its updates back until busy clears, which here is the exact
+          moment the text goes empty again, so the one announcement of the write would be
+          swallowed. The busy mark belongs on the fields below, which are what is being
+          written. */}
+      <p role="status" className="sr-only">
         {busy ? t('saving') : ''}
       </p>
 
-      <div className="flex flex-col gap-5">
+      <div
+        data-slot="task-properties-fields"
+        className="flex flex-col gap-5"
+        aria-busy={busy || undefined}
+      >
         <TaskDetailFields
           task={task}
           disabled={!canMutate}

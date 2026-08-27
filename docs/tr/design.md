@@ -541,11 +541,17 @@ disabled olan elemanı blur eder ve klavye kullanıcısı, kendi düzenlemesinin
 üzerine düşer. Bir yazma sürerken: metin field'ı `readOnly` olur; `readOnly`'si olmayan native bir
 `<select>` ve bir checkbox enabled kalır, `aria-disabled` taşır ve değişikliği kendi change
 handler'ı reddeder (React gösterilen değeri geri koyar, böylece reddedilen bir seçim ekranda
-kaydedilmiş gibi durmaz); busy durumu ise control'ün kendisi yerine yanındaki bir live region
-(`role="status"` artı `aria-busy`, boştayken de mount edilmiş halde) tarafından duyurulur. Pending
-durumu, uçuştaki tek control'e daraltılır, bir bölümün tamamına yayılmaz: bir field'daki kayıt,
-yanındaki field'ı kilitleyemez. Tek istisna `Button`'ın `loading`'i, o da yalnızca basışın zaten
-geldiği control'ü disabled ettiği için.
+kaydedilmiş gibi durmaz); `aria-busy` ise okuyucunun üzerinde durduğu control'ü değil, yazılan
+bölgeyi işaretler (properties panel'inin field'ları, member satırı, composer'ın ve inline
+rename'in kendi `<form>`'u). Yazmanın başka görünür bir işareti yoksa, yani basılmış bir button
+`Button`'ın `loading`'ini taşımıyorsa, boştayken de mount edilmiş yanındaki bir `role="status"`
+bölgesi kaydetme satırını taşır: buna ihtiyacı olan iki yer, task properties panel'i ve member
+satırı. O bölge kendi
+`aria-busy`'sini almaz, çünkü bir live region üzerindeki `aria-busy`, assistive tech'in bölgenin
+güncellemesini busy kalkana kadar ertelemesine izin verir ve burada o an, satırın yeniden boşaldığı
+andır. Pending durumu, uçuştaki tek control'e daraltılır, bir bölümün tamamına yayılmaz: bir
+field'daki kayıt, yanındaki field'ı kilitleyemez. Tek istisna `Button`'ın `loading`'i, o da
+yalnızca basışın zaten geldiği control'ü disabled ettiği için.
 
 **Error'lar**, [api-conventions.md](api-conventions.md#hatalar)'daki problem-JSON şeklinden
 türer. O contract'a göre UI **`statusCode` ve `error` üzerinden branch'lenir, asla `message`
