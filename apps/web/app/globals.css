@@ -258,6 +258,12 @@
   --text-display: 40px;
   --text-display--line-height: 44px;
   --text-display--font-weight: 600;
+  /* The dashboard's one hero figure (docs/design.md §8, `stat-tile.tsx`): a size with no
+     sibling in the reading scale above, so it gets its own step rather than an arbitrary
+     `text-[28px]` with no declared line box at all. */
+  --text-stat: 28px;
+  --text-stat--line-height: 32px;
+  --text-stat--font-weight: 600;
   --text-title-lg: 20px;
   --text-title-lg--line-height: 28px;
   --text-title-lg--font-weight: 600;
