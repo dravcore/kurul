@@ -113,10 +113,10 @@ ile yeşil kalır.
 
 Suite [`e2e/`](../../e2e) altında yaşar, derlenmiş bir API ve production web build'i
 üzerinde gerçek bir Chromium koşturur, ve tam olarak sekiz senaryodur. Dört senaryoyla başladı ve
-yalnızca stack seviyesindeki bağlantısına başka hiçbir şeyin ulaşamadığı özelliklerle büyüdü —
+yalnızca stack seviyesindeki bağlantısına başka hiçbir şeyin ulaşamadığı özelliklerle büyüdü:
 gerçek bir tarayıcıdan gelen gerçek bir multipart yükleme, importer'ı besleyen gerçek bir dosya
-seçici, ve jsdom'da hiçbiri var olmayan bir viewport, bir dokunmatik ekran ve layout edilmiş bir
-belge.
+seçici, jsdom'da hiçbiri var olmayan bir viewport, bir dokunmatik ekran ve layout edilmiş bir
+belge, ve jsdom'un yapmadığı bir implicit form submission.
 
 ### Sekiz senaryo
 

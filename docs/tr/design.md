@@ -497,9 +497,11 @@ Recharts'ın kendi tooltip'i (§8). `Select` tablodan tam tersi sebeple çıktı
 canlandıran hiçbir şey yok.
 
 Bir toast 4s durur ve yığın sağ altta üç derindir (`components/ui/sonner.tsx`): tek satırı
-okumaya yetecek kadar uzun, bir seri toast'ın kendi kendini temizleyeceği kadar kısa. Bir action
-taşıyan toast, çağrı yerinde kendi daha uzun `duration`'ını geçer; çünkü kimsenin ulaşmaya vakti
-olmayan bir kontrol, hiç kontrol olmamasından kötüdür.
+okumaya yetecek kadar uzun, bir seri toast'ın kendi kendini temizleyeceği kadar kısa. Yalnızca
+board'un drag failure toast'ı çağrı yerinde kendi daha uzun süresini geçer
+(`use-board-mutations.ts`'teki `ACTION_TOAST_MS = 8000`); çünkü kimsenin ulaşmaya vakti olmayan
+bir kontrol, hiç kontrol olmamasından kötüdür. Task panelinin retry toast'ları (comment ve
+activity reload, field save) buna bağlı değildir ve hâlâ 4s default'ta çalışır.
 
 - **Press feedback ship edilmedi.** Hiçbir şey `:active` üzerinde ölçeklenmiyor; basılan bir
   kontrol yalnızca renk adımı değiştirir ve yerinde kalır. Yukarıdaki tablo uygulamanın çizdiğidir,

@@ -113,9 +113,10 @@ never renders.
 
 The suite lives in [`e2e/`](../e2e), runs a real Chromium against a compiled API and a
 production web build, and is exactly eight scenarios. It started at four and has grown only
-with features whose stack-level wiring nothing else could reach — a real multipart upload from a
-real browser, a real file picker feeding the importer, and a viewport, a touchscreen and a
-laid-out document, none of which exist in jsdom.
+with features whose stack-level wiring nothing else could reach: a real multipart upload from a
+real browser, a real file picker feeding the importer, a viewport, a touchscreen and a
+laid-out document none of which exist in jsdom, and an implicit form submission, which jsdom
+does not perform.
 
 ### The eight scenarios
 

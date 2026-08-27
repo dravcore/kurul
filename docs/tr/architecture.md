@@ -583,7 +583,7 @@ Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 | [`0032-plan-limits.md`](decisions/0032-plan-limits.md)                                                       | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Yapılandırılana Kadar Sınırsız                                                  |
 | [`0033-webhook-delivery-and-failure-policy.md`](decisions/0033-webhook-delivery-and-failure-policy.md)       | Webhook Teslimi ve Hata Politikası: Workspace'in Sahibi Olduğu Endpoint'ler, Bir Outbox Satırı ve İmzalı Zarf (Önerildi)        |
 | [`0034-hosted-billing-and-plan-assignment.md`](decisions/0034-hosted-billing-and-plan-assignment.md)         | Barındırılan Faturalama ve Plan Ataması: Merchant of Record, Tek Abonelik Satırı ve Yapılandırılmadığında Hiçbir Şey (Önerildi) |
-| [`0035-inline-task-composer.md`](decisions/0035-inline-task-composer.md)                                     | Satır İçi Task Oluşturucu: Column'un Ayağında Tek Bir Oluşturma Yolu, Başlık İçin Dialog Yok                                    |
+| [`0035-inline-task-composer.md`](decisions/0035-inline-task-composer.md)                                     | Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok                                 |
 
 ---
 

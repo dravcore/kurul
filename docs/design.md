@@ -481,9 +481,11 @@ dashboard charts (§8). `Select` is off the table for the opposite reason: it is
 animates it.
 
 A toast sits for 4s and the stack is three deep, bottom right (`components/ui/sonner.tsx`): long
-enough to read one line, short enough that a burst clears itself. A toast carrying an action
-passes its own longer `duration` at the call site, since a control nobody has time to reach is
-worse than no control.
+enough to read one line, short enough that a burst clears itself. Only the board's drag-failure
+toast passes its own longer duration at the call site (`ACTION_TOAST_MS = 8000` in
+`use-board-mutations.ts`), since a control nobody has time to reach is worse than no control;
+the task panel's retry toasts (comment and activity reload, field save) are not wired to it and
+still run at the 4s default.
 
 - **Press feedback is not shipped.** Nothing scales on `:active`; a pressed control steps its
   colour and stays where it is. The table above is what the app draws, not what it could.
