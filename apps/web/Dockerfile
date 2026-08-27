@@ -2,7 +2,7 @@
 # bumps this line (see .github/dependabot.yml, directories /apps/web). Dependabot's docker
 # updater only parses a literal `FROM image:tag` + digest line, not an ARG-substituted one,
 # so the digest is repeated on every FROM below rather than factored into a shared ARG.
-FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS base
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS base
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
@@ -49,7 +49,7 @@ RUN pnpm --filter @kurul/shared-types build \
   && pnpm --filter @kurul/auth-access build \
   && pnpm --filter @kurul/web build
 
-FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runner
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
