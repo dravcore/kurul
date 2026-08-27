@@ -1,18 +1,26 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { InvitationDto, WorkspaceMemberDto } from '@kurul/shared-types';
+import {
+  MemberRole,
+  type InvitationDto,
+  type UpdateMemberRoleRequest,
+  type WorkspaceMemberDto,
+} from '@kurul/shared-types';
+import { api, resolveApiMessage } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { fetchInstanceConfig } from '@/lib/instance-config';
-import { canManageMember, canManageMembers } from '@/lib/member-permissions';
+import { assignableRoles, canManageMember, canManageMembers } from '@/lib/member-permissions';
 import { fetchAllWorkspaceMembers, fetchPendingInvitations } from '@/lib/member-query';
 import { isAtCeiling, useWorkspacePlan } from '@/lib/plan-query';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { useApiResource, useResourceField } from '@/lib/use-api-resource';
 import { useWorkspaceContext } from '@/components/layout/workspace-provider';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { SubmitError } from '@/components/common/submit-error';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,8 +28,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChangeMemberRoleDialog } from './change-member-role-dialog';
 import { InviteMemberDialog } from './invite-member-dialog';
 import { LeaveWorkspaceDialog } from './leave-workspace-dialog';
 import { MailDisabledNotice } from './mail-disabled-notice';
@@ -71,7 +79,6 @@ export function MembersSettings(): React.ReactElement {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [revokeInvitation, setRevokeInvitation] = useState<InvitationDto | null>(null);
-  const [roleMember, setRoleMember] = useState<WorkspaceMemberDto | null>(null);
   const [removeMember, setRemoveMember] = useState<WorkspaceMemberDto | null>(null);
 
   const currentUserId = session?.user.id ?? '';
@@ -179,7 +186,7 @@ export function MembersSettings(): React.ReactElement {
           heading is a section that only ever reports its own absence. */}
       {canManage && roster.invitations.length > 0 ? (
         <div className="flex flex-col gap-1">
-          <h3 className="text-small font-strong text-muted-foreground">{t('pendingTitle')}</h3>
+          <h2 className="text-small font-strong text-muted-foreground">{t('pendingTitle')}</h2>
           <ul className="divide-y divide-border">
             {roster.invitations.map((invitation) => (
               <li key={invitation.id} className={ROW}>
@@ -222,57 +229,26 @@ export function MembersSettings(): React.ReactElement {
         {roster.members.map((member) => {
           const isSelf = member.userId === currentUserId;
           // An ADMIN keeps every control on everyone except an OWNER, which is where the API
-          // answers 403 — so the row simply carries no menu instead of a menu that refuses.
+          // answers 403, so the row simply carries no role control instead of one that
+          // refuses.
           const manageable = !isSelf && canManageMember(activeRole, member.role);
 
           return (
-            <li key={member.id} className={ROW}>
-              <p className="min-w-0 truncate text-body text-foreground">
-                {member.name}
-                {isSelf ? (
-                  <span className="ml-2 text-small text-muted-foreground">{t('you')}</span>
-                ) : null}
-              </p>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="text-small text-muted-foreground">
-                  {t(`roles.${member.role}`)}
-                </span>
-                {isSelf || manageable ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={t('memberMenu', { name: member.name })}
-                      >
-                        <MoreHorizontal />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {manageable ? (
-                        <DropdownMenuItem onClick={() => setRoleMember(member)}>
-                          {t('changeRoleAction')}
-                        </DropdownMenuItem>
-                      ) : null}
-                      {manageable ? (
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => setRemoveMember(member)}
-                        >
-                          {t('removeAction')}
-                        </DropdownMenuItem>
-                      ) : null}
-                      {isSelf ? (
-                        <DropdownMenuItem variant="destructive" onClick={() => setLeaveOpen(true)}>
-                          {t('leaveAction')}
-                        </DropdownMenuItem>
-                      ) : null}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : null}
-              </div>
-            </li>
+            <MemberRow
+              key={member.id}
+              workspaceId={activeId}
+              member={member}
+              isSelf={isSelf}
+              manageable={manageable}
+              actorRole={activeRole}
+              onChanged={(updated) =>
+                setMembers((current) =>
+                  current.map((item) => (item.userId === updated.userId ? updated : item)),
+                )
+              }
+              onRemove={() => setRemoveMember(member)}
+              onLeave={() => setLeaveOpen(true)}
+            />
           );
         })}
       </ul>
@@ -302,20 +278,6 @@ export function MembersSettings(): React.ReactElement {
           setInvitations((current) => current.filter((item) => item.id !== invitationId))
         }
       />
-      <ChangeMemberRoleDialog
-        open={roleMember !== null}
-        onOpenChange={(open) => {
-          if (!open) setRoleMember(null);
-        }}
-        workspaceId={activeId}
-        member={roleMember}
-        actorRole={activeRole}
-        onChanged={(updated) =>
-          setMembers((current) =>
-            current.map((item) => (item.userId === updated.userId ? updated : item)),
-          )
-        }
-      />
       <RemoveMemberDialog
         open={removeMember !== null}
         onOpenChange={(open) => {
@@ -329,5 +291,203 @@ export function MembersSettings(): React.ReactElement {
       />
       <LeaveWorkspaceDialog open={leaveOpen} onOpenChange={setLeaveOpen} workspaceId={activeId} />
     </div>
+  );
+}
+
+interface MemberRowProps {
+  workspaceId: string;
+  member: WorkspaceMemberDto;
+  isSelf: boolean;
+  manageable: boolean;
+  actorRole: MemberRole | null;
+  onChanged: (member: WorkspaceMemberDto) => void;
+  onRemove: () => void;
+  onLeave: () => void;
+}
+
+/**
+ * One roster row: the name, the role, and whatever the caller may do about either.
+ *
+ * A role change PATCHes the moment the `<select>` fires, with no dialog in between, except for
+ * the one target this screen has no way back from: OWNER. Its hint (`roleHints.<role>`, the
+ * same text `ChangeMemberRoleDialog` used to show under its own picker) follows the value the
+ * `<select>` is currently showing, not `member.role`, so it stays true while an owner
+ * confirmation is still open on the pending choice.
+ */
+function MemberRow({
+  workspaceId,
+  member,
+  isSelf,
+  manageable,
+  actorRole,
+  onChanged,
+  onRemove,
+  onLeave,
+}: MemberRowProps): React.ReactElement {
+  const t = useTranslations('app.settings.members');
+  const [role, setRole] = useState(member.role);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Set only while the owner confirmation is open. The `<select>` shows this value until it is
+  // either confirmed (PATCHed) or cancelled (reverted back to `role`).
+  const [confirmRole, setConfirmRole] = useState<MemberRole | null>(null);
+  const roleHintId = useId();
+
+  function resolveRoleError(caught: unknown): string {
+    return resolveApiMessage(caught, t, {
+      fallback: 'changeRoleError',
+      byStatus: {
+        403: 'changeRoleErrorForbidden',
+        404: 'changeRoleErrorGone',
+        // The one refusal that names its own way out: the workspace has to keep an owner, so
+        // the next move is to promote someone before demoting this one.
+        409: 'changeRoleErrorLastOwner',
+      },
+    });
+  }
+
+  async function patchRole(next: MemberRole): Promise<WorkspaceMemberDto> {
+    const body: UpdateMemberRoleRequest = { role: next };
+    return api.patch<WorkspaceMemberDto, UpdateMemberRoleRequest>(
+      `/workspaces/${workspaceId}/members/${member.userId}/role`,
+      body,
+    );
+  }
+
+  /**
+   * Every role but OWNER: applied the moment it is chosen, with its own pending/error state so
+   * a failure reverts this row without disturbing anyone else's.
+   */
+  async function applyRoleDirect(next: MemberRole): Promise<void> {
+    setError(null);
+    setPending(true);
+    try {
+      const updated = await patchRole(next);
+      setRole(updated.role);
+      onChanged(updated);
+    } catch (caught) {
+      setError(resolveRoleError(caught));
+      setRole(member.role);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function onSelectChange(event: React.ChangeEvent<HTMLSelectElement>): void {
+    const next = event.target.value as MemberRole;
+    if (next === role) return;
+    if (next === MemberRole.OWNER) {
+      setConfirmRole(next);
+      return;
+    }
+    setRole(next);
+    void applyRoleDirect(next);
+  }
+
+  if (!manageable) {
+    return (
+      <li className={ROW}>
+        <p className="min-w-0 truncate text-body text-foreground">
+          {member.name}
+          {isSelf ? (
+            <span className="ml-2 text-small text-muted-foreground">{t('you')}</span>
+          ) : null}
+        </p>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-small text-muted-foreground">{t(`roles.${member.role}`)}</span>
+          {isSelf ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={t('memberMenu', { name: member.name })}
+                >
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem variant="destructive" onClick={onLeave}>
+                  {t('leaveAction')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      </li>
+    );
+  }
+
+  const shownRole = confirmRole ?? role;
+
+  return (
+    <li className="flex flex-col gap-1 py-1.5">
+      <div className="flex min-h-9 items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-body text-foreground">{member.name}</p>
+        <div className="flex shrink-0 items-center gap-2">
+          <Select
+            aria-label={t('memberRole', { name: member.name })}
+            aria-describedby={roleHintId}
+            value={shownRole}
+            disabled={pending}
+            aria-busy={pending}
+            onChange={onSelectChange}
+          >
+            {assignableRoles(actorRole).map((option) => (
+              <option key={option} value={option}>
+                {t(`roles.${option}`)}
+              </option>
+            ))}
+          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t('memberMenu', { name: member.name })}
+              >
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onClick={onRemove}>
+                {t('removeAction')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <p id={roleHintId} className="text-small text-muted-foreground">
+          {t(`roleHints.${shownRole}`)}
+        </p>
+        {/* Focus stays on the row's own control rather than jumping here: the reader just
+            chose a value on this exact `<select>`, unlike a dialog submit their focus was
+            already waiting on. */}
+        {error ? <SubmitError message={error} focusOnMount={false} /> : null}
+      </div>
+      <ConfirmDialog
+        open={confirmRole !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmRole(null);
+        }}
+        title={t('changeRoleTitle')}
+        description={t('confirmOwnerBody')}
+        cancelLabel={t('cancel')}
+        confirmLabel={t('changeRoleSubmit')}
+        onConfirm={async () => {
+          if (confirmRole === null) return;
+          // Not `applyRoleDirect`: a failure here has to stay inside the dialog the reader is
+          // looking at (its own `SubmitError`, its own re-enabled button), not revert a
+          // `<select>` hidden behind the still-open modal.
+          const updated = await patchRole(confirmRole);
+          setRole(updated.role);
+          onChanged(updated);
+        }}
+        resolveError={resolveRoleError}
+      />
+    </li>
   );
 }

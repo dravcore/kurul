@@ -157,13 +157,13 @@ One reserved severity family serves both, always shipped with an **icon and a wo
 color alone. Priority is an ordered scalar kept separate from labels; its order is carried by
 escalating chroma, so it survives colorblindness, grayscale print, and being described aloud.
 
-| Meaning                        | Priority | Token                                 | Light     | Dark      | Contrast L / D | Icon           |
-| ------------------------------ | -------- | ------------------------------------- | --------- | --------- | -------------- | -------------- |
-| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9      | `chevron-down` |
-| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9      | `minus`        |
-| Good / done                    | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7      | `check`        |
-| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8      | `chevron-up`   |
-| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8      | `chevrons-up`  |
+| Meaning                        | Priority | Token                                 | Light     | Dark      | Contrast on `--card`, L / D | Icon           |
+| ------------------------------ | -------- | ------------------------------------- | --------- | --------- | --------------------------- | -------------- |
+| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9                   | `chevron-down` |
+| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9                   | `minus`        |
+| Good / done                    | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7                   | `check`        |
+| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8                   | `chevron-up`   |
+| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8                   | `chevrons-up`  |
 
 Priority renders as a full-chroma icon plus text; labels render as a tinted chip with a
 colored dot — different weights, so a red priority and a red label never read alike.
@@ -188,12 +188,13 @@ falls straight through to the fallback fonts.
 | Body / UI | **Archivo** (variable, OFL)                                | Everything in the product                                                 | A signage grotesque: tall x-height, economical widths, legible at 12–13px. A board is hundreds of short strings in narrow columns — a signage problem. Chosen over Inter and Geist, which are correct but read as the framework default. |
 | Mono      | **JetBrains Mono** (OFL), `0.92em`                         | Ids, shortcuts, code                                                      | Unambiguous `0/O` and `1/l/I` — a UUIDv7 legibility tool, not a style choice                                                                                                                                                             |
 
-| Step                   | Size / line       | Weight    | Use                                                         |
-| ---------------------- | ----------------- | --------- | ----------------------------------------------------------- |
-| `display`              | 40 / 44           | 600       | One per auth or marketing screen                            |
-| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles           |
-| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamps · chips, counts, axis ticks            |
+| Step                   | Size / line       | Weight    | Use                                                                      |
+| ---------------------- | ----------------- | --------- | ------------------------------------------------------------------------ |
+| `display`              | 40 / 44           | 600       | One per auth or marketing screen                                         |
+| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                        |
+| `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences |
+| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav              |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamps · chips, counts, axis ticks                         |
 
 This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
 `text-lg`, `text-xs` and `font-medium` are gone from the component tree, and
@@ -208,6 +209,13 @@ title both carry their own step's line-height now, 18px and 24px, with no `leadi
 on top: that was a shadcn default riding along uninvited, not a choice this scale ever asked for.
 (Tailwind's own `text-base`, 16px, stays as a deliberate exception on three form fields below
 768px, §4, not a gap in this scale.)
+
+`read` (14/21, weight 400) is a closed list on purpose, not a general prose size: task
+description, comment body, and import report sentences carry it, nowhere else. Board cards stay
+`body` (13/18) even where they show a description snippet. `text-read-utilities.test.ts` scans
+`app/`, `components/` and `lib/` for the literal utility class and fails the build the moment a
+fourth call site adds itself, the same technique `border-utilities.test.ts` already uses for its
+own closed lists.
 
 `tabular-nums` on columns of numbers, axis ticks, and table cells — never on a hero figure or
 a stat-tile value.
@@ -225,18 +233,18 @@ a stat-tile value.
 
 App shell per the `(app)` route group in [architecture.md §4](architecture.md#4-appsweb--structure).
 
-| Region             | Spec                                                                                                                                                                                                                                                                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                                                                                                                                                                                  |
-| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                                                                                                                                                                                     |
-| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger                                                                                                                                                                   |
-| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                                                                                                                                                                                        |
-| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px); below 48rem a column is 85vw and the strip snaps to it (mandatory scroll snap), with 24px edge masks (`--background` fading to transparent) drawn on whichever side still has a column to scroll to |
-| Card               | 10px 12px padding, 8px gap, min 36px (title only), typical 56px (one meta line, measured on the seeded board); title clamps at 3 lines so nothing exceeds ~140px                                                                                                                                                              |
-| Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                                                                                                                                                                                   |
-| List / table row   | 36px; 44px below 768px                                                                                                                                                                                                                                                                                                        |
-| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                                                                                                                                                                                  |
-| Touch target       | **44px minimum below 768px**, on every interactive element without exception                                                                                                                                                                                                                                                  |
+| Region             | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                                                                                                                                                                                                                                                                                                                                                          |
+| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger                                                                                                                                                                                                                                                                                                                                        |
+| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px); below 48rem a column is 85vw and the strip snaps to it (mandatory scroll snap), with 24px edge masks (`--background` fading to transparent) drawn on whichever side still has a column to scroll to                                                                                                                                                                      |
+| Card               | 8px 12px padding plus a 32px right gutter for the drag grip (48px below 768px); 6px between the title block and the meta row, 8px between the signals inside it; **36px** title only, **56px** typical (one meta line), **76px** at the clamp: the title clamps at 2 lines, so no card is taller than that. The first three are measured on the seeded board; the clamp figure is measured on a card built for it, a title long enough to wrap onto the second line with a full meta row under it. |
+| Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                                                                                                                                                                                                                                                                                                                                                        |
+| List / table row   | 36px; 44px below 768px                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Touch target       | **44px minimum below 768px** on every control, with one exception, WCAG 2.5.5's own: a link inside a sentence, sized by the line-height of the text around it (the mail-setup link on `/settings/members`, measured 12/16)                                                                                                                                                                                                                                                                         |
 
 **The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
 would say "at least" and bound nothing below it — which is what it did, and why a column's
@@ -301,6 +309,66 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                                                     |
 | Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` — both soft navigation and a hard load render `BoardView` with the task selected (no Next.js intercepting/`@modal` route) |
 
+**Which surface a situation gets.** Every layer in the app answers to one of these:
+
+| Situation                                                                                                                                              | Surface                                   | Rule                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One or two fields that save where they are, opened from the exact spot they describe                                                                   | Inline composer / inline edit             | No layer, no focus trap; `Enter` saves, `Escape` cancels and restores the old value (`components/common/inline-rename.tsx`, `components/board/task-composer.tsx`, [ADR 0035](decisions/0035-inline-task-composer.md)) |
+| A focused multi-field form, or a destructive or hard-to-reverse confirmation that genuinely has to block the screen behind it                          | Dialog                                    | Traps focus, closes on `Esc`, restores focus on close (§5, §9 Focus management); board and column creation, invites, an owner role change, every delete                                                               |
+| One entity's full detail, read or edited alongside the list it came from                                                                               | Panel                                     | Non-modal, ~480px, a fullscreen sheet below `md` ("Task detail" above)                                                                                                                                                |
+| Several independent settings-style sections on one screen, 2 to 7 of them                                                                              | One page, one `SettingsSection` per topic | `/settings` holds six today: members, language, notifications, tokens, workspace, account                                                                                                                             |
+| One of those sections reaches its own data-table scale (a roster with a control per row), or a confirmation flow too tall for a paragraph and a button | Sub-route                                 | `/settings/members`, `/settings/account/delete` (Settings IA below)                                                                                                                                                   |
+| A distinct top-level destination                                                                                                                       | Full page                                 | Owns its own `flex-1 overflow-y-auto` ("The shell is exactly one viewport tall" above)                                                                                                                                |
+| A list of options that outgrows a flat scan                                                                                                            | Progressive disclosure                    | 7 or fewer renders flat; 8 or more folds behind a searchable popover (below)                                                                                                                                          |
+| The result of an action the screen cannot already show for itself                                                                                      | Toast                                     | Per §7's third-beat rule: the effect is off-screen, has no on-screen representation, or reaches further than the view admits                                                                                          |
+| A field-level `400` or `422` failure                                                                                                                   | Inline error                              | Under the field, focus moves to the first (§6 Errors)                                                                                                                                                                 |
+
+**How many dialogs there are, and how that is counted.**
+`find apps/web/components -iname '*dialog*.tsx' ! -iname '*.test.tsx'` is the whole list; four of
+its files are not a dialog anyone meets, and come off the count: the `ui/dialog.tsx` primitive,
+the `common/form-dialog.tsx` and `common/confirm-dialog.tsx` wrappers, and
+`board/board-dialogs.tsx`, which only mounts the board's own. That leaves **15 concrete dialogs**,
+down from 19 when this phase started: renaming a board and renaming a workspace became inline
+edits, and changing a role and deleting an account became the two sub-routes above. Every removal
+was a surface moving down the rubric, never a dialog deleted for the count's sake.
+
+**Panel order.** `TaskPanel` composes, top to bottom: `TaskPanelFields` (title at `title-lg` and
+description at `read` from `md` up, both 16px below it; the title is borderless at rest and
+bordered only on focus via `border-transparent focus:border-input`), `TaskPropertiesPanel`
+(priority, due date, estimate, assignees, labels), `TaskChecklists`, `TaskAttachments`,
+`TaskDiscussionPanel` (comments, activity), then, for whoever can mutate, a delete footer. It is
+the same order the card itself reads in: what the
+task is, then what is in it, then what was said about it. The footer is `mt-auto` and only
+reaches the bottom of the panel while it is the last child of that flex column
+(`components/task/task-panel.tsx`, pinned by `task-panel.test.tsx`), so nothing may be appended
+after it.
+
+Every titled section below the fields carries the same 1px top rule at 16px of padding. All four
+of them, not two: four headings of one weight with a rule above only two of them reads as an
+arbitrary line rather than as grouping. And the panel spends **no** full-strength copper of its own. Its
+section actions (create label, add checklist, post comment) are outline buttons, because they are
+three peers rather than the one primary action §2 budgets, and the board behind the panel is
+already spending the screen's other mark on the selected card's rail. `task-panel.test.tsx` fails
+on a default-variant button anywhere in the panel.
+
+The assignee and label pickers fold at the same number the panel itself scans without searching:
+`INLINE_PICKER_MAX = 7` (`components/task/searchable-picker.tsx`) renders 7 or fewer options as
+a flat checkbox list and folds 8 or more behind a searchable, non-portalled popover
+(`components/ui/popover.tsx`) instead of letting the list outgrow the panel's own width.
+`Escape` closes only that popover, not the panel behind it (`ESCAPE_LAYER_SELECTOR` in
+`use-task-panel-focus.ts`).
+
+**Settings IA: further down, harder to undo.** `/settings`'s sections read top to bottom on that
+rule. Members first, since it is the only section about other people and what a new workspace
+owner opens this screen to find. Language and notifications next, both about the person rather
+than the workspace. Tokens before workspace, since revoking one undoes itself the moment it is
+minted again, unlike anything below it. Workspace before account, since deleting a workspace
+stays inside it while deleting the account reaches past this workspace into every workspace the
+person is in on this instance ([ADR 0026](decisions/0026-account-deletion-anonymisation.md));
+nothing on the page is further down than that. `/settings/members` and
+`/settings/account/delete` are the two sections the sub-route rule above promotes off this page;
+every other section stays inline as a `SettingsSection` (`components/settings/settings-section.tsx`).
+
 ## 5. Interaction patterns
 
 | Drag and drop | Rule                                                                                                                                                                                                                                                                      |
@@ -312,12 +380,12 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Moved _Fix login redirect_ to In Progress, position 2 of 5."                                       |
 | Autoscroll    | Both axes, 24px edge zone                                                                                                                                                                                                                                                 |
 
-| Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged.                                                 |
-| Remote move            | Card animates to its new position over 220ms; during a local drag the update is queued and applied on drop                                                                                          |
-| Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                                                                              |
-| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Connection lost, changes may not be showing" bar, kept until the socket is back and never dismissible, never a blocking overlay |
+| Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged.                                                    |
+| Remote move            | The card moves on the column's own sortable transition (dnd-kit's 200ms default); during a local drag the update is queued and applied on drop                                                         |
+| Remote delete          | **Not shipped yet:** the card goes and the gap closes on that same sortable transition. The two beats it should have, fade to 0 over 160ms then close the gap over 160ms, are still the intended shape |
+| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Connection lost, changes may not be showing" bar, kept until the socket is back and never dismissible, never a blocking overlay    |
 
 **Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at 2px
 offset, and `outline: none` without a replacement is a review blocker. That single mark is drawn
@@ -356,17 +424,17 @@ box scrolls away with the content and is clipped by it.
 **Motion.** Purposeful micro-interactions only, **at most one orchestrated moment per view** —
 on the board that is the first paint of the columns, and nothing else.
 
-| Case                                                | Duration                      | Curve                                                     |
-| --------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail moving | 100–160ms                     | `--ease-out`                                              |
-| Tooltip, small popover                              | 125–200ms                     | `--ease-out`                                              |
-| Dropdown, select, menu                              | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detail panel, sheet                                 | 220ms                         | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                 | 200ms                         | `--ease-out`, dialog origin centered                      |
-| Dialog scrim                                        | 200ms                         | `--ease-out`                                              |
-| Card returning after a failed drop                  | 220ms                         | `--ease-in-out`                                           |
-| Column stagger on first board paint                 | 40ms between columns          | `--ease-out`                                              |
-| Skeleton pulse (loop, not a one-shot transition)    | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
+| Case                                             | Duration                      | Curve                                                     |
+| ------------------------------------------------ | ----------------------------- | --------------------------------------------------------- |
+| Sancak rail moving                               | 150ms                         | `--ease-out`                                              |
+| Tooltip, small popover                           | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                           | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detail panel, sheet                              | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)              | 200ms                         | `--ease-out`, dialog origin centered                      |
+| Dialog scrim                                     | 200ms                         | `--ease-out`                                              |
+| Card returning after a failed drop               | 220ms                         | `--ease-in-out`                                           |
+| Column stagger on first board paint              | 40ms between columns          | `--ease-out`                                              |
+| Skeleton pulse (loop, not a one-shot transition) | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
@@ -382,6 +450,8 @@ the off-canvas drawer all bind their keyframes through `data-slot`/`data-state` 
 plain `tailwindcss` with no such plugin: those classes would compile to nothing and every
 open would cut instead of transition.
 
+- **Press feedback is not shipped.** Nothing scales on `:active`; a pressed control steps its
+  colour and stays where it is. The table above is what the app draws, not what it could.
 - **No animation on keyboard-initiated actions** — the command palette opens instantly; it runs
   a hundred times a day and motion makes it feel slow.
 - **`transform` and `opacity` only** (accordion height excepted). Never `transition: all`, never
@@ -413,6 +483,13 @@ the next move; they do not explain the feature. This is the only place damga mar
 **One primary action counts the whole screen.** Where the empty state carries the action, the
 page header's copy of the same action is hidden while the screen is empty and comes back with the
 first row. Two identical primary buttons on a first run is a choice the reader does not have.
+
+The dashboard is the one screen where two regions can be empty at once, and there the two actions
+are not the same action: with boards but no tasks, the charts invite "Open a board" while the board
+list below still carries its standing "Create board". Measured on the running app, both drew the
+fill, which with the sidebar rail put three full-strength marks on one screen. The fill stays with
+the action the route carries in every state, so the charts' shortcut is an outline button
+(`components/dashboard/dashboard-summary.tsx`).
 
 | Surface               | Mark       | Headline                     | Body                                                                                                  | Action                           |
 | --------------------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------- |
@@ -582,7 +659,7 @@ Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per s
 | Large text (≥18.66px bold / 24px) | 3:1                                | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Component boundaries and states   | 3:1                                | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Disabled text                     | exempt, held to 3:1 anyway         | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 3, 4, 5 take the relief route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 | Rule                         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

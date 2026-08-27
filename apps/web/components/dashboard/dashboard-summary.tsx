@@ -108,7 +108,10 @@ export function DashboardSummary(): React.ReactElement {
         <h2 className="font-display text-title-lg font-semibold">{t('emptyTitle')}</h2>
         <p className="max-w-md text-body text-muted-foreground">{t('emptyBody')}</p>
         {boards[0] ? (
-          <Button asChild>
+          // Outline, not the fill: the board list under this section carries "Create board" in
+          // every state, and two filled buttons plus the sidebar rail is three full-strength
+          // marks on one screen (docs/design.md §2 budgets two).
+          <Button asChild variant="outline">
             <Link href={`/board/${boards[0].id}`}>{t('openBoard')}</Link>
           </Button>
         ) : null}

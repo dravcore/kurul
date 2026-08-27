@@ -1,7 +1,8 @@
 {
   "common": {
     "close": "Kapat",
-    "deletedUser": "Silinmiş kullanıcı"
+    "deletedUser": "Silinmiş kullanıcı",
+    "save": "Kaydet"
   },
   "auth": {
     "login": {
@@ -184,10 +185,13 @@
       "members": {
         "title": "Üyeler",
         "description": "Bu workspace'i kimler açabilir ve içeri girdiklerinde ne yapabilirler.",
+        "pageTitle": "Üyeler",
+        "manageAction": "Üyeleri yönet",
         "loadError": "Bu workspace'teki kişiler yüklenemedi.",
         "you": "Siz",
         "cancel": "Vazgeç",
         "memberMenu": "{name} için işlemler",
+        "memberRole": "{name} için rol",
         "roles": {
           "OWNER": "Sahip",
           "ADMIN": "Yönetici",
@@ -228,9 +232,9 @@
         "revokeError": "Davet geri çekilemedi.",
         "revokeErrorGone": "O davet zaten yok.",
         "revokeErrorForbidden": "Davetleri geri çekmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
-        "changeRoleAction": "Rolü değiştir",
         "changeRoleTitle": "Rolü değiştir",
         "changeRoleSubmit": "Rolü değiştir",
+        "confirmOwnerBody": "Sahipler siz dahil diğer bütün üyeleri çıkarabilir. Bu işlem buradan geri alınamaz.",
         "changeRoleError": "Rol değiştirilemedi.",
         "changeRoleErrorForbidden": "Sahipliği yalnızca workspace sahibi değiştirebilir. Bir workspace sahibinden isteyin.",
         "changeRoleErrorLastOwner": "Tek sahip bu. Önce başka birini sahip yapın.",
@@ -291,7 +295,6 @@
         "name": "Ad",
         "cancel": "Vazgeç",
         "renameAction": "Yeniden adlandır",
-        "renameTitle": "Workspace'i yeniden adlandır",
         "renameError": "Bu workspace yeniden adlandırılamadı.",
         "renameErrorForbidden": "Workspace'i yeniden adlandırmak için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.",
         "renameErrorGone": "Bu workspace artık yok.",
@@ -313,6 +316,7 @@
         "loadError": "Hesap bilgileriniz yüklenemedi.",
         "deleteSectionTitle": "Hesabınızı silin",
         "deleteSectionBody": "Sizi bu sunucudaki her workspace'ten çıkarır ve yazdığınız her şeyden adınızı kaldırır. Bu geri alınamaz.",
+        "deletePageTitle": "Hesabınızı silin",
         "deleteAction": "Hesabı sil",
         "deleteTitle": "Hesabınızı sil?",
         "deleteBody": "Oturumunuz kapatılacak ve buradaki her workspace'ten çıkarılacaksınız. Adınız ve e-posta adresiniz silinir. Bu geri alınamaz.",
@@ -408,7 +412,6 @@
       "createAction": "Board oluştur",
       "planLimitReached": "Bu workspace, planının izin verdiği {limit} board hakkının tamamını kullandı.",
       "createError": "Bu board oluşturulamadı.",
-      "renameTitle": "Board'u yeniden adlandır",
       "renameAction": "Yeniden adlandır",
       "renameError": "Bu board yeniden adlandırılamadı.",
       "deleteTitle": "Bu board'u sil?",
@@ -562,7 +565,13 @@
           "minutes": "{minutes}dk"
         },
         "assignees": "Atananlar",
+        "noAssignees": "Kimse atanmadı",
+        "assignAction": "Ata ({count})",
+        "searchMembers": "Üye ara",
         "labels": "Label'lar",
+        "addLabelAction": "Label ekle ({count})",
+        "searchLabels": "Label ara",
+        "noMatches": "Eşleşme yok",
         "noLabels": "Bu task'ta label yok",
         "removeLabel": "{name} label'ını kaldır",
         "newLabel": "Yeni label",
@@ -666,6 +675,8 @@
         },
         "openTask": "Task'ı aç",
         "panelLabel": "Task detayları",
+        "propertiesTitle": "Özellikler",
+        "discussionTitle": "Tartışma",
         "close": "Task panelini kapat",
         "backToBoard": "Board'a dön",
         "createAction": "Task ekle",

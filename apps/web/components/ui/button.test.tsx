@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import { Button } from './button';
@@ -14,6 +18,21 @@ afterEach(() => {
  * jsdom render can see: the 400ms threshold the timeout applies to when the marker mounts, and
  * the button's own attributes.
  */
+describe('Button module', () => {
+  it("declares 'use client' on its first line", () => {
+    // The loading spinner holds state (`useState` plus a `useEffect` timer) and server
+    // components render this button on the auth and settings routes, so without the directive
+    // React resolves the hooks against the server build: dev logs "useState only works in
+    // Client Components" and the production bundle throws `g.useState is not a function`.
+    const source = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'button.tsx'),
+      'utf8',
+    );
+
+    expect(source.split('\n')[0]).toBe("'use client';");
+  });
+});
+
 describe('Button loading', () => {
   it('is aria-busy and disabled immediately, with no spinner before 400ms', async () => {
     vi.useFakeTimers();

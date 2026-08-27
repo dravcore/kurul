@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { NextIntlClientProvider } from 'next-intl';
 import { MemberRole, type WorkspaceDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { WorkspaceSettings } from './workspace-settings';
 
 const copy = messages.app.settings.workspace;
@@ -101,7 +101,7 @@ describe('WorkspaceSettings — what an OWNER sees', () => {
     expect(screen.getByRole('button', { name: copy.deleteAction })).toBeTruthy();
   });
 
-  it('renaming through the dialog updates the name shown on the row', async () => {
+  it('renaming inline updates the name shown on the row', async () => {
     apiPatch.mockResolvedValue({ ...workspace, name: 'Kurul Labs' } as never);
     renderSection();
 
@@ -110,10 +110,7 @@ describe('WorkspaceSettings — what an OWNER sees', () => {
     fireEvent.click(screen.getByRole('button', { name: copy.renameAction }));
     const nameField = screen.getByLabelText(copy.name) as HTMLInputElement;
     fireEvent.change(nameField, { target: { value: 'Kurul Labs' } });
-    // Two buttons now share the "Rename" label — the row's opener and the dialog's submit —
-    // so the submit is the last one in document order.
-    const submitButtons = screen.getAllByRole('button', { name: copy.renameAction });
-    fireEvent.click(submitButtons[submitButtons.length - 1] as HTMLElement);
+    fireEvent.click(screen.getByRole('button', { name: messages.common.save }));
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalled());
     expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}`, {
@@ -121,6 +118,127 @@ describe('WorkspaceSettings — what an OWNER sees', () => {
     });
     await waitFor(() => expect(screen.getByText('Kurul Labs')).toBeTruthy());
     expect(screen.queryByText('Kurul')).toBeNull();
+  });
+});
+
+describe('WorkspaceSettings: inline rename (P7 task 6)', () => {
+  beforeEach(() => {
+    apiPatch.mockImplementation((_path, body) =>
+      Promise.resolve({ ...workspace, ...(body as object) } as never),
+    );
+  });
+
+  function openEditor(): void {
+    renderSection();
+    fireEvent.click(screen.getByRole('button', { name: copy.renameAction }));
+  }
+
+  it('opens the inline editor with the name selected, the Rename button still the affordance', () => {
+    openEditor();
+
+    const input = screen.getByLabelText(copy.name) as HTMLInputElement;
+    expect(input.value).toBe('Kurul');
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('Kurul'.length);
+    // The row's own text is gone while editing: one workspace name on screen, not two.
+    expect(screen.queryByText('Kurul')).toBeNull();
+  });
+
+  it('saves on Enter, same as clicking Save', async () => {
+    openEditor();
+    const input = screen.getByLabelText(copy.name) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '  Kurul Labs  ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}`, { name: 'Kurul Labs' });
+  });
+
+  it('never sends a slug: nothing in the app resolves a route by it', async () => {
+    openEditor();
+    const input = screen.getByLabelText(copy.name) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'New name' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // An exact-match assertion, not just presence: `toHaveBeenCalledWith` fails on an extra
+    // `slug` key just as readily as on a missing `name`.
+    await waitFor(() =>
+      expect(apiPatch).toHaveBeenCalledWith(`/workspaces/${WORKSPACE_ID}`, { name: 'New name' }),
+    );
+  });
+
+  it('restores the old name and sends nothing when Enter is pressed with an empty name', () => {
+    openEditor();
+    const input = screen.getByLabelText(copy.name) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(apiPatch).not.toHaveBeenCalled();
+    expect(screen.getByText('Kurul')).toBeTruthy();
+  });
+
+  it('cancels on Escape without saving, restoring the original name', () => {
+    openEditor();
+    const input = screen.getByLabelText(copy.name) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'Half-typed' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(apiPatch).not.toHaveBeenCalled();
+    expect(screen.getByText('Kurul')).toBeTruthy();
+    expect(screen.queryByText('Half-typed')).toBeNull();
+  });
+
+  it('returns focus to the Rename button after a save', async () => {
+    openEditor();
+    fireEvent.click(screen.getByRole('button', { name: messages.common.save }));
+
+    // The row this button sits on is swapped back in rather than reused across the toggle
+    // (unlike the board card's menu trigger, which stays mounted the whole time), so what
+    // matters is that *a* Rename button ends up focused, not that it is the same DOM node.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: copy.renameAction })),
+    );
+  });
+
+  it('returns focus to the Rename button after a cancel', () => {
+    openEditor();
+    fireEvent.keyDown(screen.getByLabelText(copy.name), { key: 'Escape' });
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: copy.renameAction }));
+  });
+
+  it('shows the forbidden-specific message inline and keeps the editor open', async () => {
+    apiPatch.mockRejectedValue(
+      new ApiError({ statusCode: 403, error: 'Forbidden', message: 'server wording' }),
+    );
+    openEditor();
+    fireEvent.click(screen.getByRole('button', { name: messages.common.save }));
+
+    expect(await screen.findByText(copy.renameErrorForbidden)).toBeTruthy();
+    expect(screen.getByLabelText(copy.name)).toBeTruthy();
+  });
+
+  it('shows the gone-specific message on a 404', async () => {
+    apiPatch.mockRejectedValue(
+      new ApiError({ statusCode: 404, error: 'Not Found', message: 'server wording' }),
+    );
+    openEditor();
+    fireEvent.click(screen.getByRole('button', { name: messages.common.save }));
+
+    expect(await screen.findByText(copy.renameErrorGone)).toBeTruthy();
+  });
+
+  it('falls back to the generic message on anything else', async () => {
+    apiPatch.mockRejectedValue(new Error('network'));
+    openEditor();
+    fireEvent.click(screen.getByRole('button', { name: messages.common.save }));
+
+    expect(await screen.findByText(copy.renameError)).toBeTruthy();
   });
 });
 

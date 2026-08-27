@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import type { UserDto } from '@kurul/shared-types';
 import { api } from '@/lib/api';
 import { useApiResource } from '@/lib/use-api-resource';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DeleteAccountDialog } from './delete-account-dialog';
 
 /** Row height matches the list/table row in docs/design.md §4, same as `WorkspaceSettings`. */
 const ROW = 'flex min-h-9 items-center justify-between gap-3 py-1.5';
@@ -21,13 +21,15 @@ const ROW = 'flex min-h-9 items-center justify-between gap-3 py-1.5';
  *
  * The address is read from `/me` rather than from the session, for the same reason
  * `LanguageSettings` reads it from there: Better Auth caches the session user in a cookie for
- * 60 seconds, and the address is what the confirmation gate compares against — a stale one
- * would produce a refusal nobody could explain.
+ * 60 seconds, and a stale one would show a row for an address this account no longer has.
+ *
+ * The delete control is a link out to `/settings/account/delete` rather than a dialog it opens
+ * in place: that route reads `/me` again for the same address, and re-fetching it there is what
+ * keeps this section from having to hold state a screen away from where it is used.
  */
 export function AccountSettings(): React.ReactElement {
   const t = useTranslations('app.settings.account');
   const tShell = useTranslations('app.shell');
-  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const fetchMe = useCallback((signal: AbortSignal) => api.get<UserDto>('/me', { signal }), []);
   const {
@@ -46,7 +48,7 @@ export function AccountSettings(): React.ReactElement {
   }
 
   // No user means the one read this section needs failed. The delete button is not drawn at
-  // all in that state: it would open a dialog that cannot confirm anything, because the
+  // all in that state: it would link to a route that cannot confirm anything, because the
   // address it compares against is exactly what did not load.
   if (!user) {
     return <p className="text-body text-destructive">{error ?? t('loadError')}</p>;
@@ -63,12 +65,10 @@ export function AccountSettings(): React.ReactElement {
           <p className="text-body text-foreground">{t('deleteSectionTitle')}</p>
           <p className="text-small text-muted-foreground">{t('deleteSectionBody')}</p>
         </div>
-        <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-          {t('deleteAction')}
+        <Button asChild variant="destructive" size="sm">
+          <Link href="/settings/account/delete">{t('deleteAction')}</Link>
         </Button>
       </div>
-
-      <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} email={user.email} />
     </div>
   );
 }

@@ -38,6 +38,7 @@ import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { Toaster } from '@/components/ui/sonner';
 import { EmailVerificationLink } from '@/components/auth/email-verification-link';
 import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
+import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
@@ -46,7 +47,6 @@ import { BoardColumnsEmptyState } from '@/components/board/board-placeholders';
 import { ColumnSettingsDialog } from '@/components/board/column-settings-dialog';
 import { ImportReportPanel } from '@/components/board/import-report-panel';
 import { ImportTrelloDialog } from '@/components/board/import-trello-dialog';
-import { RenameBoardDialog } from '@/components/board/rename-board-dialog';
 import { AssigneeChart } from '@/components/dashboard/assignee-chart';
 import { ChartTableToggle } from '@/components/dashboard/chart-table-toggle';
 import { ColumnChart } from '@/components/dashboard/column-chart';
@@ -56,19 +56,20 @@ import { AppSidebar } from '@/components/layout/app-sidebar';
 import { NotificationUnreadProvider } from '@/components/notification/notification-unread-provider';
 import { NotificationsList } from '@/components/notification/notifications-list';
 import { CreateTokenDialog } from '@/components/settings/create-token-dialog';
-import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
+import { DeleteAccountSettings } from '@/components/settings/delete-account-settings';
 import { InviteMemberDialog } from '@/components/settings/invite-member-dialog';
 import { MembersSettings } from '@/components/settings/members-settings';
 import { RemoveMemberDialog } from '@/components/settings/remove-member-dialog';
-import { RenameWorkspaceDialog } from '@/components/settings/rename-workspace-dialog';
 import { RevokeTokenDialog } from '@/components/settings/revoke-token-dialog';
 import { TokenCreatedDialog } from '@/components/settings/token-created-dialog';
 import { TokenSettings } from '@/components/settings/token-settings';
+import { WorkspaceSettings } from '@/components/settings/workspace-settings';
 import { AttachmentAddLink } from '@/components/task/attachment-add-link';
 import { SortableTaskCard } from '@/components/task/sortable-task-card';
 import { TaskActivitySection } from '@/components/task/task-activity-section';
 import { TaskCommentsSection } from '@/components/task/task-comments-section';
-import { TaskMetadataPanel } from '@/components/task/task-metadata-panel';
+import { TaskPropertiesPanel } from '@/components/task/task-properties-panel';
+import type { UseTaskMetadataResult } from '@/components/task/use-task-metadata';
 
 /**
  * Renders real screens against `tr.json`.
@@ -100,6 +101,7 @@ const workspace = vi.hoisted(() => ({
     workspaces: [] as unknown[],
     onSwitch: vi.fn(),
     onSignOut: vi.fn(),
+    renameActiveWorkspace: vi.fn(),
   },
 }));
 
@@ -125,24 +127,25 @@ const nav = vi.hoisted(() => ({
 }));
 
 /**
- * `TaskMetadataPanel`'s own reads. What the panel *writes* is what the case below drives.
+ * The shared read `TaskPanel` hands to its properties and discussion sections. What the section
+ * below *writes* is what the case drives.
  *
- * One frozen object rather than a fresh one per call: the panel holds these across renders.
+ * One frozen object rather than a fresh one per render: the section holds these across renders.
  */
-const taskMeta = vi.hoisted(() => ({
-  members: [] as unknown[],
-  boardLabels: [] as unknown[],
+const taskMeta = {
+  members: [],
+  boardLabels: [],
   setBoardLabels: vi.fn(),
-  comments: [] as unknown[],
+  comments: [],
   setComments: vi.fn(),
   hasMoreComments: false,
   loadingMoreComments: false,
-  loadMoreComments: vi.fn(),
-  activities: [] as unknown[],
+  loadMoreComments: vi.fn().mockResolvedValue(undefined),
+  activities: [],
   refreshActivities: vi.fn().mockResolvedValue(undefined),
   loadingMeta: false,
   metaFailed: false,
-}));
+} satisfies UseTaskMetadataResult;
 
 vi.mock('@/lib/workspace-boards', () => ({ fetchWorkspaceBoards: vi.fn() }));
 vi.mock('@/components/layout/workspace-provider', () => ({
@@ -186,7 +189,6 @@ vi.mock('@/lib/member-query', async () => {
 vi.mock('@/components/notification/use-notification-socket', () => ({
   useNotificationSocket: () => ({ connected: true }),
 }));
-vi.mock('@/components/task/use-task-metadata', () => ({ useTaskMetadata: () => taskMeta }));
 // The bell needs the unread context the shell provides; the sidebar case below is about the
 // collapse control's label, not about the bell.
 vi.mock('@/components/notification/notification-bell', () => ({
@@ -258,11 +260,12 @@ describe('the Turkish interface', () => {
   });
 
   /**
-   * The account-deletion dialog, and it is here rather than only in its own spec because both
-   * of its sentences are ICU plurals over a count — `retained` and `ownedWorkspace` — which is
-   * exactly the shape `catalog.test.ts` can prove complete and cannot prove renders.
+   * The account-deletion route's settings surface, and it is here rather than only in its own
+   * spec because both of its sentences are ICU plurals over a count (`retained` and
+   * `ownedWorkspace`), which is exactly the shape `catalog.test.ts` can prove complete and
+   * cannot prove renders.
    */
-  it('renders the account-deletion dialog in Turkish, with Turkish plural forms', async () => {
+  it('renders the account-deletion settings in Turkish, with Turkish plural forms', async () => {
     const { api } = await import('@/lib/api');
     vi.mocked(api.get).mockResolvedValue({
       userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d20',
@@ -280,7 +283,7 @@ describe('the Turkish interface', () => {
       retainedContent: { comments: 3, tasksCreated: 2, attachments: 0, activities: 9 },
     } as never);
 
-    render(tr(<DeleteAccountDialog open onOpenChange={vi.fn()} email="ada@example.com" />));
+    render(tr(<DeleteAccountSettings />));
 
     await waitFor(() => {
       expect(screen.getByText(messages.app.settings.account.ownedTitle)).toBeDefined();
@@ -437,12 +440,12 @@ interface LongString {
 const LONGEST_TURKISH: readonly LongString[] = [
   {
     key: 'app.settings.workspace.renameErrorForbidden',
-    screen: 'components/settings/rename-workspace-dialog.tsx',
+    screen: 'components/settings/workspace-settings.tsx',
     ratio: 1.54,
   },
   {
     key: 'app.board.task.labelForbidden',
-    screen: 'components/task/task-metadata-panel.tsx',
+    screen: 'components/task/task-properties-panel.tsx',
     ratio: 1.5,
   },
   {
@@ -459,6 +462,16 @@ const LONGEST_TURKISH: readonly LongString[] = [
     key: 'app.settings.members.inviteErrorForbidden',
     screen: 'components/settings/invite-member-dialog.tsx',
     ratio: 1.47,
+  },
+  {
+    key: 'app.settings.members.changeRoleErrorForbidden',
+    screen: 'components/settings/members-settings.tsx',
+    ratio: 1.47,
+  },
+  {
+    key: 'auth.invite.signInFirst',
+    screen: 'components/auth/invite-accept-view.tsx',
+    ratio: 1.46,
   },
   { key: 'auth.login.subtitle', screen: 'components/auth/login-view.tsx', ratio: 1.48 },
   {
@@ -519,11 +532,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.56,
   },
   {
-    key: 'app.settings.workspace.renameTitle',
-    screen: 'components/settings/rename-workspace-dialog.tsx',
-    ratio: 1.75,
-  },
-  {
     key: 'app.dashboard.assigneeTitle',
     screen: 'components/dashboard/assignee-chart.tsx',
     ratio: 1.59,
@@ -544,7 +552,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/task/sortable-task-card.tsx',
     ratio: 1.67,
   },
-  { key: 'app.board.renameTitle', screen: 'components/board/rename-board-dialog.tsx', ratio: 2.0 },
   { key: 'auth.login.loading', screen: 'app/(auth)/login/page.tsx', ratio: 1.5 },
   { key: 'auth.register.loading', screen: 'app/(auth)/register/page.tsx', ratio: 1.5 },
   {
@@ -606,7 +613,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
   },
   {
     key: 'app.board.renameAction',
-    screen: 'components/board/rename-board-dialog.tsx',
+    screen: 'components/board/board-list.tsx',
     ratio: 2.67,
   },
   {
@@ -621,7 +628,7 @@ const LONGEST_TURKISH: readonly LongString[] = [
   },
   {
     key: 'app.settings.workspace.renameAction',
-    screen: 'components/settings/rename-workspace-dialog.tsx',
+    screen: 'components/settings/workspace-settings.tsx',
     ratio: 2.67,
   },
   {
@@ -650,21 +657,22 @@ const LONGEST_TURKISH: readonly LongString[] = [
 /**
  * Which of those screens clip anything at all.
  *
- * Only one of the fifty sits on a clipping element: the token row's meta line. Everywhere else
- * the ellipsis is over user data, where the length of a Turkish catalogue string cannot make it
- * worse. `truncate and line-clamp are only where this file recorded them` re-derives this from
- * the sources, so a new `truncate` landing on any of the fifty screens fails rather than passing
- * unread.
+ * Everywhere but the token row's meta line, the ellipsis is over user data, where the length of
+ * a Turkish catalogue string cannot make it worse. `truncate and line-clamp are only where this
+ * file recorded them` re-derives this from the sources, so a new `truncate` landing on any of
+ * the fifty screens fails rather than passing unread.
  *
  * `messages/en.json` and `messages/tr.json` were deliberately not edited by this pass: no string
  * on the list above was found clipped.
  */
 const CLIPPING_SCREENS: readonly string[] = [
   'components/board/board-column.tsx', // the column name, which is user data
+  'components/board/board-list.tsx', // the board description, which is user data
   'components/settings/members-settings.tsx', // a member name and an invited address, both user data
   // the token name (user data) and the meta line, which carries app.settings.tokens.createdAt,
   // .lastUsedNever and .expiresAt
   'components/settings/token-settings.tsx',
+  'components/settings/workspace-settings.tsx', // the workspace name, which is user data
   'components/task/sortable-task-card.tsx', // the task title in the drag preview, which is user data
 ];
 
@@ -872,33 +880,19 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/settings/rename-workspace-dialog.tsx',
-    keys: [
-      'app.settings.workspace.renameTitle',
-      'app.settings.workspace.renameAction',
-      'app.settings.workspace.renameErrorForbidden',
-    ],
+    screen: 'components/settings/workspace-settings.tsx',
+    keys: ['app.settings.workspace.renameAction', 'app.settings.workspace.renameErrorForbidden'],
     run: async () => {
       apiPatch.mockRejectedValue(forbidden());
-      render(
-        tr(
-          <RenameWorkspaceDialog
-            open
-            onOpenChange={vi.fn()}
-            workspace={WORKSPACE}
-            onRenamed={vi.fn()}
-          />,
-        ),
-      );
+      render(tr(<WorkspaceSettings />));
 
-      expect(
-        screen.getByRole('heading', { name: messages.app.settings.workspace.renameTitle }),
-      ).toBeDefined();
       fireEvent.click(
         screen.getByRole('button', { name: messages.app.settings.workspace.renameAction }),
       );
+      fireEvent.click(screen.getByRole('button', { name: messages.common.save }));
 
-      // The longest string in the catalogue, and it lands in a dialog narrower than the screen.
+      // The longest string in the catalogue, and it lands in a form only as wide as the row it
+      // replaced, narrower than the dialog this used to be.
       await waitFor(() => {
         expect(
           screen.getByText(messages.app.settings.workspace.renameErrorForbidden),
@@ -907,18 +901,19 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/task/task-metadata-panel.tsx',
+    screen: 'components/task/task-properties-panel.tsx',
     keys: ['app.board.task.labelForbidden'],
     run: async () => {
       apiPost.mockRejectedValue(forbidden());
       render(
         trToasts(
-          <TaskMetadataPanel
+          <TaskPropertiesPanel
             workspaceId={WORKSPACE_ID}
             boardId={BOARD_ID}
             task={TASK}
             canMutate
             canManageLabels
+            meta={taskMeta}
             onUpdated={vi.fn()}
           />,
         ),
@@ -998,14 +993,24 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       'app.settings.members.seatUsage',
       'app.settings.members.copyLink',
       'app.settings.members.copiedLink',
+      'app.settings.members.changeRoleErrorForbidden',
     ],
     run: async () => {
       auth.session = {
         data: { user: { id: USER_ID, email: 'ayla@example.com', emailVerified: true } },
         isPending: false,
       };
-      loadMembers.mockResolvedValue([MEMBER]);
+      const bora: WorkspaceMemberDto = {
+        id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d21',
+        workspaceId: WORKSPACE_ID,
+        userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d22',
+        role: MemberRole.MEMBER,
+        name: 'Bora',
+        avatarUrl: null,
+      };
+      loadMembers.mockResolvedValue([MEMBER, bora]);
       loadInvitations.mockResolvedValue([INVITATION]);
+      apiPatch.mockRejectedValue(forbidden());
       routeGet([
         ['/config', { mailEnabled: true }],
         [
@@ -1031,6 +1036,21 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       await waitFor(() => {
         expect(screen.getByText(messages.app.settings.members.copiedLink)).toBeDefined();
       });
+
+      // The roster row's own inline role control, and the one failure copy this case's
+      // happy-path assertions above never exercise.
+      const row = screen.getByText('Bora').closest('li');
+      if (!row) throw new Error('no row for Bora');
+      fireEvent.change(
+        within(row).getByLabelText(
+          fill(messages.app.settings.members.memberRole, { name: 'Bora' }),
+        ),
+        { target: { value: MemberRole.ADMIN } },
+      );
+
+      expect(
+        await screen.findByText(messages.app.settings.members.changeRoleErrorForbidden),
+      ).toBeDefined();
     },
   },
   {
@@ -1181,10 +1201,11 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     run: () => {
       render(tr(<CompletionChart data={[{ date: '2026-08-01', created: 2, completed: 1 }]} />));
 
+      // The series name sits in the chart's own legend. Unlike the axes and lines, Recharts
+      // renders it without needing a measured container. The table view is the more
+      // reliable of the two to assert against in jsdom, and it carries the same string.
       fireEvent.click(screen.getByRole('button', { name: messages.app.dashboard.viewTable }));
-      expect(
-        screen.getByRole('columnheader', { name: messages.app.dashboard.seriesCreated }),
-      ).toBeDefined();
+      expect(screen.getByText(messages.app.dashboard.seriesCreated)).toBeDefined();
     },
   },
   {
@@ -1303,23 +1324,25 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
     },
   },
   {
-    screen: 'components/board/rename-board-dialog.tsx',
-    keys: ['app.board.renameTitle', 'app.board.renameAction'],
-    run: () => {
-      render(
-        tr(
-          <RenameBoardDialog
-            open
-            onOpenChange={vi.fn()}
-            workspaceId={WORKSPACE_ID}
-            board={BOARD}
-            onRenamed={vi.fn()}
-          />,
-        ),
+    screen: 'components/board/board-list.tsx',
+    keys: ['app.board.renameAction'],
+    run: async () => {
+      fetchBoards.mockResolvedValue([BOARD]);
+      apiGet.mockResolvedValue({
+        limits: { seats: null, boards: null, storageBytes: null },
+        usage: { seats: 1, boards: 0, storageBytes: 0 },
+      });
+      render(tr(<BoardList />));
+
+      // Radix opens its menu from the keyboard, which is also the path jsdom can drive.
+      const trigger = await screen.findByRole('button', { name: messages.app.board.boardMenu });
+      fireEvent.keyDown(trigger, { key: 'Enter' });
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: messages.app.board.renameAction }),
       );
 
-      expect(screen.getByRole('heading', { name: messages.app.board.renameTitle })).toBeDefined();
-      expect(screen.getByRole('button', { name: messages.app.board.renameAction })).toBeDefined();
+      // The menu item opened the inline editor in place of the card's name and description.
+      expect(screen.getByDisplayValue(BOARD.name)).toBeDefined();
     },
   },
   {
@@ -1481,6 +1504,17 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       expect(
         await screen.findByText(messages.app.settings.members.inviteErrorForbidden),
       ).toBeDefined();
+    },
+  },
+  {
+    screen: 'components/auth/invite-accept-view.tsx',
+    keys: ['auth.invite.signInFirst'],
+    run: () => {
+      // `auth.session` is reset to `{ data: null, isPending: false }` in this describe's
+      // `beforeEach`: the "not signed in yet" branch this string lives on.
+      render(tr(<InviteAcceptView invitationId={INVITATION.id} />));
+
+      expect(screen.getByText(messages.auth.invite.signInFirst)).toBeDefined();
     },
   },
   {

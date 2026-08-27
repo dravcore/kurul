@@ -124,8 +124,8 @@ describe('DialogFooter', () => {
 });
 
 /**
- * Content taller than the viewport (`delete-account-dialog.tsx`, one `<select>` per owned
- * workspace) used to be unreachable: Radix locks page scroll and the dialog itself had no
+ * Content taller than the viewport (a dialog with a form field per row of a variable-length
+ * list) used to be unreachable: Radix locks page scroll and the dialog itself had no
  * height cap, so a short viewport left the footer's submit button off-screen with no way to
  * reach it. The surface now caps its own height and its body scrolls; the header and footer opt
  * out of that scroll so the submit/cancel controls stay on screen throughout.

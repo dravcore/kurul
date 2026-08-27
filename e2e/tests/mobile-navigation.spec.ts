@@ -120,13 +120,17 @@ interface Target {
  * the claim is about *every* interactive element on the mobile path, and a list is exactly how
  * the control added next quarter escapes it.
  *
- * Two exclusions, both narrow and both necessary:
+ * Three exclusions, all narrow and all necessary:
  *   - `aria-hidden` subtrees. While the drawer is open, Radix marks the whole page behind it
  *     hidden and inert; measuring those would be measuring controls no finger can reach.
- *   - Boxes under 4px in either axis. That is the visually-hidden band — the skip link's 1×1
- *     `sr-only` box, Radix's zero-size focus guards — none of which are targets while they are
+ *   - Boxes under 4px in either axis. That is the visually-hidden band, the skip link's 1x1
+ *     `sr-only` box, Radix's zero-size focus guards, none of which are targets while they are
  *     hidden. The skip link is not let off: it is measured in the first test at the moment it
  *     is focused, which is the only moment it is one.
+ *   - Plain inline text links (`display: inline`, the default for a bare `<a>`). A sentence
+ *     read in prose is not a touch target the way a button is, and a `Button asChild` link
+ *     stays in the sweep because it is `inline-flex`, not `inline`, the same distinction the
+ *     checkbox substitution below draws between a decoration and its target.
  *
  * One substitution: a **checkbox is measured by its label**. A native checkbox is a 14px
  * platform control that is not going to be resized into a 44px square without ceasing to look
@@ -150,6 +154,10 @@ async function visibleTargets(scope: Page | Locator): Promise<Target[]> {
   return scope.locator(selector).evaluateAll((nodes) =>
     nodes
       .filter((node) => !node.closest('[aria-hidden="true"]'))
+      .filter(
+        (node) =>
+          !(node instanceof HTMLAnchorElement) || getComputedStyle(node).display !== 'inline',
+      )
       .map((node) => {
         const isCheckbox =
           node instanceof HTMLInputElement && (node.type === 'checkbox' || node.type === 'radio');
@@ -440,6 +448,60 @@ test('every interactive element on the mobile path is at least 44px', async ({ s
   expect(
     wrongFontSize(panelFields, IOS_ZOOM_THRESHOLD_PX),
     `text fields in the task panel below 16px at 360px (of ${panelFields.length} measured)`,
+  ).toEqual([]);
+});
+
+/**
+ * The two settings routes this phase moved out from under `/settings`'s own tabs and its one
+ * dialog: the member roster's per-row role picker, and the account-deletion confirmation. Both
+ * are their own full-width page rather than a panel, so they get their own sweep the same way
+ * the board and the drawer do.
+ */
+test('every field and button on the settings routes is sized for a thumb at 360px', async ({
+  stack,
+  openAs,
+}) => {
+  const owner = await stack.createUser();
+  // The members route reads the roster of a real workspace; the delete-account route reads
+  // only `/me`, but creating one here too keeps the owner's account in the same shape either
+  // route would find it in.
+  await stack.createWorkspace(owner);
+  const page = await openAs(owner, PHONE);
+
+  await page.goto('/settings/members');
+  await expect(page.getByRole('button', { name: 'Invite member' })).toBeVisible();
+
+  const membersTargets = await visibleTargets(page);
+  expect(
+    membersTargets.length,
+    'the /settings/members sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(3);
+  expect(
+    tooSmall(membersTargets),
+    `undersized controls on /settings/members at 360px (of ${membersTargets.length} measured)`,
+  ).toEqual([]);
+  const membersFields = await fieldFontSizes(page);
+  expect(
+    wrongFontSize(membersFields, IOS_ZOOM_THRESHOLD_PX),
+    `text fields on /settings/members below 16px at 360px (of ${membersFields.length} measured)`,
+  ).toEqual([]);
+
+  await page.goto('/settings/account/delete');
+  await expect(page.getByRole('button', { name: 'Delete account' })).toBeVisible();
+
+  const deleteTargets = await visibleTargets(page);
+  expect(
+    deleteTargets.length,
+    'the /settings/account/delete sweep found nothing to measure',
+  ).toBeGreaterThanOrEqual(3);
+  expect(
+    tooSmall(deleteTargets),
+    `undersized controls on /settings/account/delete at 360px (of ${deleteTargets.length} measured)`,
+  ).toEqual([]);
+  const deleteFields = await fieldFontSizes(page);
+  expect(
+    wrongFontSize(deleteFields, IOS_ZOOM_THRESHOLD_PX),
+    `text fields on /settings/account/delete below 16px at 360px (of ${deleteFields.length} measured)`,
   ).toEqual([]);
 });
 

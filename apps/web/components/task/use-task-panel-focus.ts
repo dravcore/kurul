@@ -25,6 +25,19 @@ const OPEN_LAYER_SELECTOR =
   '[data-slot="dialog-content"][data-state="open"], [data-slot="dialog-drawer-content"][data-state="open"]';
 
 /**
+ * `Esc` has one more owner than `Tab` does: the assignee and label pickers
+ * (`components/task/searchable-picker.tsx`), which a large workspace puts the two lists behind.
+ *
+ * A popover is a dismissable layer without being a focus scope, and this one deliberately
+ * renders inside the panel rather than through a portal, so the `Tab` trap above must keep
+ * working while it is open: the popover is the panel's own content, not a layer over it. Only
+ * the key changes hands. Radix dismisses it from a `document` listener in the capture phase and
+ * lets React flush the unmount afterwards, so by the time this `window` listener runs the content
+ * is still mounted and still `data-state="open"`: exactly what the dialogs above rely on.
+ */
+const ESCAPE_LAYER_SELECTOR = `${OPEN_LAYER_SELECTOR}, [data-slot="popover-content"][data-state="open"]`;
+
+/**
  * The dialog behaviour the task panel has to hand-roll.
  *
  * The panel is a plain `<aside>` behind a route segment, not a Radix dialog, so nothing gives
@@ -150,7 +163,7 @@ export function useTaskPanelFocus({
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
-      if (document.querySelector(OPEN_LAYER_SELECTOR)) return;
+      if (document.querySelector(ESCAPE_LAYER_SELECTOR)) return;
       event.preventDefault();
       onClose();
     }

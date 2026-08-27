@@ -123,7 +123,7 @@ function SkipGroup({
   if (group.samples.length === 0) {
     return (
       <div className="flex flex-col gap-1">
-        <p className="text-small text-foreground">{sentence}</p>
+        <p className="text-read text-foreground">{sentence}</p>
         {columnAction ? (
           <ColumnSettingsLink boardId={boardId} label={t('setColumnCategories')} />
         ) : null}
@@ -133,7 +133,7 @@ function SkipGroup({
 
   return (
     <details className="flex flex-col gap-1">
-      <summary className="cursor-pointer text-small text-foreground">{sentence}</summary>
+      <summary className="cursor-pointer text-read text-foreground">{sentence}</summary>
       <div className="mt-1 flex flex-col gap-1">
         {/*
           The ratio is not decoration. `samples` is truncated at the API's `SKIP_SAMPLE_LIMIT`

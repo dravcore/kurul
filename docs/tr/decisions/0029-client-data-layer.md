@@ -53,7 +53,7 @@ gevşektir; bu yüzden kod tabanı üç farklı tanımla üç kez okundu.
 | `use-task-checklists.ts` `toggleItem`                                | Bir checklist tik'i, artı yeniden sayılan `checklistSummary` rozeti |
 
 Yanlarında iki yakın-vaka daha var; kimse yanlışlıkla sayıya dahil etmesin diye adlandırmaya
-değer: `task-metadata-panel.tsx` içindeki `patchTask` bir snapshot'ı geri yükler ama asla
+değer: `task-properties-panel.tsx` içindeki `patchTask` bir snapshot'ı geri yükler ama asla
 önceden yazmaz, `workspace-provider.tsx` içindeki `onSwitch` ise `activeId`'yi önceden yazar ama
 geri dönecek bir snapshot'ı yoktur.
 

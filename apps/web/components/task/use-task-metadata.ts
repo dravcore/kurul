@@ -17,7 +17,8 @@ import { useApiResource, useResourceField } from '@/lib/use-api-resource';
 export type UseTaskMetadataOptions = {
   workspaceId: string;
   boardId: string;
-  taskId: string;
+  /** `null` while the panel has no task yet: nothing is read until one arrives. */
+  taskId: string | null;
   /** Board-scoped caches from BoardView — skip the members/labels refetch when provided. */
   members?: WorkspaceMemberDto[];
   labels?: LabelDto[];
@@ -122,11 +123,13 @@ export function useTaskMetadata({
     failed: metaFailed,
     setData: setMeta,
   } = useApiResource<TaskMeta>(
-    loadMeta,
-    // The board's caches are the floor a failure falls back to, not an empty roster: the
-    // assignee picker still has real people in it when the comment thread is the thing that
-    // did not load. Only the first render's value is kept, which is the one BoardView mounts
-    // the panel with.
+    // `null` holds the read off entirely, which is the state a deep-linked panel is in before
+    // the board has fetched the task. `loadMeta` therefore only ever runs with a real id.
+    taskId === null ? null : loadMeta,
+    // On a deep link the panel mounts before the board resolves, so `membersProp` and
+    // `labelsProp` can still be empty here. Because this is only read on the first render,
+    // that empty snapshot is what the assignee picker and label list are stuck with for the
+    // rest of this resource's life, even after the board's own fetch fills them in.
     {
       members: membersProp ?? [],
       boardLabels: labelsProp ?? [],

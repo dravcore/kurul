@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { Priority, type TaskDto } from '@kurul/shared-types';
@@ -19,40 +19,35 @@ vi.mock('@/lib/api', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
-// The metadata panel fetches comments, activity, members and labels. None of that is part of
-// the panel's focus contract, and all of it would have to be stubbed to render it here. The one
-// piece this file does need is the comment composer: its mention picker is a layer of its own
-// inside the panel, so the real section renders in the stub's place with a fixed member list.
-// Everything the factory touches is imported inside it, because the test module's own bindings
-// are not initialised yet when the mocked module is first pulled in.
-vi.mock('./task-metadata-panel', async () => {
-  const { MemberRole } = await import('@kurul/shared-types');
-  const { TaskCommentsSection } = await import('./task-comments-section');
-  return {
-    TaskMetadataPanel: (): React.ReactElement => (
-      <div data-testid="metadata">
-        <TaskCommentsSection
-          comments={[]}
-          members={[
-            {
-              id: 'm1',
-              workspaceId: 'w1',
-              userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51',
-              role: MemberRole.MEMBER,
-              name: 'Ayşe Yıldız',
-              avatarUrl: null,
-            },
-          ]}
-          canMutate
-          pending={false}
-          loading={false}
-          onSubmit={() => Promise.resolve(true)}
-          onDelete={() => {}}
-        />
-      </div>
-    ),
-  };
-});
+// The properties and discussion panels read comments, activity, members and labels through one
+// shared hook the panel owns. None of that fetch is part of this file's contract, so the hook is
+// stubbed and both real panels render against it, which is what gives the order assertion below
+// something to measure, and the mention picker (a layer of its own inside the panel) a member to
+// offer. `vi.hoisted` because the factory runs before this module's own bindings exist.
+const taskMeta = vi.hoisted(() => ({
+  members: [
+    {
+      id: 'm1',
+      workspaceId: 'w1',
+      userId: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d51',
+      role: 'MEMBER',
+      name: 'Ayşe Yıldız',
+      avatarUrl: null,
+    },
+  ],
+  boardLabels: [],
+  setBoardLabels: vi.fn(),
+  comments: [],
+  setComments: vi.fn(),
+  hasMoreComments: false,
+  loadingMoreComments: false,
+  loadMoreComments: vi.fn(),
+  activities: [],
+  refreshActivities: vi.fn().mockResolvedValue(undefined),
+  loadingMeta: false,
+  metaFailed: false,
+}));
+vi.mock('./use-task-metadata', () => ({ useTaskMetadata: () => taskMeta }));
 
 // The attachment surface owns a read of its own (`GET .../attachments`) plus the instance
 // config, neither of which is part of this file's contract. The hook is stubbed rather than the
@@ -391,6 +386,50 @@ describe('TaskPanel Escape', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(push).not.toHaveBeenCalled();
   });
+
+  /**
+   * The assignee picker is the first Radix layer the panel grew that is not a dialog, which is
+   * exactly the case the layer-aware `Esc` fix was written for: the panel has to recognise an
+   * open popover as the topmost layer or one press dismisses two things.
+   */
+  describe('with the assignee popover open', () => {
+    const oneMember = taskMeta.members;
+
+    beforeEach(() => {
+      taskMeta.members = Array.from({ length: 8 }, (_, index) => ({
+        id: `m${index + 1}`,
+        workspaceId: 'w1',
+        userId: `0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d5${index}`,
+        role: 'MEMBER',
+        name: `Member ${index + 1}`,
+        avatarUrl: null,
+      }));
+    });
+
+    afterEach(() => {
+      taskMeta.members = oneMember;
+    });
+
+    function openPicker(): void {
+      fireEvent.click(screen.getByRole('button', { name: /^Assign/ }));
+    }
+
+    it('gives the popover the first Escape and the panel the second', () => {
+      const named = { name: messages.app.board.task.searchMembers };
+      render(<Board open />);
+      openPicker();
+      expect(screen.getByRole('searchbox', named)).toBeDefined();
+
+      pressEscape();
+
+      expect(screen.queryByRole('searchbox', named)).toBeNull();
+      expect(push).not.toHaveBeenCalled();
+
+      pressEscape();
+
+      expect(push).toHaveBeenCalledWith('/board/b1', { scroll: false });
+    });
+  });
 });
 
 /**
@@ -500,23 +539,82 @@ describe('TaskPanel attachments', () => {
       screen.getByRole('region', { name: messages.app.board.task.attachments.sectionLabel }),
     ).toBeDefined();
   });
+});
 
-  it('keeps the delete footer last, with attachments above the metadata panel', () => {
+/**
+ * The panel reads in the order the card does: what the task *is* first, then what is in it, then
+ * what people said about it. That order is why the properties and the discussion are two
+ * components rather than one - the single section they used to be could not be moved above the
+ * checklists without taking the comment thread with it.
+ */
+describe('TaskPanel section order', () => {
+  const region = (name: string): HTMLElement => screen.getByRole('region', { name });
+
+  it('runs fields, properties, checklists, attachments, discussion', () => {
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    const sections = [
+      screen.getByLabelText(messages.app.board.task.title),
+      region(messages.app.board.task.propertiesTitle),
+      region(messages.app.board.task.checklist.sectionLabel),
+      region(messages.app.board.task.attachments.sectionLabel),
+      region(messages.app.board.task.discussionTitle),
+    ];
+
+    for (const [index, section] of sections.slice(0, -1).entries()) {
+      expect(
+        section.compareDocumentPosition(sections[index + 1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+  });
+
+  it('spends no full-strength copper of its own', () => {
+    // docs/design.md §2 budgets a screen at two full-strength marks: the sancak rail plus, on a
+    // view that has one, its single primary action. The board behind this panel already spends
+    // one on the selected card's rail, and the panel's section actions are not that view's one
+    // action - they are three peers (create label, add checklist, post comment). Measured on
+    // the running app, a default-variant Button here put four copper marks on one screen.
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    const panel = screen.getByRole('complementary', { name: messages.app.board.task.panelLabel });
+    const copper = within(panel)
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('data-variant') === 'default');
+
+    expect(copper.map((button) => button.textContent)).toEqual([]);
+  });
+
+  it('rules every titled section off the one above it, not two of the four', () => {
+    // Four sections carrying the same heading weight, two of them with a rule above and two
+    // without, reads as an arbitrary rule rather than as grouping: nothing on screen says the
+    // checklists belong under the properties. Either all four are separated or none is, and at
+    // this section gap (16px) the rule is what makes a heading start something.
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    for (const name of [
+      messages.app.board.task.propertiesTitle,
+      messages.app.board.task.checklist.sectionLabel,
+      messages.app.board.task.attachments.sectionLabel,
+      messages.app.board.task.discussionTitle,
+    ]) {
+      expect(region(name).className).toContain('border-t');
+      expect(region(name).className).toContain('pt-4');
+    }
+  });
+
+  it('keeps the delete footer the last child of the scroll column', () => {
     // The footer is `mt-auto` and only reaches the bottom of the scroll column while it is the
     // last child of it. A section appended after it looks fine in a screenshot of a long task
     // and wrong on every short one, which is why the position is asserted rather than reviewed.
     render(<Board open />);
 
-    const attachments = screen.getByRole('region', {
-      name: messages.app.board.task.attachments.sectionLabel,
-    });
-    const metadata = screen.getByTestId('metadata');
+    const discussion = region(messages.app.board.task.discussionTitle);
     const footer = screen.getByRole('button', {
       name: messages.app.board.task.deleteAction,
     }).parentElement!;
 
-    expect(attachments.compareDocumentPosition(metadata)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(footer.nextElementSibling).toBeNull();
-    expect(footer.parentElement).toBe(metadata.parentElement);
+    expect(footer.parentElement).toBe(discussion.parentElement);
+    expect(footer.className).toContain('mt-auto');
   });
 });

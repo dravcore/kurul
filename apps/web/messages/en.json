@@ -1,7 +1,8 @@
 {
   "common": {
     "close": "Close",
-    "deletedUser": "Deleted user"
+    "deletedUser": "Deleted user",
+    "save": "Save"
   },
   "auth": {
     "login": {
@@ -184,10 +185,13 @@
       "members": {
         "title": "Members",
         "description": "Who can open this workspace, and what they can do once they are in it.",
+        "pageTitle": "Members",
+        "manageAction": "Manage members",
         "loadError": "The people in this workspace couldn't load.",
         "you": "You",
         "cancel": "Cancel",
         "memberMenu": "Actions for {name}",
+        "memberRole": "Role for {name}",
         "roles": {
           "OWNER": "Owner",
           "ADMIN": "Admin",
@@ -228,9 +232,9 @@
         "revokeError": "The invitation couldn't be revoked.",
         "revokeErrorGone": "That invitation is already gone.",
         "revokeErrorForbidden": "You need admin access to revoke invitations. Ask a workspace owner.",
-        "changeRoleAction": "Change role",
         "changeRoleTitle": "Change role",
         "changeRoleSubmit": "Change role",
+        "confirmOwnerBody": "Owners can remove every other member, including you. This cannot be undone from here.",
         "changeRoleError": "The role couldn't be changed.",
         "changeRoleErrorForbidden": "Only an owner can change ownership. Ask a workspace owner.",
         "changeRoleErrorLastOwner": "This is the only owner. Make someone else an owner first.",
@@ -291,7 +295,6 @@
         "name": "Name",
         "cancel": "Cancel",
         "renameAction": "Rename",
-        "renameTitle": "Rename workspace",
         "renameError": "Could not rename this workspace.",
         "renameErrorForbidden": "You need admin access to rename the workspace. Ask a workspace owner.",
         "renameErrorGone": "This workspace no longer exists.",
@@ -313,6 +316,7 @@
         "loadError": "Your account details couldn't load.",
         "deleteSectionTitle": "Delete your account",
         "deleteSectionBody": "Removes you from every workspace on this server and takes your name off everything you wrote. This cannot be undone.",
+        "deletePageTitle": "Delete your account",
         "deleteAction": "Delete account",
         "deleteTitle": "Delete your account?",
         "deleteBody": "You will be signed out and removed from every workspace here. Your name and email are erased. This cannot be undone.",
@@ -408,7 +412,6 @@
       "createAction": "Create board",
       "planLimitReached": "This workspace has used all {limit} of the boards its plan allows.",
       "createError": "Could not create this board.",
-      "renameTitle": "Rename board",
       "renameAction": "Rename",
       "renameError": "Could not rename this board.",
       "deleteTitle": "Delete this board?",
@@ -562,7 +565,13 @@
           "minutes": "{minutes}m"
         },
         "assignees": "Assignees",
+        "noAssignees": "No one assigned",
+        "assignAction": "Assign ({count})",
+        "searchMembers": "Search members",
         "labels": "Labels",
+        "addLabelAction": "Add label ({count})",
+        "searchLabels": "Search labels",
+        "noMatches": "No matches",
         "noLabels": "No labels on this task",
         "removeLabel": "Remove label {name}",
         "newLabel": "New label",
@@ -666,6 +675,8 @@
         },
         "openTask": "Open task",
         "panelLabel": "Task details",
+        "propertiesTitle": "Properties",
+        "discussionTitle": "Discussion",
         "close": "Close task panel",
         "backToBoard": "Back to board",
         "createAction": "Add task",

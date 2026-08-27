@@ -286,9 +286,11 @@ function requireRule(
  * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
  * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
  * step was read as the indicator, the shell `main`, which is where the skip link lands, and the
- * task panel's heading, which a keyboard user reaches by pressing Enter on a task card. The last
- * two each carried a suppressor as a programmatic focus container until the phase keyboard tour
- * measured both of them matching `:focus-visible` in Chromium and Firefox. Both utilities
+ * task panel's heading, which a keyboard user reaches by pressing Enter on a task card, and the
+ * popover surface and the picker rows inside it, which a large workspace's assignee and label
+ * lists moved behind. The panel heading and the shell `main` each carried a suppressor as a
+ * programmatic focus container until the phase keyboard tour measured both of them matching
+ * `:focus-visible` in Chromium and Firefox. Both utilities
  * compile into `utilities`, which outranks `base`, so either one leaves the element focusing
  * with nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor
  * computes `outline-style: none`. The scan reads the whole source rather than the class strings
@@ -297,10 +299,12 @@ function requireRule(
  */
 const singleIndicatorTargets = [
   'components/layout/app-shell.tsx',
+  'components/task/searchable-picker.tsx',
   'components/task/task-panel.tsx',
   'components/ui/button.tsx',
   'components/ui/dropdown-menu.tsx',
   'components/ui/input.tsx',
+  'components/ui/popover.tsx',
   'components/ui/select.tsx',
   'components/ui/textarea.tsx',
 ];
@@ -980,6 +984,7 @@ describe('globals.css dialog and dropdown motion', () => {
     "[data-slot='dialog-content']",
     "[data-slot='dropdown-menu-content']",
     "[data-slot='dropdown-menu-sub-content']",
+    "[data-slot='popover-content']",
   ];
 
   it.each(layeredSelectors)('gives %s an animation-name in both data-state', (selector) => {
@@ -1390,6 +1395,18 @@ describe('globals.css reduced-motion cascade', () => {
     {
       label: 'submenu, closing',
       target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'closed' } },
+      moving: 'menu-content-out',
+      visible: false,
+    },
+    {
+      label: 'popover, opening',
+      target: { attrs: { 'data-slot': 'popover-content', 'data-state': 'open' } },
+      moving: 'menu-content-in',
+      visible: true,
+    },
+    {
+      label: 'popover, closing',
+      target: { attrs: { 'data-slot': 'popover-content', 'data-state': 'closed' } },
       moving: 'menu-content-out',
       visible: false,
     },

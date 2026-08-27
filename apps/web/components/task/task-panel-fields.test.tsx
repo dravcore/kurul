@@ -73,6 +73,79 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe('TaskPanelFields size and border', () => {
+  it('renders the title at title-lg, borderless at rest with the border back on focus', () => {
+    renderFields();
+
+    const title = screen.getByLabelText('Title');
+    expect(title.className).toContain('md:text-title-lg');
+    expect(title.className).toContain('border-transparent');
+    expect(title.className).toContain('focus:border-input');
+  });
+
+  it('renders the description at the read step', () => {
+    renderFields();
+
+    expect(screen.getByLabelText('Description').className).toContain('md:text-read');
+  });
+});
+
+describe('TaskPanelFields pending state', () => {
+  it('keeps both fields readOnly rather than disabled while a save is in flight, so focus stays put', async () => {
+    let resolvePatch: (value: TaskDto) => void = () => undefined;
+    apiPatch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePatch = resolve;
+        }),
+    );
+    renderFields();
+
+    const title = screen.getByLabelText('Title');
+    const description = screen.getByLabelText('Description');
+
+    fireEvent.change(title, { target: { value: 'Fix the login redirect' } });
+    description.focus();
+    fireEvent.blur(title);
+
+    // Pending is set synchronously before the awaited patch resolves.
+    expect((title as HTMLInputElement).readOnly).toBe(true);
+    expect((description as HTMLTextAreaElement).readOnly).toBe(true);
+    expect((title as HTMLInputElement).disabled).toBe(false);
+    expect((description as HTMLTextAreaElement).disabled).toBe(false);
+    // A `readOnly` field carries none of the semantics `disabled` would have announced, so
+    // `aria-busy` is what tells assistive tech the save is in flight (Ruling 4 compensation).
+    expect(title.getAttribute('aria-busy')).toBe('true');
+    expect(description.getAttribute('aria-busy')).toBe('true');
+    // The reader was still in the description field; a `disabled` field would have dropped
+    // focus to the body the moment the shared pending state applied to it.
+    expect(document.activeElement).toBe(description);
+
+    resolvePatch({ ...task(), title: 'Fix the login redirect' });
+    await waitFor(() => expect((title as HTMLInputElement).readOnly).toBe(false));
+    expect((description as HTMLTextAreaElement).readOnly).toBe(false);
+    expect(title.getAttribute('aria-busy')).toBeNull();
+    expect(description.getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('disables both fields outright when the reader cannot mutate the task', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TaskPanelFields
+          workspaceId={WORKSPACE_ID}
+          task={task()}
+          canMutate={false}
+          onUpdated={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect((screen.getByLabelText('Title') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Description') as HTMLTextAreaElement).disabled).toBe(true);
+  });
+});
+
 describe('TaskPanelFields conflict', () => {
   it('answers a 409 inline rather than with a toast', async () => {
     apiPatch.mockRejectedValue(new ApiError({ statusCode: 409, error: 'Conflict', message: 'no' }));

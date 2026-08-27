@@ -286,7 +286,15 @@ export function TaskCommentsSection({
             {mentionPickerOpen && mentionCandidates.length === 0 ? t('mentions.empty') : ''}
           </span>
           <div className="flex justify-end">
-            <Button type="button" size="sm" disabled={pending} onClick={() => void submit()}>
+            {/* Outline, not the default fill: docs/design.md §2 allows one full-strength copper
+                action per view beside the rail, and this one is not the panel's. */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => void submit()}
+            >
               {t('postComment')}
             </Button>
           </div>

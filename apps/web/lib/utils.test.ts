@@ -19,4 +19,8 @@ describe('cn', () => {
   it('keeps two font-size classes that apply at different variants', () => {
     expect(cn('text-body', 'md:text-small')).toBe('text-body md:text-small');
   });
+
+  it('recognises the read step, so a consumer can override md:text-body with it', () => {
+    expect(cn('text-base md:text-body', 'md:text-read')).toBe('text-base md:text-read');
+  });
 });
