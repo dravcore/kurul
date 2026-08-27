@@ -300,7 +300,7 @@ veritabanının şifresini döndürmez.** Resmi Postgres image'ı `POSTGRES_PASS
 `initdb` sırasında, yani bir volume ilk oluşturulduğunda uygular — `.env`'i düzenleyip zaten
 initialize edilmiş bir stack'i yeniden başlatmak, rolün şifresini tam olarak eskisi gibi
 bırakır. Çalışan bir instance'ta şifreyi döndüren `ALTER USER ... PASSWORD` komutu için
-`CHANGELOG.md`'deki `[Unreleased]` girdisine bakın.
+`CHANGELOG.md`'deki `[0.2.0]` girdisine bakın.
 
 ### Checkout'unuz yeniden adlandırmadan eskiyse
 
@@ -471,7 +471,7 @@ başarısızlıkta bir düzeltme komutuyla, kontrol başına bir satır yazdır�
 
 1. `packages/shared-types/dist` ve `packages/auth-access/dist`, kendi `src`'lerinden en az o
    kadar yeni — `pnpm dev` ve `pnpm db:seed`'in gerçekte tükettiği iki build çıktısı (bunun
-   yerini aldığı hata modu için `[Unreleased]` CHANGELOG girdisine bakın: bayat bir `dist`
+   yerini aldığı hata modu için `[0.4.0]` CHANGELOG girdisine bakın: bayat bir `dist`
    yüksek sesli başarısız olmak yerine çözümlenir ve her tüketicide `undefined` olarak geri
    okunur).
 2. Üretilmiş Prisma client'ı (`apps/api/src/generated/prisma`), `schema.prisma`'dan en az o

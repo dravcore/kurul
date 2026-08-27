@@ -295,7 +295,7 @@ builds a plain `redis://:password@redis:6379` for its own `redis` container.
 running database's password.** The official Postgres image only applies
 `POSTGRES_PASSWORD` during `initdb`, i.e. the first time a volume is created — editing `.env`
 and restarting an already-initialized stack leaves the role's password exactly as it was. See
-the `[Unreleased]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
+the `[0.2.0]` entry in `CHANGELOG.md` for the `ALTER USER ... PASSWORD` command that
 rotates it on a running instance.
 
 ### If your checkout predates the rename
@@ -464,7 +464,7 @@ with a fix command on failure:
 
 1. `packages/shared-types/dist` and `packages/auth-access/dist` are at least as new as their
    `src` — the two build outputs `pnpm dev` and `pnpm db:seed` actually consume (see the
-   `[Unreleased]` CHANGELOG entry on the failure mode this replaced: a stale `dist` resolves
+   `[0.4.0]` CHANGELOG entry on the failure mode this replaced: a stale `dist` resolves
    and reads back as `undefined` rather than failing loudly).
 2. The generated Prisma client (`apps/api/src/generated/prisma`) is at least as new as
    `schema.prisma`.
