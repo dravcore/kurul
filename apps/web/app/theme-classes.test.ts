@@ -234,11 +234,16 @@ describe('dead animation utility classes', () => {
  * weight); a raw Tailwind size or weight class is always a Kurul step recreated by hand instead
  * of named, off the theme's own line-height and unable to move with it.
  *
- * `font-semibold` is deliberately not in this set. `font-medium` is the one docs/design.md names
- * retired ("`font-medium` becomes `font-strong` (550) throughout"); `font-semibold` (600) is
- * still load-bearing on headings the type scale gives no weighted step of their own to, and stays
- * out of this ban until an audit gives each of those call sites a real step, the way it already
- * has for `text-title`/`text-title-lg`/`text-display`.
+ * `font-semibold` (600) is in this set too, per the brief's literal "font-thin through
+ * font-black": Tailwind's own weight-scale order places `semibold` inside that range. Every
+ * real call site today pairs it with a step (`text-title`, `text-title-lg`, `text-display`) whose
+ * own `@theme inline` variable already carries `font-weight: 600` (compiled and confirmed against
+ * `app/globals.css`; `globals-css-layers.test.ts`'s "keeps text-title(-lg) at 600 when paired with
+ * font-semibold" test measures the same 600, arrived at redundantly), except
+ * `dashboard/stat-tile.tsx`'s two arbitrary `text-[28px]` figures, which carry no named step at
+ * all and so have nowhere else to source a weight from. All 14 are pinned below rather than
+ * banned outright: this gate's job is to stop a new, unaudited hand weight from landing silently,
+ * not to rewrite today's headings, which is scratchpad/plans/P8.md's own Task 5.
  */
 const BANNED_SIZE_AND_WEIGHT_CLASSES = new Set([
   'text-xs',
@@ -259,6 +264,7 @@ const BANNED_SIZE_AND_WEIGHT_CLASSES = new Set([
   'font-light',
   'font-normal',
   'font-medium',
+  'font-semibold',
   'font-bold',
   'font-extrabold',
   'font-black',
@@ -276,6 +282,16 @@ interface SizeWeightException {
  * that size. Every field pairs it with `md:text-body`, handing the control back to `body` (13px)
  * once the viewport is wide enough that the zoom guard no longer applies (docs/design.md §4).
  * The three form primitives are the whole of it; nothing else carries a field's own text.
+ *
+ * The `font-semibold` entries below are today's whole tree, in two shapes:
+ * - Twelve pair it with `text-title`, `text-title-lg` or `text-display`, whose own
+ *   `--text-*--font-weight` theme variable already compiles to 600, the same 600
+ *   `font-semibold` names again on top of it. Kept as a pinned exception, not deleted here,
+ *   because scratchpad/plans/P8.md's Task 5 is the task actually auditing and dropping these
+ *   call sites one by one; this gate only has to stop a fifteenth from landing unaudited.
+ * - Two (`dashboard/stat-tile.tsx`) pair it with an arbitrary `text-[28px]`, which carries no
+ *   named step and so no weight of its own: `font-semibold` is the only source of weight there,
+ *   pending that figure getting a real token.
  */
 const SIZE_WEIGHT_EXCEPTIONS: SizeWeightException[] = [
   {
@@ -295,6 +311,90 @@ const SIZE_WEIGHT_EXCEPTIONS: SizeWeightException[] = [
     line: 18,
     bareClass: 'text-base',
     reason: 'the same iOS zoom floor, on the shared field base',
+  },
+  {
+    file: 'app/not-found.tsx',
+    line: 18,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title-lg's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'app/(app)/workspaces/new/page.tsx',
+    line: 39,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/ui/dialog.tsx',
+    line: 228,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/settings/settings-section.tsx',
+    line: 25,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/settings/activation-funnel.tsx',
+    line: 57,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/settings/delete-account-settings.tsx',
+    line: 162,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/board/import-report-panel.tsx',
+    line: 60,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/board/board-list.tsx',
+    line: 300,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title-lg's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/board/board-placeholders.tsx',
+    line: 71,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title-lg's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/layout/route-error-state.tsx',
+    line: 45,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title-lg's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/layout/sidebar-body.tsx',
+    line: 93,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/dashboard/dashboard-summary.tsx',
+    line: 108,
+    bareClass: 'font-semibold',
+    reason: "redundant with text-title-lg's own 600; Task 5 cleanup candidate",
+  },
+  {
+    file: 'components/dashboard/stat-tile.tsx',
+    line: 18,
+    bareClass: 'font-semibold',
+    reason: 'the only weight source for this arbitrary text-[28px] figure; pending its own token',
+  },
+  {
+    file: 'components/dashboard/stat-tile.tsx',
+    line: 19,
+    bareClass: 'font-semibold',
+    reason: 'the only weight source for this arbitrary text-[28px] figure; pending its own token',
   },
 ];
 
