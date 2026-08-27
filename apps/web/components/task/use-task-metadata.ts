@@ -148,41 +148,51 @@ export function useTaskMetadata({
   const setComments = useResourceField(setMeta, 'comments');
 
   /** Comments come back oldest first, so the next page appends to the end of the thread. */
-  const loadMoreComments = useCallback(async (): Promise<void> => {
-    const cursor = meta.commentsCursor;
-    if (!cursor || loadingMoreComments) return;
-    setLoadingMoreComments(true);
-    try {
-      const page = await api.get<CursorPage<CommentDto>>(
-        `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`,
-      );
-      setMeta((current) => {
-        // A comment posted from this panel also sits past the cursor, so the next page can
-        // repeat what is already on screen — the id is what decides, not the server slice.
-        const seen = new Set(current.comments.map((comment) => comment.id));
-        return {
-          ...current,
-          comments: [...current.comments, ...page.items.filter((item) => !seen.has(item.id))],
-          commentsCursor: page.nextCursor,
-        };
-      });
-    } catch {
-      toast.error(t('commentsLoadMoreError'));
-    } finally {
-      setLoadingMoreComments(false);
-    }
-  }, [workspaceId, taskId, meta.commentsCursor, loadingMoreComments, setMeta, t]);
+  const loadMoreComments = useCallback(
+    async function run(): Promise<void> {
+      const cursor = meta.commentsCursor;
+      if (!cursor || loadingMoreComments) return;
+      setLoadingMoreComments(true);
+      try {
+        const page = await api.get<CursorPage<CommentDto>>(
+          `/workspaces/${workspaceId}/tasks/${taskId}/comments?limit=${COMMENTS_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`,
+        );
+        setMeta((current) => {
+          // A comment posted from this panel also sits past the cursor, so the next page can
+          // repeat what is already on screen — the id is what decides, not the server slice.
+          const seen = new Set(current.comments.map((comment) => comment.id));
+          return {
+            ...current,
+            comments: [...current.comments, ...page.items.filter((item) => !seen.has(item.id))],
+            commentsCursor: page.nextCursor,
+          };
+        });
+      } catch {
+        toast.error(t('commentsLoadMoreError'), {
+          action: { label: t('retryAction'), onClick: () => void run() },
+        });
+      } finally {
+        setLoadingMoreComments(false);
+      }
+    },
+    [workspaceId, taskId, meta.commentsCursor, loadingMoreComments, setMeta, t],
+  );
 
-  const refreshActivities = useCallback(async (): Promise<void> => {
-    try {
-      const page = await api.get<CursorPage<ActivityDto>>(
-        `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
-      );
-      setMeta((current) => ({ ...current, activities: page.items }));
-    } catch {
-      toast.error(tActivity('loadError'));
-    }
-  }, [workspaceId, taskId, setMeta, tActivity]);
+  const refreshActivities = useCallback(
+    async function run(): Promise<void> {
+      try {
+        const page = await api.get<CursorPage<ActivityDto>>(
+          `/workspaces/${workspaceId}/tasks/${taskId}/activities?limit=${ACTIVITIES_PAGE_LIMIT}`,
+        );
+        setMeta((current) => ({ ...current, activities: page.items }));
+      } catch {
+        toast.error(tActivity('loadError'), {
+          action: { label: t('retryAction'), onClick: () => void run() },
+        });
+      }
+    },
+    [workspaceId, taskId, setMeta, tActivity, t],
+  );
 
   return {
     members: meta.members,

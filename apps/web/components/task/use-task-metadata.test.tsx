@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
+import { toast } from 'sonner';
 import { MemberRole, type LabelDto, type WorkspaceMemberDto } from '@kurul/shared-types';
 import messages from '@/messages/en.json';
 import { api } from '@/lib/api';
@@ -17,6 +18,13 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 const apiGet = vi.mocked(api.get);
 const fetchMembers = vi.mocked(fetchAllWorkspaceMembers);
+const toastError = vi.mocked(toast.error);
+
+/** Pulls the typed retry action off a recorded `toast.error` call. */
+function retryAction(call: unknown[]): { label: string; onClick: () => void } {
+  const options = call[1] as { action: { label: string; onClick: () => void } };
+  return options.action;
+}
 
 function member(id: string): WorkspaceMemberDto {
   return {
@@ -232,5 +240,85 @@ describe('useTaskMetadata', () => {
 
     expect(result.current.comments.map((entry) => entry.id)).toEqual(['c1', 'c2']);
     expect(result.current.hasMoreComments).toBe(false);
+  });
+
+  /**
+   * A failed refresh cannot just leave the reader to close the panel and reopen it: the toast
+   * itself has to be the way back in, and clicking it must not stack a second toast on top.
+   */
+  it('offers a retry on a failed activity refresh, and the retry loads without a second toast', async () => {
+    stubMeta();
+    const { result } = renderMeta();
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+
+    apiGet.mockImplementationOnce(() => Promise.reject(new Error('network')));
+    await act(() => result.current.refreshActivities());
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledWith(
+      messages.app.board.task.activity.loadError,
+      expect.objectContaining({
+        action: expect.objectContaining({ label: messages.app.board.task.retryAction }),
+      }),
+    );
+
+    apiGet.mockImplementation(
+      () =>
+        Promise.resolve({
+          items: [{ id: 'a1' }, { id: 'a2' }],
+          nextCursor: null,
+          hasMore: false,
+        }) as never,
+    );
+    const action = retryAction(toastError.mock.calls[0] as unknown[]);
+    await act(async () => {
+      action.onClick();
+    });
+    await waitFor(() => expect(result.current.activities).toHaveLength(2));
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Same contract for the comment thread's next page: the failed page load is recoverable from
+   * the toast alone, and the retry appends rather than reloading the whole thread.
+   */
+  it('offers a retry on a failed comment page load, and the retry appends the page', async () => {
+    stubMeta({ commentsCursor: 'cursor-1' });
+    const { result } = renderMeta();
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+    expect(result.current.hasMoreComments).toBe(true);
+
+    apiGet.mockImplementationOnce(() => Promise.reject(new Error('network')));
+    await act(() => result.current.loadMoreComments());
+
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(toastError).toHaveBeenCalledWith(
+      messages.app.board.task.commentsLoadMoreError,
+      expect.objectContaining({
+        action: expect.objectContaining({ label: messages.app.board.task.retryAction }),
+      }),
+    );
+    expect(result.current.comments.map((entry) => entry.id)).toEqual(['c1']);
+    expect(result.current.loadingMoreComments).toBe(false);
+    expect(result.current.hasMoreComments).toBe(true);
+
+    apiGet.mockImplementation(
+      () =>
+        Promise.resolve({
+          items: [comment('c2')],
+          nextCursor: null,
+          hasMore: false,
+        }) as never,
+    );
+    const action = retryAction(toastError.mock.calls[0] as unknown[]);
+    await act(async () => {
+      action.onClick();
+    });
+    await waitFor(() =>
+      expect(result.current.comments.map((entry) => entry.id)).toEqual(['c1', 'c2']),
+    );
+
+    expect(toastError).toHaveBeenCalledTimes(1);
   });
 });
