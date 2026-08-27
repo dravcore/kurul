@@ -7,6 +7,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependabot holds Node base-image majors.** Two days after the docker block began reading
+  `apps/*/Dockerfile`, it proposed `node:26-alpine` for both images. Node 26 is a Current
+  release until October 2026 and a base-image major moves `.nvmrc`, `engines`, the CI
+  `setup-node` step and the docs with it, so the docker block now ignores Node majors the way
+  the npm block holds TypeScript 7, with the trigger recorded in `ROADMAP.md` (DEP-26). Digest
+  and minor bumps, the reason the block exists, are unaffected.
+
 ## [0.4.0] - 2026-08-27
 
 ### Added
