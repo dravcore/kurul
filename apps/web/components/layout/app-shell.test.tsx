@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, type RenderResult } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 
@@ -31,8 +31,8 @@ vi.mock('./workspace-provider', () => ({
 
 import { AppShell } from './app-shell';
 
-function renderShell(): void {
-  render(
+function renderShell(): RenderResult {
+  return render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <AppShell>
         <p>Route content</p>
@@ -44,6 +44,7 @@ function renderShell(): void {
 afterEach(() => {
   cleanup();
   context.value.workspaces = [{ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70' }];
+  context.value.bootstrapped = true;
 });
 
 describe('AppShell', () => {
@@ -92,5 +93,56 @@ describe('AppShell', () => {
 
     expect(screen.queryByTestId('app-sidebar')).toBeNull();
     expect(screen.getByRole('main').textContent).toBe('Route content');
+  });
+});
+
+/**
+ * Before any bootstrap has ever finished, `workspaces` is the same empty array a confirmed-
+ * zero account would have, and the two can't be told apart by the array alone. The shape has to
+ * default to painting in that case: hiding it here is what used to make a returning reader's
+ * plain reload skip the sidebar shape and then pop one in once the roster resolved.
+ */
+describe('AppShell loading skeleton', () => {
+  it('paints the sidebar shape on a fresh mount, before any roster is known', () => {
+    context.value.bootstrapped = false;
+    context.value.workspaces = [];
+
+    const { container } = renderShell();
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7);
+  });
+
+  it('keeps the sidebar shape once a roster is already on hand', () => {
+    context.value.bootstrapped = false;
+    context.value.workspaces = [{ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70' }];
+
+    const { container } = renderShell();
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7);
+  });
+
+  /**
+   * The one case where an empty `workspaces` really does mean "confirmed none": a completed
+   * bootstrap has already resolved the roster empty, and a second load (a manual retry) is now
+   * in flight. `useApiResource` leaves the resolved value standing while a fresh load runs, so
+   * this is the scenario that lets the shell tell "not yet known" apart from "confirmed empty"
+   * at all: it has to have seen `bootstrapped` true at least once first.
+   */
+  it('skips the sidebar shape once a completed bootstrap has confirmed the roster is empty', () => {
+    context.value.bootstrapped = true;
+    context.value.workspaces = [];
+
+    const { container, rerender } = renderShell();
+
+    context.value.bootstrapped = false;
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AppShell>
+          <p>Route content</p>
+        </AppShell>
+      </NextIntlClientProvider>,
+    );
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4);
   });
 });

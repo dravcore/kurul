@@ -15,7 +15,7 @@ export default async function NotFound(): Promise<React.ReactElement> {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <h1 className="font-display text-title-lg font-semibold">{t('notFoundTitle')}</h1>
+      <h1 className="font-display text-title-lg">{t('notFoundTitle')}</h1>
       <p className="max-w-md text-body text-muted-foreground">{t('notFoundBody')}</p>
       <Button asChild variant="outline">
         <Link href="/dashboard">{t('backHome')}</Link>

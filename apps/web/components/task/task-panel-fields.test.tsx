@@ -41,6 +41,17 @@ function task(): TaskDto {
   };
 }
 
+/**
+ * The label-plus-field block a field sits in, which is what carries the busy mark. Read from
+ * the DOM parent rather than by `[aria-busy]`, so that "the mark is gone" is a null attribute
+ * on a found element and not a missing element.
+ */
+function busyWrapper(field: HTMLElement): HTMLElement {
+  const wrapper = field.parentElement;
+  if (!wrapper) throw new Error('the field is not wrapped');
+  return wrapper;
+}
+
 function renderFields() {
   const onUpdated = vi.fn();
   const onClose = vi.fn();
@@ -115,8 +126,12 @@ describe('TaskPanelFields pending state', () => {
     expect((description as HTMLTextAreaElement).disabled).toBe(false);
     // A `readOnly` field carries none of the semantics `disabled` would have announced, so
     // `aria-busy` is what tells assistive tech the save is in flight (Ruling 4 compensation).
-    expect(title.getAttribute('aria-busy')).toBe('true');
-    expect(description.getAttribute('aria-busy')).toBe('true');
+    // It sits on each field's wrapper rather than on the field: the mark describes the region
+    // being written, and the control the reader is standing on stays as it was.
+    expect(busyWrapper(title).getAttribute('aria-busy')).toBe('true');
+    expect(busyWrapper(description).getAttribute('aria-busy')).toBe('true');
+    expect(title.getAttribute('aria-busy')).toBeNull();
+    expect(description.getAttribute('aria-busy')).toBeNull();
     // The reader was still in the description field; a `disabled` field would have dropped
     // focus to the body the moment the shared pending state applied to it.
     expect(document.activeElement).toBe(description);
@@ -124,8 +139,8 @@ describe('TaskPanelFields pending state', () => {
     resolvePatch({ ...task(), title: 'Fix the login redirect' });
     await waitFor(() => expect((title as HTMLInputElement).readOnly).toBe(false));
     expect((description as HTMLTextAreaElement).readOnly).toBe(false);
-    expect(title.getAttribute('aria-busy')).toBeNull();
-    expect(description.getAttribute('aria-busy')).toBeNull();
+    expect(busyWrapper(title).getAttribute('aria-busy')).toBeNull();
+    expect(busyWrapper(description).getAttribute('aria-busy')).toBeNull();
   });
 
   it('disables both fields outright when the reader cannot mutate the task', () => {

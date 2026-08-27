@@ -15,8 +15,8 @@ export function StatTile({
       <p
         className={
           emphasize && value > 0
-            ? 'mt-1 text-[28px] font-semibold tracking-tight text-destructive tabular-nums'
-            : 'mt-1 text-[28px] font-semibold tracking-tight text-foreground tabular-nums'
+            ? 'mt-1 text-stat tracking-tight text-destructive'
+            : 'mt-1 text-stat tracking-tight text-foreground'
         }
       >
         {value.toLocaleString('en-US')}

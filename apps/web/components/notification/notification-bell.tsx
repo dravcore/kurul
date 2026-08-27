@@ -53,7 +53,7 @@ export function NotificationBell(): React.ReactElement {
               in the column copper must not touch, and an unread count is not an error either, so
               `--destructive` is not the answer (that family stays reserved for status and
               priority, docs/design.md §3). The ink/canvas pair already flips with the theme and
-              holds 16.12:1 light, 15.17:1 dark, against the signature fill's 2.73:1 dark AA
+              holds 14.57:1 light, 15.17:1 dark, against the signature fill's 2.73:1 dark AA
               fail. */}
           {badgeLabel ? (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-foreground px-0.5 text-micro font-strong text-background">

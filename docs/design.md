@@ -60,14 +60,19 @@ Copper works at two power levels, and mixing them up is the defect this phase fo
 
 **Full strength** (`--primary` and `--signature` share one hex per theme) is the app's rarest
 color: **at most two uses per screen**, the sancak rail plus, on a view that has one, its single
-primary action button. Two things are exempt from that count rather than a third use of it. The
-**focus ring** is full strength too, but it is singular and transient by construction: on exactly
-one element, only for as long as that element holds focus, so it never stands beside the rail as
-a second mark, it replaces whatever mark that element already carried. And a **data mark** (a
-meter fill, a progress fill, the chart's one `--signature` **emphasis** series, §8) draws full
+primary action button. Four things are exempt from that count rather than reading as a third use
+of it. The **focus ring** is full strength too, but it is singular and transient by construction:
+on exactly one element, only for as long as that element holds focus, so it never stands beside
+the rail as a second mark, it replaces whatever mark that element already carried. A **data mark**
+(a meter fill, a progress fill, the chart's one `--signature` **emphasis** series, §8) draws full
 strength because it _is_ the value being shown, not chrome describing the screen around it, so a
 settings page can carry a copper progress bar next to its one copper Invite button without
-spending a third chrome use.
+spending a third chrome use. And **a link inside body copy** and **the damga mark on the wordmark
+or an empty state** carry the identical exemption for the identical reason as each other: neither
+is chrome contending with the rail or the primary button, so a page can carry several of either at
+once without the count moving, the way P4's auth screens (two or three copper links beside their
+own damga mark, no rail in sight) and P7's settings screens (the sidebar wordmark's mark beside
+whatever the screen already spends on a rail or a button) already counted them.
 
 **Tint** (`--signature-subtle`) never reaches full strength and never joins that budget either,
 but it is not free decoration: it is bound to exactly one role, **active or selected**, on
@@ -122,11 +127,11 @@ white, so elevation reads without shadows.
 | Column ground                                                        | `--muted`                       | `#F1F3F1`              | `#1A1E1C`             |
 | Card surface                                                         | `--card`                        | `#FFFFFF`              | `#212523`             |
 | Popover surface                                                      | `--popover`                     | `#FFFFFF`              | `#272B29`             |
-| Hover step (drag preview stays the card surface, `--elevation-drag`) | `--accent`, `--secondary`       | `#EAEDEA`              | `#2F3331`             |
+| Hover step (drag preview stays the card surface, `--elevation-drag`) | `--accent`                      | `#EAEDEA`              | `#2F3331`             |
 | Border · border-strong (`--input` reads `--border-strong`)           | `--border` · `--border-strong`  | `#D6DAD8` · `#7D8481`  | `#3A403D` · `#767D7A` |
-| Text, primary                                                        | `--foreground`                  | `#191C1B`              | `#E8ECEA`             |
+| Text, primary                                                        | `--foreground`                  | `#212523`              | `#E8ECEA`             |
 | Text, secondary                                                      | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
-| Text, muted                                                          | `--muted-foreground`            | `#626965`              | `#98A09C`             |
+| Text, muted                                                          | `--muted-foreground`            | `#626965`              | `#A0A8A4`             |
 | Primary action surface · hover                                       | `--primary` · `--primary-hover` | `#A85A28` · `#964F23`  | `#D98A4E` · `#E0955B` |
 | Text on primary                                                      | `--primary-foreground`          | `#FFFFFF`              | `#131715`             |
 | Rail, focus ring, link                                               | `--signature`, `--ring`         | `#A85A28`              | `#D98A4E`             |
@@ -135,9 +140,9 @@ white, so elevation reads without shadows.
 | Dialog and drawer backdrop                                           | `--overlay-scrim`               | `rgb(25 28 27 / 0.38)` | `rgb(5 7 6 / 0.7)`    |
 
 Text worst-surface ratios, named to the surface each measures worst on
-(`app/globals.contrast.test.ts`): light `--foreground` 14.0:1, `--foreground-secondary` 5.8:1 and
+(`app/globals.contrast.test.ts`): light `--foreground` 12.6:1, `--foreground-secondary` 5.8:1 and
 `--muted-foreground` 4.6:1, all worst on `--signature-subtle`; dark `--foreground` 10.8:1,
-`--foreground-secondary` 7.1:1 and `--muted-foreground` 4.8:1, all worst on `--accent`. Copper as
+`--foreground-secondary` 7.1:1 and `--muted-foreground` 5.3:1, all worst on `--accent`. Copper as
 running text clears every surface but two, both light, both a recorded exemption rather than a
 floor moved: 4.28:1 on the hover step, where no call site draws copper text, and 4.11:1 on the
 signature tint, forbidden outright (below); dark clears all six, 4.70:1 worst on `--accent`. As a
@@ -148,7 +153,7 @@ share one hex there.
 `--signature-subtle` never carries copper (`--primary`, `--signature`) text: the exemption above
 is the rule, not a design allowance, and `app/globals.contrast.test.ts` rescans every call site on
 each run to keep it that way. Neutral `--foreground` text is allowed and is measured against it
-like any other surface, 14.0:1 in light and 11.8:1 in dark.
+like any other surface, 12.6:1 in light and 11.8:1 in dark.
 
 ### Semantic scales — status and priority
 
@@ -181,11 +186,11 @@ binary font assets to the repo). The three faces' `next/font` `.variable` classe
 property resolves only against the element that defines it, so a variable placed on `<body>`
 falls straight through to the fallback fonts.
 
-| Role      | Face                                                       | Where                                                                     | Why this one                                                                                                                                                                                                                             |
-| --------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Display   | **Fraunces** (variable, OFL), `WONK 0 SOFT 0`, high `opsz` | Wordmark, auth, marketing, empty-state headlines. Never inside the board. | High-contrast and carved rather than calligraphic — it reads like something stamped into a seal, which is the _damga_ register. Its axes let us dial the quirk to zero and keep only the engraving.                                      |
-| Body / UI | **Archivo** (variable, OFL)                                | Everything in the product                                                 | A signage grotesque: tall x-height, economical widths, legible at 12–13px. A board is hundreds of short strings in narrow columns — a signage problem. Chosen over Inter and Geist, which are correct but read as the framework default. |
-| Mono      | **JetBrains Mono** (OFL), `0.92em`                         | Ids, shortcuts, code                                                      | Unambiguous `0/O` and `1/l/I` — a UUIDv7 legibility tool, not a style choice                                                                                                                                                             |
+| Role      | Face                                                       | Where                                                                                                                                                                                                                                        | Why this one                                                                                                                                                                                                                             |
+| --------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Display   | **Fraunces** (variable, OFL), `WONK 0 SOFT 0`, high `opsz` | Wordmark, auth, marketing, empty-state headlines, the board's own zero-column and zero-board states included, since an empty state is a headline wherever it renders. Never on board content itself: card titles, column headers, cell text. | High-contrast and carved rather than calligraphic — it reads like something stamped into a seal, which is the _damga_ register. Its axes let us dial the quirk to zero and keep only the engraving.                                      |
+| Body / UI | **Archivo** (variable, OFL)                                | Everything in the product                                                                                                                                                                                                                    | A signage grotesque: tall x-height, economical widths, legible at 12–13px. A board is hundreds of short strings in narrow columns — a signage problem. Chosen over Inter and Geist, which are correct but read as the framework default. |
+| Mono      | **JetBrains Mono** (OFL), `0.92em`                         | Ids, shortcuts, code                                                                                                                                                                                                                         | Unambiguous `0/O` and `1/l/I` — a UUIDv7 legibility tool, not a style choice                                                                                                                                                             |
 
 | Step                   | Size / line       | Weight    | Use                                                                      |
 | ---------------------- | ----------------- | --------- | ------------------------------------------------------------------------ |
@@ -193,17 +198,30 @@ falls straight through to the fallback fonts.
 | `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                        |
 | `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences |
 | `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — fields and rows · card titles, active nav              |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400 · 500 | Metadata, timestamps · chips, counts, axis ticks                         |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamps · chips, counts, axis ticks                         |
 
 This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
 `text-lg`, `text-xs` and `font-medium` are gone from the component tree, and
-`app/theme-classes.test.ts` compiles every `text-`, `bg-`, `border-`, `font-` and `shadow-` class
-through Tailwind and fails the build on one that resolves to nothing, so a reintroduced default
-cannot land unnoticed again. `text-lg` becomes `title` (16/24) at every call site, `DialogTitle`
+`app/theme-classes.test.ts` holds two separate gates on that claim. One compiles every `text-`,
+`bg-`, `border-`, `font-` and `shadow-` class through Tailwind and fails the build on one that
+resolves to nothing: a typo, never a live Tailwind default, since a default compiles clean and
+would pass that gate quietly. The other denies Tailwind's own size and weight scale by name
+(`text-xs` through `text-9xl`, `font-thin` through `font-black`) against a short, reasoned
+exception list, so a reintroduced default is caught even though it compiles. That list is three
+rows and they are all the same row: `text-base` on the three mobile form fields below.
+`font-semibold` had fourteen call sites, every one a heading restating the 600 its own
+`--text-*--font-weight` already carried, and all fourteen are gone, so the ban on it carries no
+exception at all. `text-lg` becomes `title` (16/24) at every call site, `DialogTitle`
 included: a dialog's title is a section title, not a size of its own, and there is no `18px`
 step for it to have kept. `text-xs` becomes `small` (12/16), never `micro` (11/14): its two call
 sites were a button label and a keyboard-shortcut hint, neither one metadata small enough for the
-smallest step. `font-medium` becomes `font-strong` (550) throughout. The label and the dialog
+smallest step. `font-medium` becomes `font-strong` (550) throughout. Only the four heading steps
+(`display`, `stat`, `title-lg`, `title`) declare a `--text-*--font-weight`; `read`, `body`,
+`small` and `micro` declare a size and a line box and nothing else, so they render at the
+inherited 400. That is what `body-strong` names: `text-body` paired with `font-strong` at the
+call site, not a step of its own. `micro` is paired the same way in the two places it needs to
+be heavier, the board's filter count and the notification bell, and left alone in the eleven
+where it is metadata. The label and the dialog
 title both carry their own step's line-height now, 18px and 24px, with no `leading-none` layered
 on top: that was a shadcn default riding along uninvited, not a choice this scale ever asked for.
 (Tailwind's own `text-base`, 16px, stays as a deliberate exception on three form fields below
@@ -370,14 +388,14 @@ every other section stays inline as a `SettingsSection` (`components/settings/se
 
 ## 5. Interaction patterns
 
-| Drag and drop | Rule                                                                                                                                                                                                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lift          | Card scales to `1.02`, tilts `1deg`, takes the one drag shadow; the source leaves a `--muted` ghost at the same height, so the board never reflows mid-drag                                                                                                               |
-| Drop target   | Within a column, dnd-kit's displacement opens the card-height gap and a 2px copper rail marks its leading edge; across columns the rail alone marks the insertion point and nothing shifts. The destination column takes a `--signature-subtle` wash. No dashed outlines. |
-| Commit        | Optimistic — the card lands instantly, `PATCH .../tasks/:taskId/position` follows                                                                                                                                                                                         |
-| Failure       | The rollback restores the position instantly and the card lands in place with a 220ms `--ease-in-out` settle (`translateY` -6px to 0, opacity 0.5 to 1); a toast says what happened with a **Try again** control. Never leave the optimistic state standing.              |
-| Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Moved _Fix login redirect_ to In Progress, position 2 of 5."                                       |
-| Autoscroll    | Both axes, 24px edge zone                                                                                                                                                                                                                                                 |
+| Drag and drop | Rule                                                                                                                                                                                                                                                                                          |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lift          | Card scales to `1.02`, tilts `1deg`, takes the one drag shadow; the source leaves a `--muted` ghost at the same height, so the board never reflows mid-drag                                                                                                                                   |
+| Drop target   | Within a column, dnd-kit's displacement opens the card-height gap and a 2px copper rail marks its leading edge; across columns the rail alone marks the insertion point and nothing shifts. The destination column takes a `--signature-subtle` wash. No dashed outlines.                     |
+| Commit        | Optimistic — the card lands instantly, `PATCH .../tasks/:taskId/position` follows                                                                                                                                                                                                             |
+| Failure       | The rollback restores the position instantly and the card lands in place with a 220ms `--ease-in-out` settle (`translateY` -6px to 0, opacity 0.5 to 1); a toast says what happened with a **Try again** control. Never leave the optimistic state standing.                                  |
+| Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Dropped _Fix login redirect_ into In Progress." No position clause yet (Hardening track, "Board keyboard follow-ups"). |
+| Autoscroll    | Both axes, 24px edge zone                                                                                                                                                                                                                                                                     |
 
 | Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -506,6 +524,23 @@ title already in place, so it is never blank; inline actions are optimistic. Spi
 exactly one place: inside a pressed button, 14px, over its content, after 400ms. List
 content never gets one. Unknown-length work (import, export) gets a progress bar with a count.
 
+**A control the reader can be focused on is never `disabled` mid-request.** The browser blurs a
+disabled element, which drops a keyboard user onto `<body>` in the middle of their own edit.
+While a write is out: a text field goes `readOnly`; a native `<select>` and a checkbox, neither
+of which has a `readOnly`, stay enabled, carry `aria-disabled` and let their change handler
+refuse the change, which React puts back so a refused choice is never left on screen as a saved
+one; and `aria-busy` marks the region being written (the properties panel's fields, the member
+row, the composer's and the inline rename's own `<form>`), never the control the reader is
+standing on. Where the write has no other visible mark, because no pressed button is carrying
+`Button`'s `loading`, a sibling `role="status"` region mounted while idle carries the saving
+line: the task properties panel and the member row are the two places that need one. That region
+takes no `aria-busy` of its own,
+because `aria-busy` on a live region lets assistive tech defer the region's update until busy
+clears, and here that is the same moment the line goes empty again. Pending state is scoped to
+the one control in flight, never shared across a section: a save on one field may not lock the
+field beside it. `Button`'s `loading` is the single exception, and only because it disables the
+control the press already came from.
+
 **Errors** derive from the problem-JSON shape in [api-conventions.md](api-conventions.md#errors).
 Per that contract the UI **branches on `statusCode` and `error`, never on `message` text** — so
 user-facing strings come from the i18n catalog and the API `message` is logged, not shown. Only
@@ -519,7 +554,7 @@ word "Oops".
 | `401`                          | Redirect to sign-in, keeping the return URL       | Your session ended. Sign in to pick up where you left off.                                |
 | `403`                          | Inline on the blocked control                     | You need admin access to change columns. Ask a workspace owner.                           |
 | `404` in panel                 | Replaces the panel body                           | This task no longer exists. Someone may have deleted it. → **Back to board**              |
-| `409`                          | Dialog over the stale editor                      | Someone changed this task while you were editing. → **Reload** · **Copy my changes**      |
+| `409`                          | Inline under the field, not a dialog              | Someone else changed this task. Reload it to edit again.                                  |
 | `429` · `5xx`                  | Toast · error block where the content should be   | Too many requests. Try again in a few seconds. · The board couldn't load. → **Try again** |
 | Offline                        | Persistent topbar strip                           | You're offline. Changes won't save until the connection is back.                          |
 
@@ -641,24 +676,27 @@ legend plus direct labels or the table view in a chart.
 | Tooltip                | Default-on: crosshair + tooltip on line and area, per-mark on bar and cell. Card surface, 1px border, `sm` radius, 8px padding, series dot + name + `tabular-nums` value, hit target larger than the mark.                                                                           |
 | Filters and table view | Filters in one row above the charts, never inside a chart. Every chart has a "View as table" affordance — also the relief channel for the light-mode contrast WARN.                                                                                                                  |
 
-**Stat tiles.** Label in `small` `--muted-foreground`, sentence case, no trailing colon · value
-in Archivo 600 at 28px with **proportional** figures, auto-compacted (`1,284` / `12.9K`) · delta
-signed against a named period, colored by _direction × whether up is good_ (more overdue tasks
-is not good news) and paired with an arrow · optional 12-point sparkline in
-`--muted-foreground` with the current period in copper. **At most one hero figure per view**,
-≥48px, in Archivo — never Fraunces; a display face on a number reads as decoration.
+**Stat tiles.** Label in `small` `--muted-foreground`, sentence case, no trailing colon · value in
+`text-stat` (Archivo 600 at 28px, its own type-scale step, never Fraunces, since a display face on
+a number reads as decoration) with **proportional**, comma-grouped figures (`1,284`), colored
+`--foreground` or, on the one tile marked `emphasize`, `--destructive` when the count is above
+zero (`components/dashboard/stat-tile.tsx`). Not shipped yet: auto-compaction (`12.9K`), a signed
+delta against a named period, its up-is-good-or-not colouring and arrow, the optional sparkline,
+and a ≥48px hero-figure step: none has a call site or a token today, so none is claimed as
+current.
 
 ## 9. Accessibility
 
 Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per screenshot.
 
-| Requirement                       | Floor                              | Applies to                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Body text on its surface          | 4.5:1                              | `app/globals.contrast.test.ts`: every text token in §3 against six real surfaces (canvas, column, card, popover, hover step, signature tint); boundary tokens hold the same six at 3:1. Nothing is waved through on prose: every exemption is a named entry in that file carrying its measured number and its reason, re-measured on each run and failing the gate when it drifts off that number or stops being needed. There are four classes of them. `--border`, the decorative hairline that carries no state. Copper text on the signature tint, which §3 forbids outright, and on the hover step, which no call site draws, both light only. The four light label slots, measured as dots and relieved by the name beside them (§8). And the alpha derivatives whose full-strength twin is the real mark: `opacity-50` on an inactive control (WCAG exempts it, the gate holds it to 3:1 anyway) and the hole a dragged card leaves in its column. |
-| Large text (≥18.66px bold / 24px) | 3:1                                | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Component boundaries and states   | 3:1                                | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Disabled text                     | exempt, held to 3:1 anyway         | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Requirement                       | Floor                                                 | Applies to                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Body text on its surface          | 4.5:1                                                 | `app/globals.contrast.test.ts`: every text token in §3 against six real surfaces (canvas, column, card, popover, hover step, signature tint); boundary tokens hold the same six at 3:1. Nothing is waved through on prose: every exemption is a named entry in that file carrying its measured number and its reason, re-measured on each run and failing the gate when it drifts off that number or stops being needed. There are four classes of them. `--border`, the decorative hairline that carries no state. Copper text on the signature tint, which §3 forbids outright, and on the hover step, which no call site draws, both light only. The four light label slots, measured as dots and relieved by the name beside them (§8). And the alpha derivatives whose full-strength twin is the real mark: `opacity-50` on an inactive control (WCAG exempts it, the gate holds it to 3:1 anyway) and the hole a dragged card leaves in its column. |
+| APCA on dark small type           | Lc 48, under Lc 75 or gate it instead of reporting it | `app/globals.contrast.test.ts`: dark `--foreground-secondary` and `--muted-foreground` (the 11-12px meta row) against all six dark surfaces, alongside their WCAG floor above; `--foreground` clears Lc 75 (body text) on all six. Worst case: `--muted-foreground` Lc 48.5 on `--accent` (WCAG 5.3:1), `--foreground-secondary` Lc 63.7 on the same surface. The three-token ink ramp is order-checked on every surface too, so a token move cannot re-rank `--foreground` > `--foreground-secondary` > `--muted-foreground` while each still clears its own floor alone.                                                                                                                                                                                                                                                                                                                                                                                |
+| Large text (≥18.66px bold / 24px) | 3:1                                                   | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Component boundaries and states   | 3:1                                                   | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Disabled text                     | exempt, held to 3:1 anyway                            | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Chart marks on the chart surface  | 3:1, or direct labels / table view                    | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 | Rule                         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

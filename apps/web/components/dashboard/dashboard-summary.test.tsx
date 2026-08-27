@@ -84,3 +84,81 @@ describe('DashboardSummary empty state', () => {
     expect(screen.getByRole('link', { name: messages.app.dashboard.openBoard })).toBeDefined();
   });
 });
+
+/**
+ * The other half of the zero-task state: a workspace with no boards at all. `BoardList`,
+ * rendered below this section on the real `/dashboard` route, already draws its own damga mark,
+ * headline and "Create board" action for exactly this case, so this section renders nothing
+ * rather than a second mark stacked on top of it.
+ */
+describe('DashboardSummary with no boards at all', () => {
+  it('renders nothing, leaving the board list as the page’s one empty state', async () => {
+    vi.mocked(fetchWorkspaceBoards).mockResolvedValue([]);
+    vi.mocked(api.get).mockResolvedValue(EMPTY_SUMMARY);
+    const { container } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DashboardSummary />
+      </NextIntlClientProvider>,
+    );
+
+    await waitFor(() => expect(container.textContent).toBe(''));
+    expect(screen.queryByRole('heading', { name: messages.app.dashboard.emptyTitle })).toBeNull();
+  });
+});
+
+/**
+ * The dashboard summary and the board roster are two independent requests (`lib/api.ts` and
+ * `lib/workspace-boards.ts`), unsynchronized with each other. `useApiResource` starts `boards`
+ * at `[]` and, on a failed load, resets it back to `[]` too, the same shape a workspace with
+ * genuinely zero boards has. Rendering nothing on that guess, before boards has an answer of
+ * its own, would hide this section's empty state for a workspace that does have boards.
+ */
+describe('DashboardSummary while the boards fetch has not answered yet', () => {
+  it('keeps the zero-board empty state visible instead of hiding it on an unresolved boards call', async () => {
+    let resolveBoards = (_boards: (typeof BOARD)[]): void => {};
+    const boardsPromise = new Promise<(typeof BOARD)[]>((resolve) => {
+      resolveBoards = resolve;
+    });
+    vi.mocked(fetchWorkspaceBoards).mockReturnValue(boardsPromise);
+    vi.mocked(api.get).mockResolvedValue(EMPTY_SUMMARY);
+
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DashboardSummary />
+      </NextIntlClientProvider>,
+    );
+
+    // The summary already answered "zero tasks"; boards has not answered at all yet. The
+    // section must still show its own empty state rather than render nothing on the guess
+    // that an unresolved `[]` means "confirmed no boards".
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: messages.app.dashboard.emptyTitle }),
+      ).toBeDefined();
+    });
+    expect(screen.queryByRole('link', { name: messages.app.dashboard.openBoard })).toBeNull();
+
+    resolveBoards([BOARD]);
+
+    expect(
+      await screen.findByRole('link', { name: messages.app.dashboard.openBoard }),
+    ).toBeDefined();
+  });
+
+  it('keeps the zero-board empty state visible when the boards fetch fails independently', async () => {
+    vi.mocked(fetchWorkspaceBoards).mockRejectedValue(new Error('network error'));
+    vi.mocked(api.get).mockResolvedValue(EMPTY_SUMMARY);
+
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DashboardSummary />
+      </NextIntlClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: messages.app.dashboard.emptyTitle }),
+      ).toBeDefined();
+    });
+  });
+});

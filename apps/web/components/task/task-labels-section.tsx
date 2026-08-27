@@ -18,20 +18,30 @@ interface TaskLabelsSectionProps {
   boardLabels: LabelDto[];
   canMutate: boolean;
   canManageLabels: boolean;
-  pending: boolean;
+  /** Board labels whose own toggle or delete has not come back yet. */
+  pendingLabelIds: ReadonlySet<string>;
+  /** The create form's own request, which is the only thing that gates its two fields. */
+  creatingLabel: boolean;
   onToggleLabel: (labelId: string, assigned: boolean) => void;
   onDeleteBoardLabel: (labelId: string) => void;
   /** Resolves `true` once the label exists, which is when the name field is cleared. */
   onCreateLabel: (name: string, color: LabelColorSlot) => Promise<boolean>;
 }
 
-/** Labels on this task, the board's palette, and the create form for admins. */
+/**
+ * Labels on this task, the board's palette, and the create form for admins.
+ *
+ * Every gate here is scoped to the one write it belongs to and none of them uses `disabled`
+ * on a field or a row, which is what a browser blurs (docs/design.md §6). The delete and
+ * create buttons keep `Button`'s own `loading`, which is the press the reader already made.
+ */
 export function TaskLabelsSection({
   taskLabels,
   boardLabels,
   canMutate,
   canManageLabels,
-  pending,
+  pendingLabelIds,
+  creatingLabel,
   onToggleLabel,
   onDeleteBoardLabel,
   onCreateLabel,
@@ -74,7 +84,7 @@ export function TaskLabelsSection({
         type="button"
         variant="ghost"
         size="sm"
-        disabled={pending}
+        loading={pendingLabelIds.has(labelId)}
         onClick={() => onDeleteBoardLabel(labelId)}
       >
         {t('deleteLabel')}
@@ -93,7 +103,7 @@ export function TaskLabelsSection({
       triggerLabel={t('addLabelAction', { count: taskLabels.length })}
       searchLabel={t('searchLabels')}
       emptyLabel={t('noMatches')}
-      disabled={pending}
+      pendingIds={pendingLabelIds}
       options={boardLabels.map((label) => ({
         id: label.id,
         name: label.name,
@@ -108,14 +118,18 @@ export function TaskLabelsSection({
     <ul className="flex flex-col gap-1">
       {boardLabels.map((label) => {
         const assigned = taskLabelIds.has(label.id);
+        const saving = pendingLabelIds.has(label.id);
         return (
           <li key={label.id} className="flex items-center gap-2">
             <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
               <input
                 type="checkbox"
                 checked={assigned}
-                disabled={pending}
-                onChange={() => onToggleLabel(label.id, assigned)}
+                aria-disabled={saving || undefined}
+                onChange={() => {
+                  if (saving) return;
+                  onToggleLabel(label.id, assigned);
+                }}
               />
               {slotDot(label.color)}
               <span className="truncate">{label.name}</span>
@@ -155,8 +169,11 @@ export function TaskLabelsSection({
             <Input
               id={labelNameId}
               value={newLabelName}
-              disabled={pending}
-              onChange={(event) => setNewLabelName(event.target.value)}
+              readOnly={creatingLabel}
+              onChange={(event) => {
+                if (creatingLabel) return;
+                setNewLabelName(event.target.value);
+              }}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -168,9 +185,12 @@ export function TaskLabelsSection({
               size="sm"
               className="w-auto"
               value={newLabelColor}
-              disabled={pending}
+              aria-disabled={creatingLabel || undefined}
               aria-label={t('labelColor')}
-              onChange={(event) => setNewLabelColor(event.target.value as LabelColorSlot)}
+              onChange={(event) => {
+                if (creatingLabel) return;
+                setNewLabelColor(event.target.value as LabelColorSlot);
+              }}
             >
               {SLOTS.map((slot) => (
                 <option key={slot} value={slot}>
@@ -185,7 +205,7 @@ export function TaskLabelsSection({
             type="button"
             variant="outline"
             size="sm"
-            disabled={pending}
+            loading={creatingLabel}
             onClick={() => void createLabel()}
           >
             {t('createLabel')}

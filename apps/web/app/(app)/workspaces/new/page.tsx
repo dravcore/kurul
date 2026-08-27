@@ -36,9 +36,7 @@ function NewWorkspaceHeader(): React.ReactElement {
 
   return (
     <header className="flex h-[var(--topbar-height)] shrink-0 items-center justify-between border-b border-border px-3">
-      <p className="font-display text-title font-semibold tracking-tight text-foreground">
-        {t('title')}
-      </p>
+      <p className="font-display text-title tracking-tight text-foreground">{t('title')}</p>
       <Button type="button" variant="ghost" onClick={() => void onSignOut()}>
         <LogOut className="size-5" />
         {t('signOut')}

@@ -33,7 +33,7 @@ const CompletionChart = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-56 w-full rounded-lg" /> },
 );
 
-export function DashboardSummary(): React.ReactElement {
+export function DashboardSummary(): React.ReactElement | null {
   const t = useTranslations('app.dashboard');
   const tErrors = useTranslations('app.errors');
   const { activeId } = useWorkspaceContext();
@@ -46,8 +46,16 @@ export function DashboardSummary(): React.ReactElement {
     () => (activeId ? () => fetchWorkspaceBoards(activeId) : null),
     [activeId],
   );
-  // The board picker degrades to "all boards" rather than surfacing its own error row.
-  const { data: boards } = useApiResource<BoardDto[]>(fetchBoards, [], '');
+  // The board picker degrades to "all boards" rather than surfacing its own error row, but the
+  // zero-board empty state below still needs to tell "no answer yet" apart from "confirmed
+  // zero": `useApiResource` starts `data` at `[]` and resets it to `[]` on a failed load too, so
+  // `boards.length === 0` alone cannot distinguish "still loading", "failed" and "genuinely no
+  // boards" from one another.
+  const {
+    data: boards,
+    loading: boardsLoading,
+    failed: boardsFailed,
+  } = useApiResource<BoardDto[]>(fetchBoards, [], '');
 
   const selectedBoardId = useMemo(() => {
     if (!boardIdParam) return '';
@@ -102,10 +110,20 @@ export function DashboardSummary(): React.ReactElement {
   }
 
   if (summary.totalTasks === 0) {
+    // A workspace with no boards at all has nothing of its own to say here: `BoardList` below
+    // already carries the one damga mark, the one headline and the one primary action for that
+    // exact state (docs/design.md §2's two-marks budget), and rendering this section's own
+    // empty state on top of it would put a second mark and a second action on the same screen.
+    // Only act on that once the boards resource has actually answered: while it is still
+    // loading, or if it failed, `boards` is the same `[]` as a confirmed-empty roster, and
+    // returning null on that guess would hide this section's empty state instead of showing it.
+    if (!boardsLoading && !boardsFailed && boards.length === 0) {
+      return null;
+    }
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
         <DamgaMark size={64} />
-        <h2 className="font-display text-title-lg font-semibold">{t('emptyTitle')}</h2>
+        <h2 className="font-display text-title-lg">{t('emptyTitle')}</h2>
         <p className="max-w-md text-body text-muted-foreground">{t('emptyBody')}</p>
         {boards[0] ? (
           // Outline, not the fill: the board list under this section carries "Create board" in

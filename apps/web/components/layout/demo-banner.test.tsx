@@ -113,6 +113,24 @@ describe('DemoBanner', () => {
   });
 
   /**
+   * `app/globals.css` draws the one focus mark for every keyboard-reachable control in
+   * `@layer base`; a `focus-visible:outline-*` utility here would restate it and, being in a
+   * later layer, silently win with a value that only happens to match today.
+   */
+  it('leaves the dismiss control to the one focus mark app/globals.css draws', async () => {
+    resolveWith({
+      enabled: true,
+      resetIntervalMinutes: 60,
+      nextResetAt: '2026-08-22T15:00:00.000Z',
+    });
+
+    renderBanner();
+    const dismiss = await screen.findByRole('button', { name: copy.dismiss });
+
+    expect(dismiss.className).not.toMatch(/focus-visible:outline/);
+  });
+
+  /**
    * A reset deletes every session, so the first request after one is a 401. The shell owns the
    * redirect to sign-in; the banner must not turn that into a second, louder failure.
    */

@@ -648,6 +648,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   places that each disabled a button on its own and, on four of them, swapped its text to a
   "Sending…" string of its own; the two `sending` keys and `auth.invite.submitPending` leave
   `messages/en.json` and `messages/tr.json`.
+- **Light text steps back off the top of the contrast shelf, and dark metadata steps up to meet
+  APCA.** The light theme's `--foreground` moves from `#191C1B` to `#212523`. The old value
+  measured 17.17:1 on the white card (APCA Lc 104.1), far past the 4.5:1 floor and into the band
+  where a full-strength ink on a full-white card haloes over a long read; the new one holds
+  15.51:1 (Lc 102.5) there and 12.64:1 on the signature tint, its worst of the six surfaces. The
+  dark theme's `--muted-foreground` moves the other way, `#98A09C` to `#A0A8A4`: the old value
+  cleared WCAG AA on all six dark surfaces and still scored APCA Lc 44.2 on `--accent`, under the
+  Lc 48 that an 11px or 12px meta row needs, because light-on-dark is the polarity the WCAG
+  formula models worst. `#A0A8A4` is the smallest step that clears Lc 48 on all six (48.5 at
+  worst) without closing on `--foreground-secondary`, which stays a rank above it at Lc 63.7.
+  Every screen in the product is repainted by the first of those two. `app/globals.contrast.test.ts`
+  now asserts the APCA band on every surface rather than printing it to stdout, so the dark floor
+  cannot be missed silently again.
+- **A workspace with no boards shows one empty state, not two, and the dashboard's hero figures
+  sit in a declared line box.** `DashboardSummary` renders nothing at all when the workspace has
+  no boards, leaving `BoardList`'s own empty state as the page's one damga mark and one primary
+  action; it renders as before the moment the boards call has actually answered with something.
+  The 28px stat figure moves off an arbitrary `text-[28px]`, which carried no line-height at all
+  and inherited 18px, onto a named `--text-stat` step (28/32, weight 600) and drops
+  `tabular-nums`, which `docs/design.md` §8 never asked for.
+- **The shell paints its sidebar shape on a reload again.** The pre-bootstrap loading skeleton
+  gated the sidebar-shaped column on `workspaces.length`, and `workspaces` is the same empty
+  array before any bootstrap has finished as after one that found nothing. Every returning
+  reader's reload therefore lost the shape and then grew a sidebar once the roster resolved. The
+  shell now latches "a bootstrap has actually resolved" separately from the roster, so the shape
+  is the default and is skipped only for the first-time signup on its way to `/workspaces/new`,
+  which is the one case it was ever meant for.
 
 ### Removed
 
@@ -1016,6 +1043,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   over it: a real drop under `reduce` still ran a 250ms `translate3d` animation. A new
   `useReducedMotion` hook now passes `dropAnimation={null}` when the preference is set, so the
   overlay simply disappears instead of animating into place.
+- **A keyboard user's focus no longer drops to `<body>` in the middle of their own edit.** The
+  browser blurs an element the moment it goes `disabled`, so every control that disabled itself
+  while its write was in flight threw the reader out of the field they were standing in. The task
+  properties panel shared one `pending` boolean across the whole section, which meant a save on
+  the priority select also emptied focus out of the due-date field beside it; pending state is now
+  scoped to the control actually in flight (a set of ids for the assignee and label rows, a flag
+  per field for priority, due and estimate). Where there is no native `readOnly` to reach for, the
+  priority select, the checkbox rows and the member role select in `/settings/members` stay
+  enabled, carry `aria-disabled` and refuse the change in their own handler, so a refused choice
+  is never left on screen as a saved one. `/settings/account/delete` gates its confirmation field
+  `readOnly` and its disposition selects the same way while the one irreversible request is out.
+  Each write announces from a `role="status"` line mounted while idle, and `aria-busy` marks the
+  region being written rather than the region announcing it, since `aria-busy` on a live region
+  lets assistive tech defer the update until busy clears, which is the same moment the line goes
+  empty again. `docs/design.md` §6 carries the rule.
+- **`Mark all read` went grey while the workspace still had unread notifications.** The
+  notifications page gated the bulk action on the rows it happened to have loaded, so a type
+  filter that hid every unread row disabled the one control that would have cleared them. It now
+  reads the workspace's own unread count, which the page already had on hand from
+  `NotificationUnreadProvider`. In the same pass the collapsed workspace switcher stopped
+  announcing only the generic "Switch workspace": the active workspace's name now reaches a
+  pointer through `title` and assistive tech through the accessible name.
+- **The delete-account route showed its title twice and had no way back from a failed load.** The
+  topbar already renders the route's one `<h1>`, and the section below it repeated the same claim
+  as an `<h2>`; the heading and its orphaned message key are gone. A load that fails now offers a
+  retry control, the way the members roster already did, instead of leaving the route on a dead
+  error line.
 
 ### Security
 

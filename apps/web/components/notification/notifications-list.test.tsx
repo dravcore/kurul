@@ -271,12 +271,15 @@ describe('NotificationsList click-through', () => {
    * proves the patch happened is the screen agreeing there is nothing left unread.
    */
   it('stops offering mark-all-read once the last unread row has been read', async () => {
+    unread = 1;
     serveList({ items: [notification('n1')], nextCursor: null });
     renderList();
     const markAll = await screen.findByRole('button', {
       name: messages.app.notifications.markAllRead,
     });
-    expect(markAll).toHaveProperty('disabled', false);
+    // The workspace's real unread count (from `NotificationUnreadProvider`), not a count derived
+    // from the one row this page happens to have loaded.
+    await waitFor(() => expect(markAll).toHaveProperty('disabled', false));
     const listed = screen.getAllByText(/mentioned/i);
     expect(listed).toHaveLength(1);
 
@@ -303,6 +306,7 @@ describe('NotificationsList click-through', () => {
 
   it('marks everything read, and then has nothing left to offer', async () => {
     // Mixed on purpose: mark-all has to leave the row that was already read exactly as it is.
+    unread = 1;
     serveList({
       items: [notification('n1'), notification('n2', { readAt: READ_AT })],
       nextCursor: null,
@@ -311,7 +315,7 @@ describe('NotificationsList click-through', () => {
     const markAll = await screen.findByRole('button', {
       name: messages.app.notifications.markAllRead,
     });
-    expect(markAll).toHaveProperty('disabled', false);
+    await waitFor(() => expect(markAll).toHaveProperty('disabled', false));
 
     fireEvent.click(markAll);
 
@@ -332,13 +336,31 @@ describe('NotificationsList click-through', () => {
     expect(markAll).toHaveProperty('disabled', true);
   });
 
+  /**
+   * The bug this page shipped with: every row *this screen loaded* was read, so `hasUnread`
+   * derived from `items` said there was nothing left, while the workspace still had unread
+   * notifications the active type filter was hiding.
+   */
+  it('offers mark-all-read for unread items the active filter is hiding', async () => {
+    unread = 1;
+    serveList({ items: [notification('n1', { readAt: READ_AT })], nextCursor: null });
+    renderList();
+
+    const markAll = await screen.findByRole('button', {
+      name: messages.app.notifications.markAllRead,
+    });
+    await waitFor(() => expect(markAll).toHaveProperty('disabled', false));
+  });
+
   it('reports a failed mark-all-read and leaves the rows unread', async () => {
+    unread = 1;
     serveList({ items: [notification('n1')], nextCursor: null });
     apiPost.mockRejectedValue(new Error('network'));
     renderList();
     const markAll = await screen.findByRole('button', {
       name: messages.app.notifications.markAllRead,
     });
+    await waitFor(() => expect(markAll).toHaveProperty('disabled', false));
 
     fireEvent.click(markAll);
 

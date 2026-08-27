@@ -112,11 +112,17 @@ const deleteButton = (): HTMLButtonElement =>
   screen.getByRole('button', { name: copy.deleteAction }) as HTMLButtonElement;
 
 describe('DeleteAccountSettings', () => {
-  it('renders the heading and lead as page content, not dialog chrome', async () => {
+  /**
+   * `Topbar` (app/(app)/settings/account/delete/page.tsx) already carries the route's one
+   * heading, `deletePageTitle`. This surface used to repeat it as its own `<h2>`, a second
+   * heading naming the same thing on one screen, which is what this component's own test suite
+   * has to stay clear of even though the route's `<h1>` is out of its render tree.
+   */
+  it('renders the lead as page content, not dialog chrome, and carries no heading of its own', async () => {
     renderSettings();
 
-    expect(await screen.findByRole('heading', { name: copy.deleteTitle })).toBeTruthy();
-    expect(screen.getByText(copy.deleteBody)).toBeTruthy();
+    await screen.findByText(copy.deleteBody);
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -306,6 +312,62 @@ describe('DeleteAccountSettings', () => {
       // owned-workspace questions were never asked is exactly what the 409 exists to stop.
       expect(screen.queryByLabelText(copy.confirmLabel.replace('{email}', EMAIL))).toBeNull();
       expect(deleteButton().disabled).toBe(true);
+    });
+
+    it('offers the way back as a control, not as a sentence', async () => {
+      // The same shape `MembersSettings` uses for the same kind of failure (docs/design.md §7):
+      // nothing on this screen explains itself, so the recovery has to be pressable.
+      apiGet.mockReset().mockRejectedValue(apiFailure(500));
+      renderSettings();
+
+      const retry = await screen.findByRole('button', { name: messages.app.errors.retry });
+      mockApiGet(preview());
+      fireEvent.click(retry);
+
+      expect(await confirmField()).toBeTruthy();
+      expect(screen.queryByText(copy.loadError)).toBeNull();
+    });
+  });
+
+  /**
+   * The one write on this screen takes the account with it, so nothing it was confirmed with
+   * may change under it. Gated without `disabled`, which a browser blurs.
+   */
+  describe('while the delete is out', () => {
+    it('holds the confirmation field readOnly rather than disabled', async () => {
+      apiDelete.mockReturnValue(new Promise<never>(() => {}));
+      renderSettings();
+      const field = await confirmField();
+
+      fireEvent.change(field, { target: { value: EMAIL } });
+      field.focus();
+      fireEvent.click(deleteButton());
+
+      await waitFor(() => expect(apiDelete).toHaveBeenCalled());
+      expect(document.activeElement).toBe(field);
+      expect(field.disabled).toBe(false);
+      expect(field.readOnly).toBe(true);
+    });
+
+    it('refuses a change of disposition', async () => {
+      mockApiGet(soleOwned([{ userId: CANDIDATE_ID, name: 'Grace' }]));
+      apiDelete.mockReturnValue(new Promise<never>(() => {}));
+      renderSettings();
+
+      const select = (await screen.findAllByRole('combobox'))[0] as HTMLSelectElement;
+      fireEvent.change(select, { target: { value: CANDIDATE_ID } });
+      fireEvent.change(await confirmField(), { target: { value: EMAIL } });
+      await waitFor(() => expect(deleteButton().disabled).toBe(false));
+      fireEvent.click(deleteButton());
+      await waitFor(() => expect(apiDelete).toHaveBeenCalled());
+
+      select.focus();
+      fireEvent.change(select, { target: { value: 'delete' } });
+
+      expect(document.activeElement).toBe(select);
+      expect(select.disabled).toBe(false);
+      expect(select.getAttribute('aria-disabled')).toBe('true');
+      expect(select.value).toBe(CANDIDATE_ID);
     });
   });
 });

@@ -30,7 +30,19 @@ export function WorkspaceSwitcher({
         <Button
           type="button"
           variant="ghost"
-          aria-label={collapsed ? t('switchWorkspace') : undefined}
+          // Collapsed to the 24px initial chip, this trigger is the only place the active
+          // workspace's name still appears: `title` names it for a pointer, and the
+          // accessible name folds it into the action for AT, matching how a screen reader
+          // would otherwise announce nothing more specific than "Switch workspace" on every
+          // workspace at once.
+          title={collapsed ? active?.name : undefined}
+          aria-label={
+            collapsed
+              ? active
+                ? t('switchWorkspaceNamed', { name: active.name })
+                : t('switchWorkspace')
+              : undefined
+          }
           className={cn(
             'h-10 justify-start gap-2 px-2',
             collapsed ? 'w-10 justify-center px-0' : 'w-full',

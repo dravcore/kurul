@@ -15,8 +15,9 @@ import { describe, expect, it } from 'vitest';
  * No colour is measured against one blessed surface. The same text token lands on the canvas, on
  * a column, on a card, inside a popover, on the hover step and on the signature tint, so the
  * floor has to hold on the worst of the six. WCAG 2.x AA is the binding standard (4.5:1 for text,
- * 3:1 for boundaries and state marks); APCA is a second opinion, reported for the dark theme
- * where the light-on-dark polarity is what the WCAG formula models worst.
+ * 3:1 for boundaries and state marks); APCA is the second opinion the dark theme is held to as
+ * well, where the light-on-dark polarity is what the WCAG formula models worst: `--foreground` at
+ * Lc 75 and the two secondary text tokens at Lc 48, asserted on every surface rather than printed.
  *
  * A token is only half of what a browser paints. The other half is the tree: an alpha derivative
  * (`bg-destructive/60`, `opacity-50`) is a token mixed with whatever is behind it, and a rule
@@ -167,9 +168,11 @@ const AA_NON_TEXT = 3;
 const SURFACE_STEP = 1.05;
 
 /**
- * Every surface a colour can land on. `--secondary` is absent because it is `--accent`'s twin
- * value, which the per-theme block below asserts rather than assumes, and `--primary` /
- * `--destructive` are covered as fills by their own `-foreground` pair.
+ * Every surface a colour can land on. `--secondary` is absent because the token is: the Button
+ * `secondary` variant that used to paint it carried no call site and no visible hover step, so
+ * it went, and the two now-dead tokens went with it rather than sitting in `globals.css` with
+ * nothing painting them and nothing measuring them. `--primary` / `--destructive` are covered
+ * as fills by their own `-foreground` pair.
  */
 const SURFACES = [
   '--background',
@@ -189,9 +192,11 @@ const TEXT_TOKENS = [
   '--muted-foreground',
   // Aliases that shadcn primitives read by name, each with a call site in `components/ui/`.
   // They equal `--foreground` today; measured separately so a future split cannot slip past
-  // this gate.
+  // this gate. `--secondary-foreground` was the third of them until the Button `secondary`
+  // variant it painted was deleted (`hover:bg-secondary/80` measured under 1.05:1 against its
+  // own resting fill on every surface, and nothing called the variant to begin with); it is
+  // absent here because the token itself is gone from `globals.css`.
   '--popover-foreground',
-  '--secondary-foreground',
   '--accent-foreground',
 ];
 
@@ -470,17 +475,6 @@ for (const theme of THEMES) {
 
     it('holds every non-exempt label slot at 3:1 on every surface as a dot', () => {
       expect(belowFloor(theme, LABEL_SLOTS, SURFACES, AA_NON_TEXT)).toEqual([]);
-    });
-
-    // What keeps `--secondary` out of SURFACES. components/ui/button.tsx paints `bg-secondary`
-    // and `hover:bg-secondary/80`, so it is a ground the tree really lands text on; the matrix
-    // covers it only while the two tokens are one value.
-    it("keeps --secondary on --accent's value", () => {
-      expect(
-        hexOf(theme, '--secondary'),
-        'the secondary button paints a ground no surface in SURFACES matches any more: add ' +
-          '--secondary to SURFACES so every text and boundary token is measured against it',
-      ).toBe(hexOf(theme, '--accent'));
     });
   });
 }
@@ -1206,7 +1200,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: '--muted-foreground',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 5.01, dark: 6.2 },
+    worst: { light: 5.01, dark: 6.82 },
   },
   {
     utility: 'bg-background/95',
@@ -1217,7 +1211,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: '--muted-foreground',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 5.29, dark: 6.76 },
+    worst: { light: 5.29, dark: 7.43 },
   },
   {
     utility: 'bg-muted/40',
@@ -1229,7 +1223,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: '--foreground',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 16.41, dark: 12.85 },
+    worst: { light: 14.83, dark: 12.85 },
   },
   {
     utility: 'dark:bg-destructive/60',
@@ -1244,28 +1238,6 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     floor: AA_TEXT,
     themes: ['dark'],
     worst: { dark: 5.08 },
-  },
-  {
-    utility: 'hover:bg-secondary/80',
-    files: ['components/ui/button.tsx'],
-    fill: '--secondary',
-    alpha: 0.8,
-    over: NEUTRAL_SURFACES,
-    text: '--secondary-foreground',
-    floor: AA_TEXT,
-    themes: ['light', 'dark'],
-    worst: { light: 14.68, dark: 11.07 },
-  },
-  {
-    utility: 'dark:hover:bg-accent/50',
-    files: ['components/ui/button.tsx'],
-    fill: '--accent',
-    alpha: 0.5,
-    over: NEUTRAL_SURFACES,
-    text: '--accent-foreground',
-    floor: AA_TEXT,
-    themes: ['dark'],
-    worst: { dark: 11.39 },
   },
   {
     utility: 'data-[variant=destructive]:focus:bg-destructive/10',
@@ -1292,10 +1264,13 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 3.21, dark: 4.21 },
+    worst: { light: 3.05, dark: 4.21 },
     reason:
       'WCAG 1.4.3 exempts text in an inactive control, and docs/design.md §9 holds disabled ' +
-      'text to 3:1 anyway, which this clears. Not open for revisit: the alpha stays ' +
+      'text to 3:1 anyway, which this clears. The light 3.05 is what now bounds light ' +
+      '--foreground from the other side: a second step off near-black takes an inactive control ' +
+      'under that 3:1, so the ink and this composite move together or not at all. Not open for ' +
+      'revisit either way: the alpha stays ' +
       'the disabled treatment on controls, because it thins whatever the control already paints ' +
       '(a filled button and a bare field do not share a resting colour) and a single drawn ' +
       'token cannot. The surfaces with no such colour to thin, chart marks and placeholders, ' +
@@ -1310,7 +1285,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 3.21, dark: 4.21 },
+    worst: { light: 3.05, dark: 4.21 },
     reason: 'the same inactive-control exemption, on a menu row',
   },
   {
@@ -1322,7 +1297,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 3.21, dark: 4.21 },
+    worst: { light: 3.05, dark: 4.21 },
     reason: 'the same exemption, on the label of a disabled field',
   },
   {
@@ -1334,7 +1309,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 3.21, dark: 4.21 },
+    worst: { light: 3.05, dark: 4.21 },
     reason: 'the same exemption, on the label of a disabled field group',
   },
   {
@@ -1347,7 +1322,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_NON_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 5.98, dark: 6.69 },
+    worst: { light: 5.47, dark: 6.69 },
   },
   {
     utility: 'opacity-40',
@@ -1358,7 +1333,7 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     text: 'self',
     floor: AA_TEXT,
     themes: ['light', 'dark'],
-    worst: { light: 2.45, dark: 3.35 },
+    worst: { light: 2.34, dark: 3.35 },
     reason:
       'the hole a card leaves in the column while it is being dragged. What the reader is ' +
       'following is the drag overlay under the pointer, drawn at full strength with the ' +
@@ -1619,6 +1594,32 @@ describe('hover steps', () => {
       ).toBeGreaterThanOrEqual(SURFACE_STEP);
     }
   });
+
+  // The ghost variant paints no fill at rest (components/ui/button.tsx): what changes on hover
+  // is the ground the button already sits on, replaced by the solid `--accent` token in both
+  // themes alike (`hover:bg-accent` light, `dark:hover:bg-accent` dark, no alpha in either), so
+  // one loop over both themes is the whole test: the ghost hover is measured the same way in
+  // both, not a plain-token compare in one and an alpha composite in the other. It used to be
+  // `dark:hover:bg-accent/50`, a 50% wash that cleared this floor by as little as 0.007:1 on
+  // --popover, close enough that the next token nudge could have silently dropped it under; the
+  // solid token was not merely simpler, it moved the worst case to 1.12:1.
+  it('keeps the ghost hover a visible step from every ground it sits on', () => {
+    const failures: string[] = [];
+    for (const theme of THEMES) {
+      const hover = hexOf(theme, '--accent');
+      for (const ground of NEUTRAL_SURFACES) {
+        const surface = hexOf(theme, ground);
+        const measured = round(contrastRatio(surface, hover), 3);
+        if (measured < SURFACE_STEP) {
+          failures.push(
+            `${theme}: ${ground} ${surface} against --accent ${hover} is ` +
+              `${measured.toFixed(3)}:1, below ${SURFACE_STEP.toFixed(2)}:1`,
+          );
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
 });
 
 /**
@@ -1673,11 +1674,18 @@ function lightnessContrast(text: string, background: string): number {
 describe('APCA on the dark theme', () => {
   const BODY_TEXT_FLOOR = 75;
 
-  // Only `--foreground` is gated. WCAG 2.x AA is this project's binding standard and the three
-  // secondary tokens below clear it on every surface; APCA scores them lower because it models
-  // light-on-dark polarity, and the values that would satisfy both are outside the current
-  // ramp. They are reported rather than asserted, and logged below as the APCA / WCAG
-  // divergence pairs.
+  /**
+   * The floor the two secondary text tokens are held to.
+   *
+   * Lc 75 is APCA's number for body text at normal weight and neither of them reaches it: the
+   * values that would are outside the dark ramp, and WCAG AA, which both clear on all six
+   * surfaces, is this project's binding standard. Lc 48 is what the smallest type they are
+   * actually painted at needs, the 11 and 12px meta row on a card, and it is asserted on every
+   * surface rather than printed. A target that lives only in stdout is a target nobody misses out
+   * loud: `--muted-foreground` sat at Lc 44.2 on `--accent` for two audits under a console.log.
+   */
+  const META_TEXT_FLOOR = 48;
+
   it('holds --foreground at Lc 75 on every dark surface', () => {
     const foreground = hexOf('dark', '--foreground');
     const failures = SURFACES.flatMap((surface) => {
@@ -1694,16 +1702,16 @@ describe('APCA on the dark theme', () => {
   });
 
   /**
-   * The divergence itself is what is asserted, in both directions.
+   * The divergence itself is what is asserted, in every direction.
    *
-   * Each token below has to clear the WCAG floor this file gates it at on all six dark surfaces
-   * *and* score under Lc 75. Widening the gap fails on the first half; closing it fails on the
-   * second, which is the half that matters: the day a token move lifts one of these past Lc 75,
-   * this stops being a divergence to report and becomes a pair the gate above can simply hold,
-   * and the note explaining the exception should go with it. Asserting only that the rows come
-   * back, which is what this test did before, asserts nothing about either.
+   * Each token below has to clear the WCAG floor this file gates it at on all six dark surfaces,
+   * score at or above Lc 48, and score under Lc 75. Sinking fails the first two; closing the gap
+   * fails the third, which is the one that retires this test: the day a token move lifts one of
+   * these past Lc 75, it stops being a divergence to report and becomes a pair the gate above can
+   * simply hold, and the note explaining the exception should go with it. Asserting only that the
+   * rows come back, which is what this test did before, asserts nothing about any of them.
    */
-  it('keeps every reported token AA on WCAG and under the APCA body floor', () => {
+  it('holds every reported token AA on WCAG and inside the Lc 48 to 75 band', () => {
     const reported: { token: string; floor: number }[] = [
       { token: '--foreground-secondary', floor: AA_TEXT },
       { token: '--muted-foreground', floor: AA_TEXT },
@@ -1731,6 +1739,12 @@ describe('APCA on the dark theme', () => {
               `the ${floor.toFixed(1)}:1 it is reported as clearing`,
           ];
         }
+        if (lc < META_TEXT_FLOOR) {
+          return [
+            `dark: ${token} ${text} on ${surface} ${background} is Lc ${lc.toFixed(1)}, below ` +
+              `Lc ${META_TEXT_FLOOR}, the floor the 11 and 12px meta row this token paints needs`,
+          ];
+        }
         if (lc >= BODY_TEXT_FLOOR) {
           return [
             `dark: ${token} ${text} on ${surface} ${background} now scores Lc ${lc.toFixed(1)}, ` +
@@ -1742,6 +1756,30 @@ describe('APCA on the dark theme', () => {
       }),
     );
     expect(broken).toEqual([]);
+  });
+
+  // The Lc 48 floor is a floor, not a destination: a tertiary ink lifted through the token above
+  // it leaves three ink weights scoring the same, which is one ink weight under three names. The
+  // WCAG gates above cannot see this, because they hold each token against a surface and never
+  // against each other.
+  it('keeps the dark ink ramp in order on every surface', () => {
+    const INK_RAMP = ['--foreground', '--foreground-secondary', '--muted-foreground'] as const;
+    const failures = SURFACES.flatMap((surface) => {
+      const background = hexOf('dark', surface);
+      return INK_RAMP.flatMap((token, index) => {
+        const nextDown = INK_RAMP[index + 1];
+        if (nextDown === undefined) return [];
+        const score = lightnessContrast(hexOf('dark', token), background);
+        const nextScore = lightnessContrast(hexOf('dark', nextDown), background);
+        return score > nextScore
+          ? []
+          : [
+              `dark: on ${surface} ${token} scores Lc ${score.toFixed(1)}, not above ` +
+                `${nextDown}'s Lc ${nextScore.toFixed(1)}`,
+            ];
+      });
+    });
+    expect(failures).toEqual([]);
   });
 });
 

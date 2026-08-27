@@ -107,7 +107,10 @@ export function DemoBanner(): React.ReactElement | null {
         type="button"
         onClick={dismiss}
         aria-label={t('dismiss')}
-        className="shrink-0 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        // `app/globals.css` draws the one focus mark in `@layer base`; this button carried its
+        // own `focus-visible:outline-*` trio on top of it, restating the same 2px ring for no
+        // reader this control does not already have.
+        className="shrink-0 rounded-sm p-1 text-muted-foreground hover:text-foreground"
       >
         <X className="size-4" aria-hidden />
       </button>

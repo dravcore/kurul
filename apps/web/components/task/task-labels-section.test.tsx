@@ -21,7 +21,8 @@ function renderSection(
     boardLabels?: LabelDto[];
     canMutate?: boolean;
     canManageLabels?: boolean;
-    pending?: boolean;
+    pendingLabelIds?: string[];
+    creatingLabel?: boolean;
   } = {},
 ) {
   const onCreateLabel = vi.fn().mockResolvedValue(true);
@@ -34,7 +35,8 @@ function renderSection(
         boardLabels={overrides.boardLabels ?? []}
         canMutate={overrides.canMutate ?? true}
         canManageLabels={overrides.canManageLabels ?? true}
-        pending={overrides.pending ?? false}
+        pendingLabelIds={new Set(overrides.pendingLabelIds ?? [])}
+        creatingLabel={overrides.creatingLabel ?? false}
         onToggleLabel={onToggleLabel}
         onDeleteBoardLabel={onDeleteBoardLabel}
         onCreateLabel={onCreateLabel}
@@ -108,10 +110,58 @@ describe('TaskLabelsSection colour picker', () => {
     expect(document.activeElement).toBe(picker());
   });
 
-  it('disables the picker while a mutation is in flight', () => {
-    renderSection({ pending: true });
+  it('keeps the picker focusable while the create it belongs to is out', () => {
+    // The create form's own two fields, gated so the reader cannot change what is already
+    // being created, and gated without `disabled`, which a browser blurs.
+    renderSection({ creatingLabel: true });
+    picker().focus();
 
-    expect(picker().disabled).toBe(true);
+    fireEvent.change(picker(), { target: { value: 'slot-3' } });
+
+    expect(document.activeElement).toBe(picker());
+    expect(picker().disabled).toBe(false);
+    expect(picker().getAttribute('aria-disabled')).toBe('true');
+    expect(picker().value).toBe('slot-1');
+  });
+
+  it('holds the name field readOnly rather than disabled while the create is out', () => {
+    renderSection({ creatingLabel: true });
+    const field = screen.getByLabelText('New label') as HTMLInputElement;
+
+    expect(field.disabled).toBe(false);
+    expect(field.readOnly).toBe(true);
+  });
+});
+
+describe('TaskLabelsSection while one row is in flight', () => {
+  it('swallows a second toggle on the busy row and leaves the rest alone', () => {
+    const { onToggleLabel } = renderSection({
+      boardLabels: boardLabels(INLINE_PICKER_MAX),
+      pendingLabelIds: ['l3'],
+    });
+    const box = screen.getByLabelText('Label 3') as HTMLInputElement;
+    box.focus();
+
+    fireEvent.click(box);
+
+    expect(document.activeElement).toBe(box);
+    expect(box.disabled).toBe(false);
+    expect(box.getAttribute('aria-disabled')).toBe('true');
+    expect(onToggleLabel).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('Label 4'));
+
+    expect(onToggleLabel).toHaveBeenCalledWith('l4', false);
+  });
+
+  it('marks only the row whose delete is out as busy', () => {
+    renderSection({ boardLabels: boardLabels(2), pendingLabelIds: ['l1'] });
+
+    const buttons = screen.getAllByRole('button', { name: messages.app.board.task.deleteLabel });
+
+    expect(buttons[0]!.getAttribute('aria-busy')).toBe('true');
+    expect(buttons[1]!.getAttribute('aria-busy')).toBeNull();
+    expect((buttons[1] as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
@@ -187,7 +237,8 @@ describe('TaskLabelsSection popover deletion keeps focus', () => {
       taskLabels: [] as LabelDto[],
       canMutate: true,
       canManageLabels: true,
-      pending: false,
+      pendingLabelIds: new Set<string>(),
+      creatingLabel: false,
       onToggleLabel: vi.fn(),
       onDeleteBoardLabel: vi.fn(),
       onCreateLabel: vi.fn().mockResolvedValue(true),

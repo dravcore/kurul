@@ -123,7 +123,10 @@ export function TaskPanelFields({
         tabbed into the next field. `role="alert"` still announces it.
       */}
       {conflict ? <SubmitError message={t('saveConflict')} focusOnMount={false} /> : null}
-      <div className="flex flex-col gap-1.5">
+      {/* `aria-busy` on the wrapper, not on the field: the mark describes the region being
+          written, and a reader standing on the control should not have the control itself
+          change state under them (docs/design.md §6). */}
+      <div className="flex flex-col gap-1.5" aria-busy={pending || undefined}>
         <Label htmlFor={titleId}>{t('title')}</Label>
         <Input
           id={titleId}
@@ -133,20 +136,18 @@ export function TaskPanelFields({
           // fields share one `pending` flag, so a save started from one would otherwise pull
           // focus out from under a reader still typing in the other.
           readOnly={pending}
-          aria-busy={pending || undefined}
           className="border-transparent md:text-title-lg focus:border-input"
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => void save()}
         />
       </div>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5" aria-busy={pending || undefined}>
         <Label htmlFor={descriptionId}>{t('description')}</Label>
         <Textarea
           id={descriptionId}
           value={description}
           disabled={!canMutate}
           readOnly={pending}
-          aria-busy={pending || undefined}
           onChange={(event) => setDescription(event.target.value)}
           onBlur={() => void save()}
           rows={8}

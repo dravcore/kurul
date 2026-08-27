@@ -68,7 +68,7 @@ export function BoardColumnsEmptyState({
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <DamgaMark />
-      <h2 className="font-display text-title-lg font-semibold">{t('column.emptyTitle')}</h2>
+      <h2 className="font-display text-title-lg">{t('column.emptyTitle')}</h2>
       <p className="max-w-md text-body text-muted-foreground">{t('column.emptyBody')}</p>
       {canMutateColumns ? (
         <div className="flex flex-wrap items-center justify-center gap-2">

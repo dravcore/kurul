@@ -297,7 +297,7 @@ export function BoardList(): React.ReactElement {
       {boards.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
           <DamgaMark />
-          <h2 className="font-display text-title-lg font-semibold">{t('emptyTitle')}</h2>
+          <h2 className="font-display text-title-lg">{t('emptyTitle')}</h2>
           <p className="max-w-sm text-body text-muted-foreground">{t('emptyBody')}</p>
           {canCreate ? (
             <Button type="button" onClick={() => setCreateOpen(true)} disabled={atBoardCeiling}>

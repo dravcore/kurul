@@ -58,6 +58,7 @@ const EMPTY_PREVIEW: AccountDeletionPreviewDto = {
 export function DeleteAccountSettings(): React.ReactElement {
   const t = useTranslations('app.settings.account');
   const tShell = useTranslations('app.shell');
+  const tErrors = useTranslations('app.errors');
   const router = useRouter();
 
   const fetchMe = useCallback((signal: AbortSignal) => api.get<UserDto>('/me', { signal }), []);
@@ -86,7 +87,17 @@ export function DeleteAccountSettings(): React.ReactElement {
   const ready = !loading && !failed && allDecided && confirmed;
 
   function decide(workspaceId: string, value: string): void {
+    // Refused rather than `disabled` while the delete is out: a native `<select>` has no
+    // `readOnly` and disabling it would blur the reader (docs/design.md §6). What must not
+    // happen is the disposition changing under a request that already carries the old one.
+    if (pending) return;
     setDecisions((current) => ({ ...current, [workspaceId]: value }));
+  }
+
+  /** Both reads, because the screen needs both and only offers one way back. */
+  function retryLoad(): void {
+    me.reload();
+    preview.reload();
   }
 
   function dispositionsFor(): WorkspaceDispositionRequest[] {
@@ -147,10 +158,10 @@ export function DeleteAccountSettings(): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-title font-semibold">{t('deleteTitle')}</h2>
-        <p className="text-body text-muted-foreground">{t('deleteBody')}</p>
-      </div>
+      {/* No `<h2>` here: `Topbar` already carries `deletePageTitle` as the route's one heading
+          (app/(app)/settings/account/delete/page.tsx), and a second one repeating the same
+          "delete your account" claim would be a duplicate landmark, not a subsection. */}
+      <p className="text-body text-muted-foreground">{t('deleteBody')}</p>
 
       {loading ? (
         <div className="flex flex-col gap-2" role="status" aria-busy>
@@ -159,7 +170,16 @@ export function DeleteAccountSettings(): React.ReactElement {
         </div>
       ) : null}
 
-      {failed ? <p className="text-body text-destructive">{me.error ?? preview.error}</p> : null}
+      {failed ? (
+        // Nothing here explains itself, so the recovery is a control rather than a sentence
+        // (docs/design.md §7), the same shape `MembersSettings` gives the same kind of failure.
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-body text-destructive">{me.error ?? preview.error}</p>
+          <Button type="button" onClick={retryLoad}>
+            {tErrors('retry')}
+          </Button>
+        </div>
+      ) : null}
 
       {!loading && !failed ? (
         <div className="flex flex-col gap-4">
@@ -185,6 +205,7 @@ export function DeleteAccountSettings(): React.ReactElement {
                   <Select
                     id={`disposition-${workspace.workspaceId}`}
                     value={decisions[workspace.workspaceId] ?? UNDECIDED}
+                    aria-disabled={pending || undefined}
                     onChange={(event) => decide(workspace.workspaceId, event.target.value)}
                   >
                     <option value={UNDECIDED}>{t('ownedChoose')}</option>
@@ -211,7 +232,13 @@ export function DeleteAccountSettings(): React.ReactElement {
             <Input
               id="delete-account-confirm"
               value={typedEmail}
-              onChange={(event) => setTypedEmail(event.target.value)}
+              // `readOnly`, never `disabled`: the reader may still be in this field when the
+              // request goes out, and a disabled field drops focus (docs/design.md §6).
+              readOnly={pending}
+              onChange={(event) => {
+                if (pending) return;
+                setTypedEmail(event.target.value);
+              }}
               autoComplete="off"
               aria-invalid={typedEmail.length > 0 && !confirmed}
             />

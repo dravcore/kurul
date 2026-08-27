@@ -14,7 +14,7 @@ const MEMBER_USER_ID = '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1e06';
 
 // `vi.mock` factories are hoisted above every `const` in this file, so the doubles they close
 // over have to be hoisted with them.
-const mocks = vi.hoisted(() => ({ post: vi.fn(), delete: vi.fn() }));
+const mocks = vi.hoisted(() => ({ post: vi.fn(), delete: vi.fn(), patch: vi.fn() }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -22,7 +22,10 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // same status-to-copy mapping the app runs.
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>();
-  return { ...actual, api: { ...actual.api, post: mocks.post, delete: mocks.delete } };
+  return {
+    ...actual,
+    api: { ...actual.api, post: mocks.post, delete: mocks.delete, patch: mocks.patch },
+  };
 });
 
 import { TaskPropertiesPanel } from './task-properties-panel';
@@ -98,6 +101,7 @@ const propertiesRegion = (): HTMLElement =>
 beforeEach(() => {
   mocks.post.mockReset();
   mocks.delete.mockReset();
+  mocks.patch.mockReset();
 });
 
 afterEach(() => {
@@ -184,5 +188,135 @@ describe('TaskPropertiesPanel', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(toast.error).toHaveBeenCalledWith(messages.app.board.task.labelDeleteError);
+  });
+});
+
+/**
+ * The whole panel used to share one `pending` flag, so any write re-rendered every field as
+ * `disabled` and the browser blurred whichever one the reader was holding. These fire a real
+ * change against a request that never settles, which is the state the old flag was wrong in.
+ *
+ * jsdom does not run the browser's focus fixup, so `document.activeElement` cannot fail here on
+ * its own: the assertion that carries the guarantee in a real browser is `disabled === false`.
+ */
+describe('TaskPropertiesPanel while a write is out', () => {
+  /** Leaves the mocked call unresolved for the rest of the test. */
+  function neverSettles(mock: { mockImplementation: (impl: () => Promise<never>) => void }): void {
+    mock.mockImplementation(() => new Promise<never>(() => {}));
+  }
+
+  const priority = (): HTMLSelectElement => screen.getByLabelText(messages.app.board.task.priority);
+  const due = (): HTMLInputElement => screen.getByLabelText(messages.app.board.task.dueDate);
+  const estimate = (): HTMLInputElement => screen.getByLabelText(messages.app.board.task.estimate);
+  const liveRegion = (): HTMLElement => within(propertiesRegion()).getByRole('status');
+  /** What the busy mark sits on: the fields being written, not the region announcing them. */
+  const fields = (): HTMLElement => {
+    const found = propertiesRegion().querySelector('[data-slot="task-properties-fields"]');
+    if (!found) throw new Error('the properties fields wrapper is gone');
+    return found as HTMLElement;
+  };
+
+  it('keeps the priority select focused instead of disabling it', async () => {
+    neverSettles(mocks.patch);
+    renderPanel();
+    priority().focus();
+
+    fireEvent.change(priority(), { target: { value: Priority.URGENT } });
+
+    await waitFor(() => expect(mocks.patch).toHaveBeenCalled());
+    expect(document.activeElement).toBe(priority());
+    expect(priority().disabled).toBe(false);
+    expect(priority().getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('keeps the due-date field focused and readOnly', async () => {
+    neverSettles(mocks.patch);
+    renderPanel();
+    due().focus();
+
+    fireEvent.change(due(), { target: { value: '2026-09-01' } });
+
+    await waitFor(() => expect(mocks.patch).toHaveBeenCalled());
+    expect(document.activeElement).toBe(due());
+    expect(due().disabled).toBe(false);
+    expect(due().readOnly).toBe(true);
+  });
+
+  it('leaves the estimate the reader is typing in alone while another field saves', async () => {
+    neverSettles(mocks.patch);
+    renderPanel();
+    fireEvent.change(priority(), { target: { value: Priority.URGENT } });
+    await waitFor(() => expect(mocks.patch).toHaveBeenCalled());
+
+    estimate().focus();
+    fireEvent.change(estimate(), { target: { value: '45' } });
+
+    expect(document.activeElement).toBe(estimate());
+    expect(estimate().disabled).toBe(false);
+    expect(estimate().readOnly).toBe(false);
+    expect(estimate().value).toBe('45');
+  });
+
+  it('keeps the assignee checkbox focused while its own toggle is out', async () => {
+    neverSettles(mocks.post);
+    renderPanel();
+    const box = screen.getByLabelText('Ayşe Yıldız') as HTMLInputElement;
+    box.focus();
+
+    fireEvent.click(box);
+
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+    expect(document.activeElement).toBe(box);
+    expect(box.disabled).toBe(false);
+    expect(box.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('keeps the label checkbox focused while its own toggle is out', async () => {
+    neverSettles(mocks.post);
+    renderPanel();
+    const box = screen.getByLabelText('Bug') as HTMLInputElement;
+    box.focus();
+
+    fireEvent.click(box);
+
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+    expect(document.activeElement).toBe(box);
+    expect(box.disabled).toBe(false);
+    expect(box.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  /**
+   * `aria-busy="true"` on a live region lets assistive tech hold the region's own updates back
+   * until busy clears, which here is the same moment its text goes empty again: the one
+   * announcement of the write would be deferred into nothing. So the region carries the text
+   * and the fields around it carry the mark.
+   */
+  it('announces the write from a section live region rather than from the control', async () => {
+    neverSettles(mocks.patch);
+    renderPanel();
+
+    expect(liveRegion().textContent).toBe('');
+    expect(fields().getAttribute('aria-busy')).toBeNull();
+
+    fireEvent.change(priority(), { target: { value: Priority.URGENT } });
+
+    await waitFor(() => expect(liveRegion().textContent).toBe(messages.app.board.task.saving));
+    expect(fields().getAttribute('aria-busy')).toBe('true');
+    expect(liveRegion().getAttribute('aria-busy')).toBeNull();
+    expect(priority().getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('gates only the row whose write is out, not the section around it', async () => {
+    neverSettles(mocks.post);
+    renderPanel();
+
+    fireEvent.click(screen.getByLabelText('Ayşe Yıldız'));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalled());
+
+    expect(priority().getAttribute('aria-disabled')).toBeNull();
+    expect(due().readOnly).toBe(false);
+    expect(
+      (screen.getByLabelText('Bug') as HTMLInputElement).getAttribute('aria-disabled'),
+    ).toBeNull();
   });
 });

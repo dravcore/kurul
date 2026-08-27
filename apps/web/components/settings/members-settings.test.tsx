@@ -159,10 +159,14 @@ function clickLastButton(label: string): void {
  * The role `<select>` on a specific member's row, scoped by the row it sits in and named for
  * that member (`Role for {name}`), unlike the invite dialog's plain `Role`.
  */
-function roleSelectFor(name: string): HTMLSelectElement {
+function rowFor(name: string): HTMLElement {
   const row = screen.getByText(name).closest('li');
   if (!row) throw new Error(`no row found for ${name}`);
-  return within(row).getByLabelText(`Role for ${name}`) as HTMLSelectElement;
+  return row;
+}
+
+function roleSelectFor(name: string): HTMLSelectElement {
+  return within(rowFor(name)).getByLabelText(`Role for ${name}`) as HTMLSelectElement;
 }
 
 beforeAll(() => {
@@ -351,7 +355,13 @@ describe('MembersSettings — changing a role', () => {
     expect(select.getAttribute('aria-describedby')).toBe(hint.id);
   });
 
-  it('disables the select while its own patch is in flight, and re-enables it after', async () => {
+  /**
+   * A native `<select>` has no `readOnly`, so the row keeps its control enabled and refuses the
+   * write instead. jsdom does not run the browser's focus fixup, so `document.activeElement`
+   * cannot fail here on its own: `disabled === false` is what keeps a real browser from
+   * dropping the reader onto `<body>` for the length of the request.
+   */
+  it('keeps the select focused while its own patch is in flight, and clears the mark after', async () => {
     let resolvePatch: (value: WorkspaceMemberDto) => void = () => {};
     apiPatch.mockImplementation(
       () =>
@@ -361,14 +371,42 @@ describe('MembersSettings — changing a role', () => {
     );
     renderSection();
     await screen.findByText('Bora');
+    roleSelectFor('Bora').focus();
 
     fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
 
-    expect(roleSelectFor('Bora').disabled).toBe(true);
-    expect(roleSelectFor('Bora').getAttribute('aria-busy')).toBe('true');
+    expect(document.activeElement).toBe(roleSelectFor('Bora'));
+    expect(roleSelectFor('Bora').disabled).toBe(false);
+    expect(roleSelectFor('Bora').getAttribute('aria-disabled')).toBe('true');
+    // The busy state moved off the control the reader is holding and onto a live region of
+    // its own, which is the only thing left saying the write is happening. The row carries
+    // `aria-busy`, never the region: on the region it would license assistive tech to defer
+    // the update until busy clears, and by then the text is empty again.
+    const busy = within(rowFor('Bora')).getByRole('status');
+    expect(busy.textContent).toBe(copy.savingRole);
+    expect(busy.getAttribute('aria-busy')).toBeNull();
+    expect(rowFor('Bora').getAttribute('aria-busy')).toBe('true');
+    expect(roleSelectFor('Bora').getAttribute('aria-busy')).toBeNull();
 
     resolvePatch(member(BORA_ID, 'Bora', MemberRole.ADMIN));
-    await waitFor(() => expect(roleSelectFor('Bora').disabled).toBe(false));
+    await waitFor(() => expect(roleSelectFor('Bora').getAttribute('aria-disabled')).toBeNull());
+    expect(within(rowFor('Bora')).getByRole('status').textContent).toBe('');
+    expect(rowFor('Bora').getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('refuses a second choice while the first patch is still out', async () => {
+    apiPatch.mockImplementation(() => new Promise<never>(() => {}));
+    renderSection();
+    await screen.findByText('Bora');
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
+    await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.MEMBER } });
+
+    expect(apiPatch).toHaveBeenCalledTimes(1);
+    // The refused choice is put back rather than left on screen as a value nothing saved.
+    expect(roleSelectFor('Bora').value).toBe(MemberRole.ADMIN);
   });
 
   /**
