@@ -113,6 +113,10 @@ describe('TaskPanelFields pending state', () => {
     expect((description as HTMLTextAreaElement).readOnly).toBe(true);
     expect((title as HTMLInputElement).disabled).toBe(false);
     expect((description as HTMLTextAreaElement).disabled).toBe(false);
+    // A `readOnly` field carries none of the semantics `disabled` would have announced, so
+    // `aria-busy` is what tells assistive tech the save is in flight (Ruling 4 compensation).
+    expect(title.getAttribute('aria-busy')).toBe('true');
+    expect(description.getAttribute('aria-busy')).toBe('true');
     // The reader was still in the description field; a `disabled` field would have dropped
     // focus to the body the moment the shared pending state applied to it.
     expect(document.activeElement).toBe(description);
@@ -120,6 +124,8 @@ describe('TaskPanelFields pending state', () => {
     resolvePatch({ ...task(), title: 'Fix the login redirect' });
     await waitFor(() => expect((title as HTMLInputElement).readOnly).toBe(false));
     expect((description as HTMLTextAreaElement).readOnly).toBe(false);
+    expect(title.getAttribute('aria-busy')).toBeNull();
+    expect(description.getAttribute('aria-busy')).toBeNull();
   });
 
   it('disables both fields outright when the reader cannot mutate the task', () => {

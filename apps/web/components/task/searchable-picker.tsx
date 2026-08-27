@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
  */
 export const INLINE_PICKER_MAX = 7;
 
-export interface PickerOption {
+interface PickerOption {
   id: string;
   name: string;
   selected: boolean;
@@ -27,14 +27,16 @@ export interface PickerOption {
 }
 
 interface SearchablePickerProps {
-  /** Already-translated trigger copy, count included. */
+  /** Already-translated trigger copy, count included. Also names the popover surface. */
   triggerLabel: string;
-  /** Names the filter field, stands in as its placeholder, and names the popover surface. */
+  /** Names the filter field and stands in as its placeholder. */
   searchLabel: string;
   emptyLabel: string;
   options: PickerOption[];
   disabled: boolean;
   onToggle: (id: string, selected: boolean) => void;
+  /** Lets a caller latch its own flat-vs-popover layout decision while this is open. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -55,12 +57,15 @@ export function SearchablePicker({
   options,
   disabled,
   onToggle,
+  onOpenChange,
 }: SearchablePickerProps): React.ReactElement {
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const optionIdsRef = useRef(options.map((option) => option.id));
 
   // Folded in the reader's own locale, not with `toLowerCase()`. Turkish pairs `İ` with `i` and
   // `I` with `ı`, so the invariant fold turns "İbrahim" into `i` + U+0307 and leaves "Işıl" as
@@ -69,6 +74,23 @@ export function SearchablePicker({
   const needle = fold(query.trim());
   const shown =
     needle === '' ? options : options.filter((option) => fold(option.name).includes(needle));
+
+  // A row can disappear out from under the reader who is looking at it, such as a board label
+  // deleted from its own trailing control. When that leaves focus stranded on the body, put it
+  // back somewhere useful: the filter field while the popover is still open to hold it, or the
+  // trigger if the popover has since closed and the field is gone with it.
+  useEffect(() => {
+    const previousIds = optionIdsRef.current;
+    const currentIds = options.map((option) => option.id);
+    optionIdsRef.current = currentIds;
+    const lostARow = previousIds.some((id) => !currentIds.includes(id));
+    if (!lostARow || document.activeElement !== document.body) return;
+    if (open) {
+      searchRef.current?.focus();
+    } else {
+      triggerRef.current?.focus();
+    }
+  }, [options, open]);
 
   function boxes(): HTMLInputElement[] {
     return Array.from(
@@ -104,17 +126,18 @@ export function SearchablePicker({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        onOpenChange?.(next);
         // A query left behind would hide most of the list the next time the picker opens, with
         // nothing on screen to say why.
         if (!next) setQuery('');
       }}
     >
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" disabled={disabled}>
+        <Button ref={triggerRef} type="button" variant="outline" size="sm" disabled={disabled}>
           {triggerLabel}
         </Button>
       </PopoverTrigger>
-      <PopoverContent aria-label={searchLabel} className="flex flex-col gap-2">
+      <PopoverContent aria-label={triggerLabel} className="flex flex-col gap-2">
         <Input
           ref={searchRef}
           type="search"
@@ -123,7 +146,7 @@ export function SearchablePicker({
           placeholder={searchLabel}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key !== 'ArrowDown') return;
+            if (event.key !== 'ArrowDown' || shown.length === 0) return;
             event.preventDefault();
             focusRow(0);
           }}

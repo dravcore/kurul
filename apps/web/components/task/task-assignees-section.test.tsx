@@ -47,8 +47,8 @@ function renderSection(count: number, assigned: string[] = []) {
 }
 
 const trigger = (): HTMLElement => screen.getByRole('button', { name: /^Assign/ });
-// By role rather than by label text: the popover surface carries the same name, so that the
-// reader who lands on it is told what it holds.
+// By role rather than by label text: the searchbox and the dialog it sits in are named
+// differently now, and this helper only cares about the field.
 const search = (): HTMLInputElement =>
   screen.getByRole('searchbox', {
     name: messages.app.board.task.searchMembers,
@@ -131,6 +131,21 @@ describe('TaskAssigneesSection over the threshold', () => {
     expect(screen.getByText(messages.app.board.task.noMatches)).toBeDefined();
   });
 
+  it('leaves ArrowDown alone when the query matches nobody, rather than preventing it into an empty list', () => {
+    renderSection(INLINE_PICKER_MAX + 1);
+    openPicker();
+    fireEvent.change(search(), { target: { value: 'nobody' } });
+    search().focus();
+
+    const event = fireEvent.keyDown(search(), { key: 'ArrowDown' });
+
+    // A cancelled event is what a native `<input type="search">` would otherwise have used for
+    // its own default `ArrowDown` behaviour; there is nothing here for the picker to steal it
+    // for, since there are no rows to step into.
+    expect(event).toBe(true);
+    expect(document.activeElement).toBe(search());
+  });
+
   it('walks from the search field into the rows and back with the arrow keys', () => {
     renderSection(INLINE_PICKER_MAX + 1);
     openPicker();
@@ -158,15 +173,15 @@ describe('TaskAssigneesSection over the threshold', () => {
     expect(onToggle).toHaveBeenCalledWith('u4', false);
   });
 
-  it('names the popover surface, which Radix exposes as a dialog', () => {
+  it('names the popover surface after the trigger, not the search field, so the two are not announced identically', () => {
     // Without this the reader lands in an unnamed `role="dialog"` and is told nothing about
-    // what it holds.
+    // what it holds; naming it the same as the search field inside it would announce both
+    // controls identically the moment focus moves from one to the other.
     renderSection(INLINE_PICKER_MAX + 1);
     openPicker();
 
-    expect(
-      screen.getByRole('dialog', { name: messages.app.board.task.searchMembers }),
-    ).toBeDefined();
+    const dialogName = messages.app.board.task.assignAction.replace('{count}', '0');
+    expect(screen.getByRole('dialog', { name: dialogName })).toBeDefined();
   });
 
   it('leaves every row reachable as a native checkbox', () => {

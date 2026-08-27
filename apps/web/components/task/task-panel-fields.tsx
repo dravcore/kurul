@@ -133,6 +133,7 @@ export function TaskPanelFields({
           // fields share one `pending` flag, so a save started from one would otherwise pull
           // focus out from under a reader still typing in the other (P6 deferred finding).
           readOnly={pending}
+          aria-busy={pending || undefined}
           className="border-transparent md:text-title-lg focus:border-input"
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => void save()}
@@ -145,6 +146,7 @@ export function TaskPanelFields({
           value={description}
           disabled={!canMutate}
           readOnly={pending}
+          aria-busy={pending || undefined}
           onChange={(event) => setDescription(event.target.value)}
           onBlur={() => void save()}
           rows={8}

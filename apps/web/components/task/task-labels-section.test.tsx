@@ -169,3 +169,70 @@ describe('TaskLabelsSection palette threshold', () => {
     expect(onDeleteBoardLabel).toHaveBeenCalledWith('l2');
   });
 });
+
+/**
+ * `onDeleteBoardLabel` never mutates `boardLabels` itself: the caller does, once the server
+ * confirms. These re-render with the shorter list the caller would pass down, the same way
+ * `TaskPropertiesPanel` does after a successful delete.
+ */
+describe('TaskLabelsSection popover deletion keeps focus', () => {
+  const trigger = (): HTMLElement => screen.getByRole('button', { name: /^Add label/ });
+  const search = (): HTMLInputElement =>
+    screen.getByRole('searchbox', {
+      name: messages.app.board.task.searchLabels,
+    }) as HTMLInputElement;
+
+  function renderPalette(count: number) {
+    const props = {
+      taskLabels: [] as LabelDto[],
+      canMutate: true,
+      canManageLabels: true,
+      pending: false,
+      onToggleLabel: vi.fn(),
+      onDeleteBoardLabel: vi.fn(),
+      onCreateLabel: vi.fn().mockResolvedValue(true),
+    };
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TaskLabelsSection {...props} boardLabels={boardLabels(count)} />
+      </NextIntlClientProvider>,
+    );
+    return {
+      deleteFirstAndShrinkTo(remaining: number): void {
+        const deleteButton = screen.getAllByRole('button', {
+          name: messages.app.board.task.deleteLabel,
+        })[0]!;
+        deleteButton.focus();
+        fireEvent.click(deleteButton);
+        rerender(
+          <NextIntlClientProvider locale="en" messages={messages}>
+            <TaskLabelsSection {...props} boardLabels={boardLabels(count).slice(-remaining)} />
+          </NextIntlClientProvider>,
+        );
+      },
+    };
+  }
+
+  it(`keeps the popover open and focus inside it when a delete crosses ${INLINE_PICKER_MAX} board labels`, () => {
+    // Exactly the boundary: without latching, the shrink from 8 to 7 would flip the palette
+    // back to a flat list and unmount the popover the reader is still in.
+    const { deleteFirstAndShrinkTo } = renderPalette(INLINE_PICKER_MAX + 1);
+    fireEvent.click(trigger());
+
+    deleteFirstAndShrinkTo(INLINE_PICKER_MAX);
+
+    expect(screen.getByRole('dialog')).toBeDefined();
+    expect(document.activeElement).toBe(search());
+  });
+
+  it(`keeps focus inside the popover when a delete leaves it above ${INLINE_PICKER_MAX} board labels`, () => {
+    // No shape change here, only a row disappearing out from under the reader's focus.
+    const { deleteFirstAndShrinkTo } = renderPalette(INLINE_PICKER_MAX + 2);
+    fireEvent.click(trigger());
+
+    deleteFirstAndShrinkTo(INLINE_PICKER_MAX + 1);
+
+    expect(screen.getByRole('dialog')).toBeDefined();
+    expect(document.activeElement).toBe(search());
+  });
+});

@@ -40,8 +40,20 @@ export function TaskLabelsSection({
   const labelNameId = useId();
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState<LabelColorSlot>(LabelColorSlot['slot-1']);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const taskLabelIds = new Set(taskLabels.map((label) => label.id));
+
+  // Latched rather than read fresh every render: deleting a board label from inside the open
+  // popover can carry `boardLabels.length` across `INLINE_PICKER_MAX` (8 down to 7, exactly the
+  // boundary), and flipping shape mid-interaction would unmount the popover, and the delete
+  // control the reader's focus was just on, out from under them. The decision is free to track
+  // the current count again once the popover is closed, which is when a shape change is safe.
+  const shouldUsePopover = boardLabels.length > INLINE_PICKER_MAX;
+  const [popoverLatched, setPopoverLatched] = useState(shouldUsePopover);
+  if (!pickerOpen && popoverLatched !== shouldUsePopover) {
+    setPopoverLatched(shouldUsePopover);
+  }
 
   async function createLabel(): Promise<void> {
     const name = newLabelName.trim();
@@ -73,46 +85,47 @@ export function TaskLabelsSection({
   /**
    * The board's palette, drawn flat while it still fits and behind a searchable popover once it
    * does not. `INLINE_PICKER_MAX` is the same number the assignee list reads, so the two never
-   * disagree about what counts as a long list.
+   * disagree about what counts as a long list. `popoverLatched`, not `shouldUsePopover` directly,
+   * is what decides the shape here.
    */
-  const palette =
-    boardLabels.length > INLINE_PICKER_MAX ? (
-      <SearchablePicker
-        triggerLabel={t('addLabelAction', { count: taskLabels.length })}
-        searchLabel={t('searchLabels')}
-        emptyLabel={t('noMatches')}
-        disabled={pending}
-        options={boardLabels.map((label) => ({
-          id: label.id,
-          name: label.name,
-          selected: taskLabelIds.has(label.id),
-          accent: slotDot(label.color),
-          trailing: canManageLabels ? deleteButton(label.id) : undefined,
-        }))}
-        onToggle={onToggleLabel}
-      />
-    ) : (
-      <ul className="flex flex-col gap-1">
-        {boardLabels.map((label) => {
-          const assigned = taskLabelIds.has(label.id);
-          return (
-            <li key={label.id} className="flex items-center gap-2">
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
-                <input
-                  type="checkbox"
-                  checked={assigned}
-                  disabled={pending}
-                  onChange={() => onToggleLabel(label.id, assigned)}
-                />
-                {slotDot(label.color)}
-                <span className="truncate">{label.name}</span>
-              </label>
-              {canManageLabels ? deleteButton(label.id) : null}
-            </li>
-          );
-        })}
-      </ul>
-    );
+  const palette = popoverLatched ? (
+    <SearchablePicker
+      triggerLabel={t('addLabelAction', { count: taskLabels.length })}
+      searchLabel={t('searchLabels')}
+      emptyLabel={t('noMatches')}
+      disabled={pending}
+      options={boardLabels.map((label) => ({
+        id: label.id,
+        name: label.name,
+        selected: taskLabelIds.has(label.id),
+        accent: slotDot(label.color),
+        trailing: canManageLabels ? deleteButton(label.id) : undefined,
+      }))}
+      onToggle={onToggleLabel}
+      onOpenChange={setPickerOpen}
+    />
+  ) : (
+    <ul className="flex flex-col gap-1">
+      {boardLabels.map((label) => {
+        const assigned = taskLabelIds.has(label.id);
+        return (
+          <li key={label.id} className="flex items-center gap-2">
+            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-body max-md:min-h-11">
+              <input
+                type="checkbox"
+                checked={assigned}
+                disabled={pending}
+                onChange={() => onToggleLabel(label.id, assigned)}
+              />
+              {slotDot(label.color)}
+              <span className="truncate">{label.name}</span>
+            </label>
+            {canManageLabels ? deleteButton(label.id) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   return (
     <div className="flex flex-col gap-2">
