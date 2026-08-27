@@ -40,9 +40,10 @@
       // via `playwright test -c measure.config.ts` (see measure.config.ts's own header).
       "entry": ["measure.config.ts", "measure/*.measure.ts"],
       // Consumed by a one-off browser evidence script, run by hand for a phase's closing
-      // accessibility sweep (screens/P8-axe.json) and deleted afterwards: never by a spec
-      // file the smoke suite runs, so no committed source imports it and knip cannot see the
-      // real call site.
+      // accessibility sweep (output kept under the gitignored
+      // .claude/handoffs/uiux/screens/, not committed) and deleted afterwards: never by a
+      // spec file the smoke suite runs, so no committed source imports it and knip cannot see
+      // the real call site.
       "ignoreDependencies": ["@axe-core/playwright"],
     },
   },
