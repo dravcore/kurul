@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { BELOW_MD } from '@/components/board/use-create-task-shortcut';
 
 export type UseTaskPanelFocusOptions = {
   /** Re-runs the opener capture when the panel switches task. */
@@ -73,7 +74,7 @@ export function useTaskPanelFocus({
   // ordinary document tab order is correct there.
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
-    const media = window.matchMedia('(max-width: 767px)');
+    const media = window.matchMedia(BELOW_MD);
 
     function onKeyDown(event: KeyboardEvent): void {
       if (event.key !== 'Tab' || !media.matches) return;

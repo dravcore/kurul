@@ -16,6 +16,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
  */
 export const INLINE_PICKER_MAX = 7;
 
+/**
+ * Joins option ids into the single string the focus-restore effect below depends on. NUL is the
+ * one character a UUIDv7 (`Task.id` and friends) cannot contain, so no id can forge a boundary.
+ */
+const ID_SEPARATOR = '\u0000';
+
+/** The inverse of the join, empty-list included: `''.split()` would answer `['']`, not `[]`. */
+function idsOf(key: string): string[] {
+  return key === '' ? [] : key.split(ID_SEPARATOR);
+}
+
 interface PickerOption {
   id: string;
   name: string;
@@ -65,7 +76,11 @@ export function SearchablePicker({
   const searchRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const optionIdsRef = useRef(options.map((option) => option.id));
+  // The effect below cares about the id set, not about the array identity: both call sites
+  // rebuild `options` inline on every render, so depending on the array itself would run the
+  // diff on every keystroke in the panel. The joined key changes only when the set does.
+  const optionIdKey = options.map((option) => option.id).join(ID_SEPARATOR);
+  const optionIdKeyRef = useRef(optionIdKey);
 
   // Folded in the reader's own locale, not with `toLowerCase()`. Turkish pairs `İ` with `i` and
   // `I` with `ı`, so the invariant fold turns "İbrahim" into `i` + U+0307 and leaves "Işıl" as
@@ -80,9 +95,9 @@ export function SearchablePicker({
   // back somewhere useful: the filter field while the popover is still open to hold it, or the
   // trigger if the popover has since closed and the field is gone with it.
   useEffect(() => {
-    const previousIds = optionIdsRef.current;
-    const currentIds = options.map((option) => option.id);
-    optionIdsRef.current = currentIds;
+    const previousIds = idsOf(optionIdKeyRef.current);
+    const currentIds = idsOf(optionIdKey);
+    optionIdKeyRef.current = optionIdKey;
     const lostARow = previousIds.some((id) => !currentIds.includes(id));
     if (!lostARow || document.activeElement !== document.body) return;
     if (open) {
@@ -90,7 +105,7 @@ export function SearchablePicker({
     } else {
       triggerRef.current?.focus();
     }
-  }, [options, open]);
+  }, [optionIdKey, open]);
 
   function boxes(): HTMLInputElement[] {
     return Array.from(

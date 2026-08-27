@@ -1366,12 +1366,12 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
               canMoveRight={false}
               onOpenSettings={vi.fn()}
               onDelete={vi.fn()}
-              onMoveLeft={vi.fn()}
-              onMoveRight={vi.fn()}
+              onMoveColumn={vi.fn()}
               composerOpen={false}
               composerFocusNonce={0}
               onComposerOpenChange={vi.fn()}
               onTaskCreated={vi.fn()}
+              staggerIndex={null}
             />
           </DndContext>,
         ),

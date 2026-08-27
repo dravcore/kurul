@@ -154,11 +154,11 @@ function ColumnHarness({
       canMoveRight={false}
       onOpenSettings={vi.fn()}
       onDelete={vi.fn()}
-      onMoveLeft={vi.fn()}
-      onMoveRight={vi.fn()}
+      onMoveColumn={vi.fn()}
       composerOpen={composerOpen}
       composerFocusNonce={0}
-      onComposerOpenChange={setComposerOpen}
+      onComposerOpenChange={(_columnId, open) => setComposerOpen(open)}
+      staggerIndex={null}
       onTaskCreated={onTaskCreated}
       dropIndicatorIndex={dropIndicatorIndex}
       taskSignals={taskSignals}
@@ -615,12 +615,12 @@ describe('BoardColumn task composer', () => {
             canMoveRight={false}
             onOpenSettings={vi.fn()}
             onDelete={vi.fn()}
-            onMoveLeft={vi.fn()}
-            onMoveRight={vi.fn()}
+            onMoveColumn={vi.fn()}
             composerOpen={false}
             composerFocusNonce={0}
             onComposerOpenChange={vi.fn()}
             onTaskCreated={vi.fn()}
+            staggerIndex={null}
           />
         </DndContext>
       </NextIntlClientProvider>,

@@ -259,7 +259,7 @@ describe('BoardCanvas create shortcut', () => {
     renderCanvas({ columns: [column('col-1', 1)], canMutateTasks: true });
 
     act(() => pressC());
-    act(() => lastColumnProps('col-1').onComposerOpenChange(false));
+    act(() => lastColumnProps('col-1').onComposerOpenChange('col-1', false));
 
     expect(lastColumnProps('col-1').composerOpen).toBe(false);
   });
@@ -267,7 +267,7 @@ describe('BoardCanvas create shortcut', () => {
   it('leaves an open composer where it is and bumps its focus nonce instead', () => {
     renderCanvas({ columns: [column('col-1', 1), column('col-2', 2)], canMutateTasks: true });
 
-    act(() => lastColumnProps('col-2').onComposerOpenChange(true));
+    act(() => lastColumnProps('col-2').onComposerOpenChange('col-2', true));
     const before = lastColumnProps('col-2').composerFocusNonce;
 
     act(() => pressC());
@@ -297,6 +297,13 @@ describe('BoardCanvas column keyboard navigation', () => {
     // jsdom implements no scrolling at all, so the method the canvas calls to bring the newly
     // focused heading into view does not exist on the prototype.
     Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  // A plain assignment rather than a spy, because there is no property to spy on; the file's
+  // own `vi.restoreAllMocks()` therefore cannot take it back off and a later test would keep
+  // reading this one's stub.
+  afterEach(() => {
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
   });
 
   it('moves focus to the first heading on Home', () => {
@@ -500,6 +507,10 @@ describe('BoardCanvas roving tab stop', () => {
 
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
   });
 
   it('puts exactly one heading in the tab order, the first by default', () => {
