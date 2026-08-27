@@ -576,7 +576,8 @@ describe('TaskPanel section order', () => {
     // the running app, a default-variant Button here put four copper marks on one screen.
     render(<Board open selected={{ ...task, checklists: [] }} />);
 
-    const copper = screen
+    const panel = screen.getByRole('complementary', { name: messages.app.board.task.panelLabel });
+    const copper = within(panel)
       .getAllByRole('button')
       .filter((button) => button.getAttribute('data-variant') === 'default');
 
