@@ -36,8 +36,9 @@ interface TaskCommentsSectionProps {
 /**
  * The comment thread and its composer, including the `@mention` picker.
  *
- * The picker is an editable combobox: DOM focus never leaves the textarea, so the caret
- * stays where the author is typing and `aria-activedescendant` is what moves instead.
+ * The picker behaves like a combobox's list, but the field itself is a textbox: a textarea
+ * takes no ARIA role. DOM focus never leaves the textarea, so the caret stays where the
+ * author is typing and `aria-activedescendant` is what moves instead.
  */
 export function TaskCommentsSection({
   comments,
@@ -205,17 +206,15 @@ export function TaskCommentsSection({
           <Textarea
             ref={commentRef}
             id={commentId}
-            // The implicit `textbox` role does not support `aria-expanded`; the mention
-            // picker turns this field into an editable combobox while it is open, so it
-            // needs the role that actually owns that state.
-            role="combobox"
+            // A textarea takes no ARIA role, so the field stays a plain textbox. Its open
+            // state is carried by aria-controls naming the listbox instead of aria-expanded,
+            // and the active option travels through aria-activedescendant.
             aria-haspopup="listbox"
             value={commentBody}
             disabled={pending}
             rows={3}
             aria-describedby={`${commentId}-hint`}
             aria-autocomplete="list"
-            aria-expanded={mentionPickerOpen}
             aria-controls={mentionPickerOpen ? mentionListId : undefined}
             aria-activedescendant={
               mentionPickerOpen && mentionCandidates.length > 0

@@ -114,14 +114,31 @@ describe('TaskCommentsSection', () => {
     renderSection();
     const textarea = composer();
 
-    expect(textarea.getAttribute('aria-expanded')).toBe('false');
+    expect(textarea.getAttribute('role')).toBeNull();
+    expect(textarea.getAttribute('aria-controls')).toBeNull();
     expect(screen.queryByRole('listbox')).toBeNull();
 
     type(textarea, 'ship it @Ah');
 
-    expect(textarea.getAttribute('aria-expanded')).toBe('true');
+    expect(textarea.getAttribute('aria-controls')).toBe(screen.getByRole('listbox').id);
+    expect(textarea.getAttribute('aria-haspopup')).toBe('listbox');
     const options = screen.getAllByRole('option');
     expect(options.map((option) => option.textContent)).toEqual(['Ahmet Demir']);
+  });
+
+  /** ARIA in HTML gives <textarea> no allowed role (axe aria-allowed-role), so the field stays
+   * a plain textbox and its open state travels through aria-controls instead. */
+  it('stays a textbox: a textarea takes no ARIA role', () => {
+    renderSection();
+    const textarea = composer();
+
+    expect(textarea.getAttribute('role')).toBeNull();
+    expect(textarea.hasAttribute('aria-expanded')).toBe(false);
+
+    type(textarea, 'ship it @Ah');
+
+    expect(textarea.getAttribute('role')).toBeNull();
+    expect(textarea.hasAttribute('aria-expanded')).toBe(false);
   });
 
   it('moves the active option with the arrow keys while focus stays on the textarea', () => {
