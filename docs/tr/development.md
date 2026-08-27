@@ -2,7 +2,7 @@
 
 Kurul geliştirme ortamının nasıl kurulacağı ve günden güne nasıl çalışılacağı.
 
-> 🌐 [English (canonical)](../development.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../development.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 

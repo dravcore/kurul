@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-09
 
-> 🌐 [English (canonical)](../../decisions/0009-board-column-permissions.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0009-board-column-permissions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

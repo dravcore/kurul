@@ -6,7 +6,7 @@
 **Güncellendi:** 2026-08-18 — `session.cookieCache.maxAge` (`api/src/auth/auth.ts`) 5 dakikadan 60 saniyeye indi; aşağıda silinen hesabın çerez penceresini anlatan "beş dakika" rakamları artık tarihsel: bu ADR'ın kabul ettiği gerçek pencere şu an 60 saniyeye kadar (denetim bulgusu SEC-01).
 **Güncellendi:** 2026-08-26: parola sıfırlama artık yapılandırıldı (`emailAndPassword.sendResetPassword`), yani `reset-password:<token>` gerçekten yazılan bir `Verification` satırı. Silme işlemindeki `Verification` silmesi, adres koşulunun yanına bir kullanıcı id'si koşulu kazandı; aşağıdaki sonuç maddesi de buna göre yeniden yazıldı (denetim bulgusu SEC-01, özellik boşluğu).
 
-> 🌐 [English (kanonik)](../../decisions/0026-account-deletion-anonymisation.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0026-account-deletion-anonymisation.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

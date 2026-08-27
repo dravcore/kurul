@@ -6,7 +6,7 @@
 mutation'ları, Better Auth organization yazıları için HTTP firewall, paylaşılan
 `@kurul/auth-access` rolleri.
 
-> 🌐 [English (canonical)](../../decisions/0004-auth-better-auth.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0004-auth-better-auth.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

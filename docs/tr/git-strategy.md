@@ -2,7 +2,7 @@
 
 Kurul için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
 
-> 🌐 [English (canonical)](../git-strategy.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../git-strategy.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 

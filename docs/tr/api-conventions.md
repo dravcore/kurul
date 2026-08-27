@@ -3,7 +3,7 @@
 Kurul API'si için REST konvansiyonları: URL'ler, verb'ler, payload'lar, hatalar,
 pagination ve DTO'lar.
 
-> 🌐 [English (canonical)](../api-conventions.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../api-conventions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 

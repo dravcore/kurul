@@ -3,7 +3,7 @@
 Kurul web uygulamasının görsel ve etkileşim dili: ilkeler, token'lar, yerleşim, hareket,
 durumlar ve metin.
 
-> 🌐 [English (canonical)](../design.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../design.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 

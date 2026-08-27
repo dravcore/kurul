@@ -2,7 +2,7 @@
 
 Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 
-> 🌐 [English (canonical)](../coding-standards.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../coding-standards.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 

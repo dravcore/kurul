@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-08
 
-> 🌐 [English (canonical)](../../decisions/0008-git-flow-semver.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0008-git-flow-semver.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

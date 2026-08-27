@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
 
-> 🌐 [English (kanonik)](../../decisions/0025-trello-import-mapping.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0025-trello-import-mapping.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

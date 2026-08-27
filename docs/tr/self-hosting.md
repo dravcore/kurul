@@ -3,7 +3,7 @@
 Kurul'u bir sunucuya, kendi domain'inize, HTTPS ve çalışan e-posta ile kurun. Aşağıdakilerin
 tamamı bilinçli olarak tek sayfa; çoğu DNS beklemekle geçen yaklaşık bir saat ayırın.
 
-> 🌐 [English (canonical)](../self-hosting.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../self-hosting.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları indirir ve aynı imaj
 her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (gerekçesi için bkz.

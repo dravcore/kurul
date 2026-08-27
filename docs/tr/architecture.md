@@ -2,7 +2,7 @@
 
 Kurul sisteminin şekli: kod nasıl saklanıyor, nasıl çalışıyor ve veri nasıl modelleniyor.
 
-> 🌐 [English (canonical)](../architecture.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../architecture.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 

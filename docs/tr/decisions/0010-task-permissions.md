@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-09
 
-> 🌐 [English (canonical)](../../decisions/0010-task-permissions.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0010-task-permissions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

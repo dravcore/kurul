@@ -3,7 +3,7 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-23
 
-> 🌐 [English (kanonik)](../../decisions/0032-plan-limits.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../../decisions/0032-plan-limits.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## Bağlam
 

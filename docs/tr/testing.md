@@ -2,7 +2,7 @@
 
 Kurul'un neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldığı.
 
-> 🌐 [English (canonical)](../testing.md) | Türkçe — Bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir.
+> 🌐 [English (kanonik)](../testing.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
 
 ## İçindekiler
 
