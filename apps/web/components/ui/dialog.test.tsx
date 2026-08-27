@@ -62,6 +62,21 @@ describe('DialogContent', () => {
 
     expect(close?.className).not.toMatch(/outline-(none|hidden)|ring-\[3px\]|ring-ring/);
   });
+
+  /**
+   * The button's resting opacity-70 is a group opacity, so it fades the base-layer focus
+   * outline to 2.91:1 in light, under the 3:1 floor docs/design.md (section 9) sets. The
+   * focus-visible utility lifts the whole button to full opacity exactly while the ring shows.
+   */
+  it('lifts the close button to full opacity while its focus ring shows', () => {
+    renderDialog();
+
+    const close = document.querySelector('[data-slot="dialog-close"]');
+
+    expect(close?.className).toContain('focus-visible:opacity-100');
+    expect(close?.className).toContain('opacity-70');
+    expect(close?.className).toContain('hover:opacity-100');
+  });
 });
 
 /**
