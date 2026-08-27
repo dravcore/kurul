@@ -24,10 +24,16 @@
   color-scheme: light;
 
   --background: #f7f8f7;
-  --foreground: #191c1b;
+  /* One step off near-black on purpose. #191c1b measured 17.17:1 on the white card (APCA Lc
+     104.1), far past the 4.5:1 floor and into the band where a full-strength ink on a full-white
+     card haloes on long reading. This holds 15.51:1 (Lc 102.5) on the card and 12.64:1 on the
+     signature tint, its worst of the six surfaces. The three aliases below carry the same value
+     because shadcn primitives read them by name; a split between them and this token would be a
+     design decision, not a typo. */
+  --foreground: #212523;
   --card: #ffffff;
   --popover: #ffffff;
-  --popover-foreground: #191c1b;
+  --popover-foreground: #212523;
   --primary: #a85a28;
   --primary-foreground: #ffffff;
   /* A hover cannot be an alpha of --primary: thinning the fill toward the page (shadcn's
@@ -40,11 +46,11 @@
      the hover step, so it has to stay a visible step away from both grounds it is painted
      over (the white card and the column), and --muted is the column ground itself. */
   --secondary: #eaedea;
-  --secondary-foreground: #191c1b;
+  --secondary-foreground: #212523;
   --muted: #f1f3f1;
   --muted-foreground: #626965;
   --accent: #eaedea;
-  --accent-foreground: #191c1b;
+  --accent-foreground: #212523;
   --destructive: #c0281f;
   /* Same reason as --primary-hover above: a thinned --destructive mixes toward the page and
      takes white under 4.5:1 before the hover finishes fading in. */
@@ -152,7 +158,14 @@
   --secondary: #2f3331;
   --secondary-foreground: #e8ecea;
   --muted: #1a1e1c;
-  --muted-foreground: #98a09c;
+  /* This token is what the 11px and 12px meta rows are painted in (text-micro and text-small on a
+     card, a column header, a menu row), so the type it has to survive is the smallest the app
+     draws. #98a09c cleared WCAG AA on all six dark surfaces (4.79:1 at worst, on --accent) and
+     still scored APCA Lc 44.2 there, under the Lc 48 that size needs, because light-on-dark is
+     the polarity WCAG's formula models least well. This is the smallest step that clears Lc 48 on
+     all six (48.5 on --accent) without closing on --foreground-secondary, which stays a rank
+     above it at Lc 63.7. */
+  --muted-foreground: #a0a8a4;
   --accent: #2f3331;
   --accent-foreground: #e8ecea;
   /* #f47a73 is the lowest value that clears 4.5:1 against --accent (4.81), the tightest step
