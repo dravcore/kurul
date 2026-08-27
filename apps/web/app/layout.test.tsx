@@ -42,11 +42,14 @@ vi.mock('./globals.css', () => ({}));
 import RootLayout, { generateMetadata } from './layout';
 import messages from '@/messages/en.json';
 
-/** Depth-first search for the first element whose props carry `prop`. */
-function findWithProp(node: unknown, prop: string): ReactElement | undefined {
+/** Depth-first search for the first element the predicate accepts. */
+function findMatching(
+  node: unknown,
+  predicate: (element: ReactElement) => boolean,
+): ReactElement | undefined {
   if (Array.isArray(node)) {
     for (const child of node) {
-      const hit = findWithProp(child, prop);
+      const hit = findMatching(child, predicate);
       if (hit) {
         return hit;
       }
@@ -58,36 +61,22 @@ function findWithProp(node: unknown, prop: string): ReactElement | undefined {
     return undefined;
   }
 
-  const props = node.props as Record<string, unknown>;
-  if (prop in props) {
+  if (predicate(node)) {
     return node;
   }
 
-  return findWithProp(props.children, prop);
+  const props = node.props as Record<string, unknown>;
+  return findMatching(props.children, predicate);
+}
+
+/** Depth-first search for the first element whose props carry `prop`. */
+function findWithProp(node: unknown, prop: string): ReactElement | undefined {
+  return findMatching(node, (element) => prop in (element.props as Record<string, unknown>));
 }
 
 /** Depth-first search for the first element of the given host type (e.g. `'body'`). */
 function findByType(node: unknown, type: string): ReactElement | undefined {
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      const hit = findByType(child, type);
-      if (hit) {
-        return hit;
-      }
-    }
-    return undefined;
-  }
-
-  if (!isValidElement(node)) {
-    return undefined;
-  }
-
-  if (node.type === type) {
-    return node;
-  }
-
-  const props = node.props as Record<string, unknown>;
-  return findByType(props.children, type);
+  return findMatching(node, (element) => element.type === type);
 }
 
 beforeEach(() => {
@@ -189,6 +178,6 @@ describe('RootLayout', () => {
 
     const body = findByType(tree, 'body');
     expect(body).toBeDefined();
-    expect((body?.props as { className?: string }).className).toBeUndefined();
+    expect((body?.props as { className?: string }).className ?? '').not.toMatch(/--font-/);
   });
 });

@@ -107,7 +107,7 @@ describe('TaskAssigneesSection over the threshold', () => {
     for (const chip of chips) {
       expect(chip.className).toContain('border');
       expect(chip.className).toContain('bg-muted');
-      expect(chip.className).toContain('rounded-[var(--radius-sm)]');
+      expect(chip.className).toContain('rounded-sm');
     }
   });
 

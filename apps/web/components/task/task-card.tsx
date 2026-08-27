@@ -101,7 +101,7 @@ export function TaskCard({
         // `border-l-2` is unconditional so the selected and unselected box are the same size:
         // a rail that only thickens on selection would shift the title text by a pixel the
         // moment a card is opened.
-        'block rounded-[var(--radius-md)] border border-border border-l-2 bg-card px-3 py-2 text-left transition-[color,background-color,border-color] max-md:min-h-11',
+        'block rounded-md border border-border border-l-2 bg-card px-3 py-2 text-left transition-[color,background-color,border-color] max-md:min-h-11',
         // `border-l-signature` is a longhand (`border-left-color`) and `border-border` /
         // `hover:border-border-strong` are the shorthand (`border-color`); Tailwind emits every
         // side-specific longhand after the shorthands that touch the same property, so the left

@@ -79,7 +79,7 @@ export function AppSidebar(): React.ReactElement {
   return (
     <aside
       className={cn(
-        'hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-150 ease-[var(--ease-out)] md:flex',
+        'hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-150 ease-out md:flex',
         collapsed ? 'w-[var(--sidebar-rail-width)]' : 'w-[var(--sidebar-width)]',
       )}
     >

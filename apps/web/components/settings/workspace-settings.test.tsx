@@ -121,7 +121,7 @@ describe('WorkspaceSettings — what an OWNER sees', () => {
   });
 });
 
-describe('WorkspaceSettings: inline rename (P7 task 6)', () => {
+describe('WorkspaceSettings: inline rename', () => {
   beforeEach(() => {
     apiPatch.mockImplementation((_path, body) =>
       Promise.resolve({ ...workspace, ...(body as object) } as never),

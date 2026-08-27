@@ -18,19 +18,19 @@ import { StatTile } from './stat-tile';
 
 const PriorityChart = dynamic(() => import('./priority-chart').then((mod) => mod.PriorityChart), {
   ssr: false,
-  loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />,
+  loading: () => <Skeleton className="h-56 w-full rounded-lg" />,
 });
 const AssigneeChart = dynamic(() => import('./assignee-chart').then((mod) => mod.AssigneeChart), {
   ssr: false,
-  loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />,
+  loading: () => <Skeleton className="h-56 w-full rounded-lg" />,
 });
 const ColumnChart = dynamic(() => import('./column-chart').then((mod) => mod.ColumnChart), {
   ssr: false,
-  loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />,
+  loading: () => <Skeleton className="h-56 w-full rounded-lg" />,
 });
 const CompletionChart = dynamic(
   () => import('./completion-chart').then((mod) => mod.CompletionChart),
-  { ssr: false, loading: () => <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" /> },
+  { ssr: false, loading: () => <Skeleton className="h-56 w-full rounded-lg" /> },
 );
 
 export function DashboardSummary(): React.ReactElement {
@@ -79,10 +79,10 @@ export function DashboardSummary(): React.ReactElement {
     return (
       <div className="flex flex-col gap-6">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
-          <Skeleton className="h-24 w-full rounded-[var(--radius-lg)]" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
         </div>
-        <Skeleton className="h-56 w-full rounded-[var(--radius-lg)]" />
+        <Skeleton className="h-56 w-full rounded-lg" />
       </div>
     );
   }

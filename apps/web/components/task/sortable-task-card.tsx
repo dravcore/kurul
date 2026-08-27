@@ -61,7 +61,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
         // height once it has been rendered, so the column's scroll height settles instead of
         // drifting as cards with more metadata turn out taller than the guess.
         // 56px is the measured median card height on the seeded board (min 36 for a bare
-        // title). As of P6 task 5, label dots moved into the same `flex-nowrap` meta row as the
+        // title). Label dots moved into the same `flex-nowrap` meta row as the
         // due date, estimate and assignees, so a card carrying all of them still measures 56 on
         // one line, not the ~76 a label row of its own used to add as a second row before that
         // change. A placeholder that is too tall is not free: at that old 76px, the seeded
@@ -114,7 +114,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 /** Drag overlay preview — matches design.md lift treatment. */
 export function TaskDragPreview({ task }: { task: TaskDto }): React.ReactElement {
   return (
-    <div className="w-[min(280px,80vw)] scale-[1.02] rotate-[1deg] rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 shadow-drag motion-reduce:rotate-0 motion-reduce:scale-100">
+    <div className="w-[min(280px,80vw)] scale-[1.02] rotate-[1deg] rounded-md border border-border bg-card px-3 py-2 shadow-drag motion-reduce:rotate-0 motion-reduce:scale-100">
       <div className="flex items-start gap-1.5">
         <PriorityIcon priority={task.priority} className="mt-0.5" />
         <span className="line-clamp-2 min-w-0 flex-1 text-body text-foreground">{task.title}</span>

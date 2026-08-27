@@ -38,7 +38,7 @@ interface BoardCardProps {
 /**
  * One board tile: the link to the board, and (behind its menu) rename and delete.
  *
- * Rename used to be a dialog (`RenameBoardDialog`); P7 task 6 folds it into this card instead,
+ * Rename used to be a dialog (`RenameBoardDialog`); it is folded into this card instead,
  * because the menu item was the only real affordance a dialog gave it. The menu item survives
  * unchanged; what it opens is now an `InlineRename` in place of the name and description, not a
  * modal. Its own component (rather than inline in `BoardList`'s `.map`) because the editing
@@ -85,7 +85,7 @@ function BoardCard({
   }
 
   return (
-    <li className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-[color,background-color,border-color] hover:border-border-strong hover:bg-accent focus-within:border-border-strong">
+    <li className="group relative rounded-lg border border-border bg-card p-4 transition-[color,background-color,border-color] hover:border-border-strong hover:bg-accent focus-within:border-border-strong">
       {editing ? (
         <div className="pr-8">
           <InlineRename
@@ -240,7 +240,7 @@ export function BoardList(): React.ReactElement {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-busy>
           <span className="sr-only">{tShell('loading')}</span>
           {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-[88px] w-full rounded-[var(--radius-lg)]" />
+            <Skeleton key={index} className="h-[88px] w-full rounded-lg" />
           ))}
         </div>
       </div>

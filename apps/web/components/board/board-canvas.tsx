@@ -42,6 +42,9 @@ function overflowOf(scroller: HTMLElement): BoardOverflow | null {
   return null;
 }
 
+/** Shared empty list, so every column with nothing in it is handed the same value. */
+const NO_TASKS: TaskDto[] = [];
+
 const dropAnimation: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
     styles: { active: { opacity: '0.4' } },
@@ -112,6 +115,11 @@ export function BoardCanvas({
     );
     setComposerFocusNonce((current) => current + 1);
   }, [columns, firstColumnId]);
+  /** Takes the column id rather than closing over one, so every column is handed one identity. */
+  const onComposerOpenChange = useCallback((columnId: string, open: boolean) => {
+    setComposerColumnId(open ? columnId : null);
+  }, []);
+
   const canAddTask = canMutateTasks && workspaceId !== null && firstColumnId !== null;
   useCreateTaskShortcut(canAddTask ? openOrFocusComposer : null);
 
@@ -258,7 +266,7 @@ export function BoardCanvas({
             <BoardColumn
               key={column.id}
               column={column}
-              tasks={tasksByColumn.get(column.id) ?? []}
+              tasks={tasksByColumn.get(column.id) ?? NO_TASKS}
               boardId={boardId}
               selectedTaskId={selectedTaskId}
               taskSignals={taskSignals}
@@ -267,26 +275,25 @@ export function BoardCanvas({
               headingTabbable={index === currentColumnIndex}
               canMoveLeft={index > 0}
               canMoveRight={index < columns.length - 1}
-              onOpenSettings={() => onOpenColumnSettings(column)}
-              onDelete={() => onDeleteColumn(column)}
-              onMoveLeft={() => onMoveColumn(column, -1)}
-              onMoveRight={() => onMoveColumn(column, 1)}
+              onOpenSettings={onOpenColumnSettings}
+              onDelete={onDeleteColumn}
+              onMoveColumn={onMoveColumn}
               workspaceId={workspaceId}
               composerOpen={composerColumnId === column.id}
               composerFocusNonce={composerFocusNonce}
-              onComposerOpenChange={(open) => setComposerColumnId(open ? column.id : null)}
+              onComposerOpenChange={onComposerOpenChange}
               onTaskCreated={onTaskCreated}
               // A number rather than the indicator object, so a column that is not the target is
               // handed a prop equal in value for the whole drag instead of a fresh object each
-              // time. How often that happens at all is bounded by @dnd-kit, which raises
-              // `onDragOver` from an effect keyed on the over id rather than per pointer event.
+              // time, and `BoardColumn`'s `memo` can hold it back. Every other prop on this
+              // element is either scalar or referentially stable for the same reason. How often
+              // this one changes at all is bounded by @dnd-kit, which raises `onDragOver` from an
+              // effect keyed on the over id rather than per pointer event.
               dropIndicatorIndex={
                 dnd.dropIndicator?.columnId === column.id ? dnd.dropIndicator.index : null
               }
               className={entranceDone ? undefined : 'board-column-enter'}
-              style={
-                entranceDone ? undefined : ({ '--stagger-index': index } as React.CSSProperties)
-              }
+              staggerIndex={entranceDone ? null : index}
             />
           ))}
           {canMutateColumns ? (

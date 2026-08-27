@@ -56,7 +56,7 @@ export function NotificationBell(): React.ReactElement {
               holds 16.12:1 light, 15.17:1 dark, against the signature fill's 2.73:1 dark AA
               fail. */}
           {badgeLabel ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-sm)] bg-foreground px-0.5 text-micro font-strong text-background">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-foreground px-0.5 text-micro font-strong text-background">
               {badgeLabel}
             </span>
           ) : null}

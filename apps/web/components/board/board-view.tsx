@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { TaskDto } from '@kurul/shared-types';
+import type { ColumnDto, TaskDto } from '@kurul/shared-types';
 import { authClient } from '@/lib/auth';
 import { canMutateColumns, canMutateLabels, canMutateTasks } from '@/lib/board-permissions';
 import {
@@ -197,6 +197,19 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
       reload,
     });
 
+  /**
+   * Swallows the promise `moveColumn` answers with, which nothing here awaits. Memoised because
+   * `BoardCanvas` hands this straight to every `BoardColumn`, and those are `memo`-wrapped: an
+   * inline wrapper would be a new identity on every render of this view and would re-render the
+   * whole strip.
+   */
+  const handleMoveColumn = useCallback(
+    (column: ColumnDto, direction: -1 | 1) => {
+      void moveColumn(column, direction);
+    },
+    [moveColumn],
+  );
+
   const dnd = useBoardTaskDnd(tasks, canMutateTasksFlag, commitTaskMove);
   const dndAccessibility = useMemo(
     () => ({
@@ -342,7 +355,7 @@ export function BoardView({ boardId, selectedTaskId = null }: BoardViewProps): R
               onCreateColumn={dialogs.openCreateColumn}
               onOpenColumnSettings={dialogs.openColumnSettings}
               onDeleteColumn={dialogs.openDeleteColumn}
-              onMoveColumn={(column, direction) => void moveColumn(column, direction)}
+              onMoveColumn={handleMoveColumn}
               onTaskCreated={appendTask}
             />
           )}

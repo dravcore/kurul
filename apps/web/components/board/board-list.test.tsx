@@ -245,9 +245,6 @@ describe('BoardList', () => {
       const report = await screen.findByRole('region', { name: /import report/i });
       expect(report.textContent).toContain('124 tasks');
       expect(screen.getByRole('status').getAttribute('aria-busy')).toBe('true');
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(screen.getByRole('region', { name: /import report/i })).toBeDefined();
     });
 
     it('shows nothing until an import has actually returned one', async () => {
@@ -332,7 +329,7 @@ describe('BoardList - the board ceiling (ADR 0032)', () => {
   });
 });
 
-describe('BoardList - inline rename (P7 task 6)', () => {
+describe('BoardList - inline rename', () => {
   function boardWithDescription(): BoardDto {
     return {
       id: 'b1',

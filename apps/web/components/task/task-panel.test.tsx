@@ -491,6 +491,17 @@ describe('TaskPanel mobile Tab trap', () => {
     expect(notPrevented).toBe(false);
     expect(panel().contains(document.activeElement)).toBe(true);
   });
+
+  it("arms itself on the query the panel's own md:static compiles from", () => {
+    // `(max-width: 767px)` is not the same query: it and `width < 48rem` part company for a
+    // reader whose root font size is not 16px, and the width between them is one where the
+    // panel is already a fullscreen sheet with an unarmed trap behind it, so Tab walks onto
+    // the board underneath.
+    matchMobile();
+    render(<Board open />);
+
+    expect(vi.mocked(window.matchMedia)).toHaveBeenCalledWith('(width < 48rem)');
+  });
 });
 
 describe('TaskPanel checklists', () => {

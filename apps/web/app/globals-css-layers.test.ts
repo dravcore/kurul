@@ -283,14 +283,14 @@ function requireRule(
 
 /**
  * Every element a keyboard can land on whose own class string could outrank the base outline:
- * the four form primitives, which until Phase 4 each carried an `outline-none` next to a ring
+ * the four form primitives, each of which used to carry an `outline-none` next to a ring
  * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
  * step was read as the indicator, the shell `main`, which is where the skip link lands, and the
  * task panel's heading, which a keyboard user reaches by pressing Enter on a task card, and the
  * popover surface and the picker rows inside it, which a large workspace's assignee and label
  * lists moved behind. The panel heading and the shell `main` each carried a suppressor as a
- * programmatic focus container until the phase keyboard tour measured both of them matching
- * `:focus-visible` in Chromium and Firefox. Both utilities
+ * programmatic focus container until a keyboard accessibility pass measured both of them
+ * matching `:focus-visible` in Chromium and Firefox. Both utilities
  * compile into `utilities`, which outranks `base`, so either one leaves the element focusing
  * with nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor
  * computes `outline-style: none`. The scan reads the whole source rather than the class strings
@@ -430,6 +430,11 @@ beforeAll(async () => {
     'text-title-lg',
     'font-semibold',
     'font-strong',
+    // The real app's `@source` scan finds these two in the tree, which is what makes Tailwind
+    // generate them into `@layer utilities`. This synthetic build only compiles what it is
+    // handed, so they are named here or the utilities under test would not exist.
+    'font-display',
+    'font-mono',
   ]);
   sheet = parseStylesheet(css);
 }, 30_000);
@@ -690,29 +695,39 @@ describe('globals.css cascade layers', () => {
     ).toBe(false);
   });
 
-  // A theme font stack resolves on :root: `@theme inline` compiles `--font-sans` and its
-  // siblings onto `:root, :host` in `@layer theme`, and a custom property's `var()` reference
-  // only resolves against the element that defines it, so the next/font variable each stack
-  // names has to be defined on :root too, not on a descendant.
-  it('points every font-stack property at a next/font variable defined on html', async () => {
+  // A theme font stack resolves on :root: `@theme inline` compiles `--font-sans` onto
+  // `:root, :host` in `@layer theme` because `body` below reads it as a `var()`, and a custom
+  // property's `var()` reference only resolves against the element that defines it, so the
+  // next/font variable the stack names has to be defined on :root too, not on a descendant.
+  // The display and mono stacks reach the page as the generated `.font-display` / `.font-mono`
+  // utilities instead, which `@theme inline` compiles with the stack's value in place, so those
+  // are asserted where they land rather than on the theme block.
+  it('points every font stack at a next/font variable defined on html', async () => {
     const nextFontVariables = ['--font-archivo', '--font-fraunces', '--font-jetbrains'];
-    const fontStackProperties = ['--font-sans', '--font-display', '--font-mono'];
 
     const themeRule = requireRule(sheet, 'the compiled :root, :host theme block', (rule) => {
       return (
         rule.layer === 'theme' &&
-        fontStackProperties.every((property) => {
-          return rule.declarations.some((declaration) => declaration.property === property);
-        })
+        rule.declarations.some((declaration) => declaration.property === '--font-sans')
       );
     });
+    const sans = themeRule.declarations.find((entry) => entry.property === '--font-sans');
+    expect(sans?.value.startsWith('var(--font-archivo)')).toBe(true);
 
-    for (const property of fontStackProperties) {
-      const declaration = themeRule.declarations.find((entry) => entry.property === property);
-      expect(declaration).toBeDefined();
-      expect(
-        nextFontVariables.some((variable) => declaration!.value.startsWith(`var(${variable})`)),
-      ).toBe(true);
+    const familyUtilities: [string, string][] = [
+      ['.font-display', '--font-fraunces'],
+      ['.font-mono', '--font-jetbrains'],
+    ];
+    for (const [selector, variable] of familyUtilities) {
+      const rule = requireRule(sheet, `the ${selector} utility`, (candidate) => {
+        return (
+          candidate.selector === selector &&
+          candidate.declarations.some((declaration) => declaration.property === 'font-family')
+        );
+      });
+      expect(rule.layer).toBe('utilities');
+      const family = rule.declarations.find((entry) => entry.property === 'font-family');
+      expect(family?.value.startsWith(`var(${variable})`)).toBe(true);
     }
 
     const layoutSource = await readFile(path.join(webRoot, 'app/layout.tsx'), 'utf8');
@@ -776,13 +791,13 @@ describe('globals.css cascade layers', () => {
 });
 
 /**
- * The border-based twins of the states this phase built out of a surface step or a tint.
+ * The border-based twins of the states built out of a surface step or a tint.
  * `forced-colors: active` replaces every author colour with the user's palette, so a hover step,
  * a selection tint and a drop tint all collapse onto the same ground: without these rules the
  * three states below are indistinguishable from a resting card, column or menu row, which is
  * what docs/design.md §9 forbids. jsdom evaluates no media queries, so the compiled stylesheet
  * is where the fallbacks can be checked at all; a real Chromium under forced-colors and
- * prefers-contrast emulation is the phase-level check on top of this one.
+ * prefers-contrast emulation is the manual check on top of this one.
  */
 describe('globals.css forced-colours and contrast fallbacks', () => {
   let forced: Stylesheet;
@@ -964,7 +979,7 @@ describe('globals.css forced-colours and contrast fallbacks', () => {
 });
 
 /**
- * P5 Task 1: the dialog and dropdown open/close, written as real keyframes bound through
+ * The dialog and dropdown open/close, written as real keyframes bound through
  * `data-slot`/`data-state` because this project imports plain `tailwindcss` with no animation
  * plugin (`animate-in`, `fade-in-0`, `zoom-in-95` and their siblings compile to nothing at all).
  * jsdom never evaluates a `@media` query and never plays a keyframe, so the compiled sheet is
@@ -1027,7 +1042,7 @@ describe('globals.css dialog and dropdown motion', () => {
 });
 
 /**
- * P5 Task 2: the loading skeleton's own pulse (components/ui/skeleton.tsx), replacing Tailwind's
+ * The loading skeleton's own pulse (components/ui/skeleton.tsx), replacing Tailwind's
  * `animate-pulse` (2s, 1.0-0.5, no reduced-motion twin) with docs/design.md §6's 1.6s, 1.0-0.6
  * loop. A board renders dozens of these at once, so `prefers-reduced-motion: reduce` does not
  * retarget the loop to a fade like the dialog and menu above, it removes the animation outright
@@ -1079,7 +1094,7 @@ describe('globals.css skeleton motion', () => {
 });
 
 /**
- * P5 Task 4: the submit spinner covers the button's content instead of joining it.
+ * The submit spinner covers the button's content instead of joining it.
  *
  * The spinner is positioned out of flex flow (components/ui/button.tsx), and these two rules
  * clear what sits under it. Both halves matter to the geometry: a button with no leading icon
@@ -1120,7 +1135,7 @@ describe('globals.css button spinner cover', () => {
 });
 
 /**
- * P6 Task 6: the two marks a card wears when the board answers back, and the JS timers that
+ * The two marks a card wears when the board answers back, and the JS timers that
  * decide how long each one's `data-state` stays on the element.
  *
  * The keyframe's duration and the timer's are one figure written twice. Dropped early, the card
@@ -1192,7 +1207,7 @@ describe('globals.css task card feedback', () => {
 });
 
 /**
- * P5 Task 5: the adversarial pass over every animated surface under
+ * The adversarial pass over every animated surface under
  * `prefers-reduced-motion: reduce`.
  *
  * The suites above check that a reduced-motion rule *exists* for a surface. Existing is not
@@ -1353,13 +1368,13 @@ describe('globals.css reduced-motion cascade', () => {
     {
       label: 'dialog surface, opening',
       target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'open' } },
-      moving: 'dialog-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'dialog surface, closing',
       target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'closed' } },
-      moving: 'dialog-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
@@ -1377,37 +1392,37 @@ describe('globals.css reduced-motion cascade', () => {
     {
       label: 'menu, opening',
       target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'open' } },
-      moving: 'menu-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'menu, closing',
       target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'closed' } },
-      moving: 'menu-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
       label: 'submenu, opening',
       target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'open' } },
-      moving: 'menu-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'submenu, closing',
       target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'closed' } },
-      moving: 'menu-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
       label: 'popover, opening',
       target: { attrs: { 'data-slot': 'popover-content', 'data-state': 'open' } },
-      moving: 'menu-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'popover, closing',
       target: { attrs: { 'data-slot': 'popover-content', 'data-state': 'closed' } },
-      moving: 'menu-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
@@ -1461,8 +1476,7 @@ describe('globals.css reduced-motion cascade', () => {
     ({ target }) => {
       const name = keyframeNameOf(winningAnimation(target, { reduced: true }));
       expect(name).not.toBe('none');
-      const body = keyframeBody(name);
-      expect(body.slice(body.lastIndexOf('to'))).toMatch(/opacity\s*:\s*1\b/);
+      expect(keyframeBody(name)).toMatch(/\bto\s*\{[^}]*opacity\s*:\s*1\b/);
     },
   );
 });

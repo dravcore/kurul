@@ -206,7 +206,12 @@ describe('TaskLabelsSection popover deletion keeps focus', () => {
         fireEvent.click(deleteButton);
         rerender(
           <NextIntlClientProvider locale="en" messages={messages}>
-            <TaskLabelsSection {...props} boardLabels={boardLabels(count).slice(-remaining)} />
+            <TaskLabelsSection
+              {...props}
+              // Counted from the front rather than as `slice(-remaining)`, which cannot express
+              // an empty palette: `slice(-0)` is `slice(0)` and hands back the whole list.
+              boardLabels={boardLabels(count).slice(count - remaining)}
+            />
           </NextIntlClientProvider>,
         );
       },
@@ -231,6 +236,19 @@ describe('TaskLabelsSection popover deletion keeps focus', () => {
     fireEvent.click(trigger());
 
     deleteFirstAndShrinkTo(INLINE_PICKER_MAX + 1);
+
+    expect(screen.getByRole('dialog')).toBeDefined();
+    expect(document.activeElement).toBe(search());
+  });
+
+  it('keeps focus inside the popover when the last board label goes with the delete', () => {
+    // The empty palette is its own case for the picker: it compares option ids as one joined
+    // string, and an empty string has to read back as no ids rather than as a single empty
+    // one, or the reader the delete stranded on the body is left there.
+    const { deleteFirstAndShrinkTo } = renderPalette(INLINE_PICKER_MAX + 1);
+    fireEvent.click(trigger());
+
+    deleteFirstAndShrinkTo(0);
 
     expect(screen.getByRole('dialog')).toBeDefined();
     expect(document.activeElement).toBe(search());

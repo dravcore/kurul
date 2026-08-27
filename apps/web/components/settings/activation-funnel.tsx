@@ -122,14 +122,14 @@ function FunnelRow({
       </div>
       {step.unit === 'users' ? (
         <div
-          className="h-2 w-full overflow-hidden rounded-[var(--radius-sm)] bg-muted"
+          className="h-2 w-full overflow-hidden rounded-sm bg-muted"
           // The bar is decoration over a number that is already written out beside it, so it
           // carries no accessible name of its own — a screen reader that announced both would
           // read the same figure twice.
           aria-hidden="true"
         >
           <div
-            className="h-full rounded-[var(--radius-sm)] bg-primary"
+            className="h-full rounded-sm bg-primary"
             style={{ width: `${stepBarPercent(dto, step.count)}%` }}
           />
         </div>

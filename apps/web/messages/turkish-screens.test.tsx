@@ -372,7 +372,7 @@ describe('the Turkish interface', () => {
  * past the cut fails here instead of quietly landing on a screen nobody re-measured.
  *
  * What a jsdom render can and cannot prove: it lays nothing out, so there is no width, no line
- * box and no overflow to measure, and the phase's browser pass is where clipping is finally
+ * box and no overflow to measure, and a manual browser pass is where clipping is finally
  * seen. What it can prove is that the whole Turkish string reaches the DOM of the screen that
  * shows it, and that is what every case below asserts. Nothing here needed the "cannot be
  * mounted" escape: the three keys that live on a toast are read off a real `Toaster`, and the
@@ -1366,12 +1366,12 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
               canMoveRight={false}
               onOpenSettings={vi.fn()}
               onDelete={vi.fn()}
-              onMoveLeft={vi.fn()}
-              onMoveRight={vi.fn()}
+              onMoveColumn={vi.fn()}
               composerOpen={false}
               composerFocusNonce={0}
               onComposerOpenChange={vi.fn()}
               onTaskCreated={vi.fn()}
+              staggerIndex={null}
             />
           </DndContext>,
         ),

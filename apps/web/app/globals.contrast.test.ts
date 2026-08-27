@@ -187,9 +187,9 @@ const TEXT_TOKENS = [
   '--foreground',
   '--foreground-secondary',
   '--muted-foreground',
-  // Aliases that shadcn primitives read by name. They equal `--foreground` today; measured
-  // separately so a future split cannot slip past this gate.
-  '--card-foreground',
+  // Aliases that shadcn primitives read by name, each with a call site in `components/ui/`.
+  // They equal `--foreground` today; measured separately so a future split cannot slip past
+  // this gate.
   '--popover-foreground',
   '--secondary-foreground',
   '--accent-foreground',
@@ -426,10 +426,6 @@ for (const theme of THEMES) {
       expect(belowFloor(theme, TEXT_TOKENS, SURFACES, AA_TEXT)).toEqual([]);
     });
 
-    it('holds --foreground-disabled at 3:1 on every surface', () => {
-      expect(belowFloor(theme, ['--foreground-disabled'], SURFACES, AA_NON_TEXT)).toEqual([]);
-    });
-
     it('holds copper and destructive text at 4.5:1 on every surface', () => {
       expect(belowFloor(theme, COPPER_AND_DESTRUCTIVE_TEXT, SURFACES, AA_TEXT)).toEqual([]);
     });
@@ -441,7 +437,6 @@ for (const theme of THEMES) {
     it('holds each fill against the text it carries at 4.5:1', () => {
       const fills: [string, string][] = [
         ['--primary-foreground', '--primary'],
-        ['--destructive-foreground', '--destructive'],
         ['--primary-foreground', '--primary-hover'],
       ];
       const failures = fills.flatMap(([text, fill]) => belowFloor(theme, [text], [fill], AA_TEXT));
@@ -462,9 +457,8 @@ for (const theme of THEMES) {
       expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
     });
 
-    // `--destructive-hover` carries the button's literal `text-white`, not the
-    // `--destructive-foreground` token: the button never reads that token in dark mode (see
-    // `RAW_COLOUR_CALL_SITES` below), so `text-white` is what the hover actually paints under.
+    // `--destructive-hover` carries the button's literal `text-white` (see
+    // `RAW_COLOUR_CALL_SITES` below), so white is what the hover actually paints under.
     it('holds white against --destructive-hover at 4.5:1', () => {
       const ratio = round(contrastRatio('#ffffff', hexOf(theme, '--destructive-hover')), 2);
       expect(ratio).toBeGreaterThanOrEqual(AA_TEXT);
@@ -1071,12 +1065,13 @@ describe('text under a ground its own file does not paint', () => {
  * of them was in the tree the whole time a scan for `text-white` alone reported it clean. `%23`
  * is the `#` a `url()` has to escape, which is how that one stayed out of every grep.
  *
- * Two call sites are pinned. shadcn's destructive button is where the token is the wrong answer:
- * `--destructive-foreground` is dark ink in dark mode and measures 3.56 on the fill that button
- * actually paints there (`dark:bg-destructive/60`), against white's 5.08. The select chevron is
- * where no token reaches: it is drawn into the control's own background as a `data:` URI, and
- * inside one `var()` is not read at all and `currentColor` resolves against the SVG rather than
- * against the document.
+ * Two call sites are pinned. shadcn's destructive button is where a paired ink token is the
+ * wrong answer: an ink cut for the full-strength `--destructive` is dark in dark mode and
+ * measures 3.56 on the thinned fill that button actually paints there
+ * (`dark:bg-destructive/60`), against white's 5.08. The select chevron is where no token
+ * reaches: it is drawn into the control's own background as a `data:` URI, and inside one
+ * `var()` is not read at all and `currentColor` resolves against the SVG rather than against
+ * the document.
  */
 const RAW_COLOUR_CALL_SITES: {
   file: string;
@@ -1096,8 +1091,8 @@ const RAW_COLOUR_CALL_SITES: {
     note:
       'the dark 2.67 is the base rule, which `dark:bg-destructive/60` replaces in dark and ' +
       'ALPHA_DERIVATIVES measures at 5.08 there; the hover is --destructive-hover, a solid ' +
-      'token gated on its own floor above, not an alpha of this fill. P4 owns ' +
-      'components/ui/button.tsx',
+      'token gated on its own floor above, not an alpha of this fill, and ' +
+      'components/ui/button.tsx is covered there rather than here',
   },
   {
     file: 'components/ui/select.tsx',
@@ -1119,7 +1114,7 @@ const RAW_COLOUR_CALL_SITES: {
  * utilities, and a hex inside an arbitrary value in either spelling a class string can carry.
  */
 const RAW_COLOUR = [
-  /(?<![a-z0-9])(?:text|bg|border|ring|fill|stroke|outline|divide|shadow|from|via|to)-(?:white|black)(?![-\w])/,
+  /(?<![a-z0-9])(?:text|bg|border|ring|fill|stroke|outline|divide|shadow|from|via|to|caret|accent|decoration|placeholder)-(?:white|black)(?![-\w])/,
   /\[[^\]]*(?:#|%23)[0-9a-fA-F]{3,8}/,
 ];
 
@@ -1242,8 +1237,9 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     fill: '--destructive',
     alpha: 0.6,
     over: NEUTRAL_SURFACES,
-    // `text-white`, not `--destructive-foreground`: the token is dark ink in dark mode and
-    // measures 3.56 on this fill, against white's 5.08. See RAW_COLOUR_CALL_SITES.
+    // `text-white`, and no paired ink token: ink cut for the full-strength fill would be dark
+    // in dark mode and measure 3.56 on this thinned one, against white's 5.08. See
+    // RAW_COLOUR_CALL_SITES.
     text: '#ffffff',
     floor: AA_TEXT,
     themes: ['dark'],
@@ -1299,11 +1295,11 @@ const ALPHA_DERIVATIVES: AlphaRow[] = [
     worst: { light: 3.21, dark: 4.21 },
     reason:
       'WCAG 1.4.3 exempts text in an inactive control, and docs/design.md §9 holds disabled ' +
-      'text to 3:1 anyway, which this clears. Settled in Phase 4 and not open: the alpha stays ' +
+      'text to 3:1 anyway, which this clears. Not open for revisit: the alpha stays ' +
       'the disabled treatment on controls, because it thins whatever the control already paints ' +
       '(a filled button and a bare field do not share a resting colour) and a single drawn ' +
-      'token cannot. --foreground-disabled stays declared and gated at 3:1 above as the drawn ' +
-      'token for the surfaces that have no such colour to thin, chart marks and placeholders',
+      'token cannot. The surfaces with no such colour to thin, chart marks and placeholders, ' +
+      'read --muted-foreground, which is gated at 4.5:1 above',
   },
   {
     utility: 'data-[disabled]:opacity-50',
@@ -1402,7 +1398,8 @@ function worstComposite(theme: Theme, row: AlphaRow): { surface: string; measure
  *
  * Read out of the painted class strings rather than the raw file, for the reason
  * `classNameValues` exists: a utility named in a doc comment is prose, and the comment above
- * `DropdownMenuItem` names the one this phase deleted. `opacity-100` is skipped because
+ * `DropdownMenuItem` names the outline suppressor dropped from that row, not a class still
+ * painted anywhere. `opacity-100` is skipped because
  * restoring full opacity cannot thin anything.
  */
 const ALPHA_UTILITY =
@@ -1678,9 +1675,9 @@ describe('APCA on the dark theme', () => {
 
   // Only `--foreground` is gated. WCAG 2.x AA is this project's binding standard and the three
   // secondary tokens below clear it on every surface; APCA scores them lower because it models
-  // light-on-dark polarity, and the values that would satisfy both are outside the ramp this
-  // phase settled on. They are reported rather than asserted, and named in the phase report as
-  // the APCA / WCAG divergence pairs.
+  // light-on-dark polarity, and the values that would satisfy both are outside the current
+  // ramp. They are reported rather than asserted, and logged below as the APCA / WCAG
+  // divergence pairs.
   it('holds --foreground at Lc 75 on every dark surface', () => {
     const foreground = hexOf('dark', '--foreground');
     const failures = SURFACES.flatMap((surface) => {
@@ -1703,15 +1700,13 @@ describe('APCA on the dark theme', () => {
    * *and* score under Lc 75. Widening the gap fails on the first half; closing it fails on the
    * second, which is the half that matters: the day a token move lifts one of these past Lc 75,
    * this stops being a divergence to report and becomes a pair the gate above can simply hold,
-   * and the note explaining the exception should go with it. Asserting only that three rows come
+   * and the note explaining the exception should go with it. Asserting only that the rows come
    * back, which is what this test did before, asserts nothing about either.
    */
   it('keeps every reported token AA on WCAG and under the APCA body floor', () => {
     const reported: { token: string; floor: number }[] = [
       { token: '--foreground-secondary', floor: AA_TEXT },
       { token: '--muted-foreground', floor: AA_TEXT },
-      // Disabled text is held to 3:1, not 4.5, here and in docs/design.md §9.
-      { token: '--foreground-disabled', floor: AA_NON_TEXT },
     ];
     const rows = reported.map(({ token }) => {
       const text = hexOf('dark', token);
@@ -1720,8 +1715,8 @@ describe('APCA on the dark theme', () => {
       );
       return `${token} ${text}: ${cells.join(', ')}`;
     });
-    // Printed as well as asserted, and visible with `vitest --reporter=verbose`: the phase report
-    // quotes this table as the APCA / WCAG divergence list.
+    // Printed as well as asserted, and visible with `vitest --reporter=verbose`: this table is
+    // the APCA / WCAG divergence list.
     console.log(['APCA Lc, dark theme (divergence from WCAG AA):', ...rows].join('\n  '));
 
     const broken = reported.flatMap(({ token, floor }) =>

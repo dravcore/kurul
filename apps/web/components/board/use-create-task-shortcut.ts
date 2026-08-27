@@ -5,8 +5,16 @@ import { useEffect } from 'react';
 /** The panel `components/task/task-panel.tsx` renders, which is a full-screen layer below `md`. */
 const TASK_PANEL = '[data-slot="task-panel"]';
 
-/** Tailwind's `md` breakpoint, as the media query the panel's own `md:static` compiles from. */
-const BELOW_MD = '(width < 48rem)';
+/**
+ * Tailwind's `md` breakpoint, as the media query the panel's own `md:static` compiles from.
+ *
+ * `width < 48rem` and not `max-width: 767px`: the two disagree for anyone whose root font size
+ * is not 16px, which would put this query and the utilities it mirrors on different sides of
+ * the same breakpoint (`app/globals.css` makes the same point about `--topbar-height`). Shared
+ * with `components/task/use-task-panel-focus.ts`, which arms the panel's Tab trap at exactly
+ * the width the panel becomes a fullscreen sheet.
+ */
+export const BELOW_MD = '(width < 48rem)';
 
 /**
  * `c` opens the board's first task composer (ADR 0035, the letter docs/design.md §5 reserves).

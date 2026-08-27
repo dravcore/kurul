@@ -47,7 +47,9 @@ export default defineConfig({
       // Floors sit a few points under the measured baseline, the same margin
       // `apps/api/jest.config.cjs` uses, so routine refactors do not trip them.
       //
-      // `app/**` (2026-08-12): stmts 90.93 / branch 100 / funcs 90 / lines 90.93.
+      // `app/**` (2026-08-27, re-measured): stmts 100 / branch 100 / funcs 100 / lines 100
+      // (79/79, 6/6, 34/34, 79/79). The route tests this series added left the folder fully
+      // covered, so the floor moves up with it rather than staying 15 points behind.
       // `app/layout.tsx` counts here too: `next/font/google` is stubbed in its test rather
       // than the file being excluded, because an excluded file is an invisible one.
       //
@@ -78,16 +80,16 @@ export default defineConfig({
       // `components/board/**`'s 54 branch floor, the lowest in this file, so it gets the same
       // few-points-under margin as the rest rather than a round of new tests.
       //
-      // `components/settings/**` (2026-08-27, P7 fix wave): re-measured at 92.75/88.27/91.67/
-      // 94.40 after the panel and settings IA changes, well past the figures above, so the
-      // floor moves up with it (branch stays at 86, a few points under the measured 88.27,
-      // for the same margin the rest of this file keeps).
+      // `components/settings/**` (2026-08-27): re-measured at 92.75/88.27/91.67/94.40 after the
+      // panel and settings IA changes, well past the figures above, so the floor moves up with
+      // it (branch stays at 86, a few points under the measured 88.27, for the same margin the
+      // rest of this file keeps).
       thresholds: {
         'app/**': {
-          statements: 85,
-          branches: 90,
-          functions: 85,
-          lines: 85,
+          statements: 97,
+          branches: 97,
+          functions: 97,
+          lines: 97,
         },
         'components/board/**': {
           statements: 65,

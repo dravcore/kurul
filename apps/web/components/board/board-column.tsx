@@ -93,17 +93,22 @@ interface BoardColumnProps {
   canMutateTasks: boolean;
   canMoveLeft: boolean;
   canMoveRight: boolean;
-  onOpenSettings: () => void;
-  onDelete: () => void;
-  onMoveLeft: () => void;
-  onMoveRight: () => void;
+  /**
+   * Every handler below takes what it acts on rather than being pre-bound to it by the caller.
+   * A bound arrow would be a new function on each of the canvas's renders and would defeat the
+   * `memo` this component is wrapped in for every column at once, drag included.
+   */
+  onOpenSettings: (column: ColumnDto) => void;
+  onDelete: (column: ColumnDto) => void;
+  onMoveColumn: (column: ColumnDto, direction: -1 | 1) => void;
   /** One composer is open on the board at a time, so the canvas owns which column has it. */
   composerOpen: boolean;
   composerFocusNonce: number;
-  onComposerOpenChange: (open: boolean) => void;
+  onComposerOpenChange: (columnId: string, open: boolean) => void;
   onTaskCreated: (task: TaskDto) => void;
   className?: string;
-  style?: React.CSSProperties;
+  /** This column's place in the entrance stagger, or null once the stagger has played. */
+  staggerIndex: number | null;
 }
 
 export const BoardColumn = memo(function BoardColumn({
@@ -121,14 +126,13 @@ export const BoardColumn = memo(function BoardColumn({
   canMoveRight,
   onOpenSettings,
   onDelete,
-  onMoveLeft,
-  onMoveRight,
+  onMoveColumn,
   composerOpen,
   composerFocusNonce,
   onComposerOpenChange,
   onTaskCreated,
   className,
-  style,
+  staggerIndex,
 }: BoardColumnProps): React.ReactElement {
   const t = useTranslations('app.board.column');
   const tTask = useTranslations('app.board.task');
@@ -251,10 +255,18 @@ export const BoardColumn = memo(function BoardColumn({
    */
   const isDropTarget = isOver || railIndex !== null;
 
+  // Built here rather than handed down as a `style` object, which would be a fresh value on
+  // every render of the canvas and would defeat this component's `memo` for every column.
+  // `app/globals.css` turns the index into the entrance animation's delay.
+  const style =
+    staggerIndex === null
+      ? undefined
+      : ({ '--stagger-index': staggerIndex } as React.CSSProperties);
+
   return (
     <section
       className={cn(
-        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
+        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-md bg-muted',
         // Below `md` the column is 85vw (`--column-width` in app/globals.css) and snaps under
         // the thumb, so the desktop 280-320px clamp has to come off or a wide phone would be
         // handed a 320px column inside a 430px viewport and the snap would leave a slice of the
@@ -300,19 +312,19 @@ export const BoardColumn = memo(function BoardColumn({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onOpenSettings}>
+              <DropdownMenuItem onClick={() => onOpenSettings(column)}>
                 <Settings2 />
                 {t('settingsTitle')}
               </DropdownMenuItem>
-              <DropdownMenuItem disabled={!canMoveLeft} onClick={onMoveLeft}>
+              <DropdownMenuItem disabled={!canMoveLeft} onClick={() => onMoveColumn(column, -1)}>
                 <ArrowLeft />
                 {t('moveLeft')}
               </DropdownMenuItem>
-              <DropdownMenuItem disabled={!canMoveRight} onClick={onMoveRight}>
+              <DropdownMenuItem disabled={!canMoveRight} onClick={() => onMoveColumn(column, 1)}>
                 <ArrowRight />
                 {t('moveRight')}
               </DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              <DropdownMenuItem variant="destructive" onClick={() => onDelete(column)}>
                 {t('deleteAction')}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -345,7 +357,7 @@ export const BoardColumn = memo(function BoardColumn({
           <div ref={sentinelRef} aria-hidden className="h-px shrink-0" />
         ) : null}
         {tasks.length === 0 ? (
-          <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-border-strong text-small text-muted-foreground">
+          <div className="flex h-14 items-center justify-center rounded-md border border-border-strong text-small text-muted-foreground">
             {t('emptyDrop')}
           </div>
         ) : null}
@@ -359,7 +371,7 @@ export const BoardColumn = memo(function BoardColumn({
               onCreated={onTaskCreated}
               onClose={(returnFocus) => {
                 returnFocusRef.current = returnFocus;
-                onComposerOpenChange(false);
+                onComposerOpenChange(column.id, false);
               }}
             />
           ) : (
@@ -369,7 +381,7 @@ export const BoardColumn = memo(function BoardColumn({
               variant="ghost"
               size="sm"
               className="justify-start"
-              onClick={() => onComposerOpenChange(true)}
+              onClick={() => onComposerOpenChange(column.id, true)}
             >
               <Plus />
               {tTask('createAction')}
