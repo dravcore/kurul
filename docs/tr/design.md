@@ -201,13 +201,14 @@ doğrudan fallback fontlara düşer.
 | Body / UI | **Archivo** (variable, OFL)                                  | Üründeki her şey                                                                                                                                                                                                                                                            | Bir signage grotesque: yüksek x-height, ekonomik genişlikler, 12–13px'te okunaklı. Bir board, dar column'larda yüzlerce kısa string demek — bir signage problemi. Doğru olan ama framework varsayılanı gibi okunan Inter ve Geist yerine seçildi. |
 | Mono      | **JetBrains Mono** (OFL), `0.92em`                           | Id'ler, shortcut'lar, kod                                                                                                                                                                                                                                                   | Belirsiz olmayan `0/O` ve `1/l/I` — bir stil tercihi değil, bir UUIDv7 okunabilirlik aracı                                                                                                                                                        |
 
-| Adım                   | Boyut / satır     | Weight    | Kullanım                                                             |
-| ---------------------- | ----------------- | --------- | -------------------------------------------------------------------- |
-| `display`              | 40 / 44           | 600       | Auth veya marketing ekranı başına bir tane                           |
-| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Sayfa ve panel başlıkları · section ve dialog başlıkları             |
-| `read`                 | 14 / 21           | 400       | Uzun prose: task description, comment body, import report cümleleri  |
-| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline** — field'lar ve satırlar · kart başlıkları, aktif nav |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamp'ler · chip'ler, count'lar, axis tick'leri        |
+| Adım                   | Boyut / satır     | Weight    | Kullanım                                                                           |
+| ---------------------- | ----------------- | --------- | ---------------------------------------------------------------------------------- |
+| `display`              | 40 / 44           | 600       | Auth veya marketing ekranı başına bir tane                                         |
+| `stat`                 | 28 / 32           | 600       | Stat tile'ın value'su, başka hiçbir yer (§8); proportional rakamlar, asla Fraunces |
+| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Sayfa ve panel başlıkları · section ve dialog başlıkları                           |
+| `read`                 | 14 / 21           | 400       | Uzun prose: task description, comment body, import report cümleleri                |
+| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline**: field'lar ve satırlar · kart başlıkları, aktif nav                |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamp'ler · chip'ler, count'lar, axis tick'leri                      |
 
 Bu ölçeğin tamamı budur, bir Tailwind varsayılanının fark edilmeden dolduracağı bir boşluk
 bırakmaz: `text-sm`, `text-lg`, `text-xs` ve `font-medium` component ağacından tamamen kalktı, ve
