@@ -8,15 +8,25 @@ import { INLINE_PICKER_MAX, SearchablePicker } from './searchable-picker';
 interface TaskAssigneesSectionProps {
   members: WorkspaceMemberDto[];
   assignedUserIds: ReadonlySet<string>;
+  /** The reader may not write at all. A permission lock, never a request in flight. */
   disabled: boolean;
+  /** Members whose own assign or unassign has not come back yet. */
+  pendingUserIds: ReadonlySet<string>;
   onToggle: (userId: string, assigned: boolean) => void;
 }
 
-/** Workspace members as checkboxes — assignment is a membership, not a single owner. */
+/**
+ * Workspace members as checkboxes: assignment is a membership, not a single owner.
+ *
+ * A row whose write is out stays enabled and refuses the toggle rather than going `disabled`,
+ * which is what a browser blurs (docs/design.md §6): the reader is standing on the row they
+ * just pressed, and every other row keeps working.
+ */
 export function TaskAssigneesSection({
   members,
   assignedUserIds,
   disabled,
+  pendingUserIds,
   onToggle,
 }: TaskAssigneesSectionProps): React.ReactElement {
   const t = useTranslations('app.board.task');
@@ -49,6 +59,7 @@ export function TaskAssigneesSection({
             searchLabel={t('searchMembers')}
             emptyLabel={t('noMatches')}
             disabled={disabled}
+            pendingIds={pendingUserIds}
             options={members.map((member) => ({
               id: member.userId,
               name: member.name,
@@ -61,6 +72,7 @@ export function TaskAssigneesSection({
         <ul className="flex flex-col gap-1">
           {members.map((member) => {
             const isAssigned = assignedUserIds.has(member.userId);
+            const saving = pendingUserIds.has(member.userId);
             return (
               <li key={member.id}>
                 <label className="flex cursor-pointer items-center gap-2 text-body max-md:min-h-11">
@@ -68,7 +80,11 @@ export function TaskAssigneesSection({
                     type="checkbox"
                     checked={isAssigned}
                     disabled={disabled}
-                    onChange={() => onToggle(member.userId, isAssigned)}
+                    aria-disabled={saving || undefined}
+                    onChange={() => {
+                      if (saving) return;
+                      onToggle(member.userId, isAssigned);
+                    }}
                   />
                   <span>{member.name}</span>
                 </label>

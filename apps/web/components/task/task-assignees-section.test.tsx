@@ -26,7 +26,7 @@ function members(count: number): WorkspaceMemberDto[] {
 
 function renderMembers(
   roster: WorkspaceMemberDto[],
-  { assigned = [] as string[], locale = 'en' } = {},
+  { assigned = [] as string[], locale = 'en', pending = [] as string[] } = {},
 ) {
   const onToggle = vi.fn();
   render(
@@ -35,6 +35,7 @@ function renderMembers(
         members={roster}
         assignedUserIds={new Set(assigned)}
         disabled={false}
+        pendingUserIds={new Set(pending)}
         onToggle={onToggle}
       />
     </NextIntlClientProvider>,
@@ -196,6 +197,52 @@ describe('TaskAssigneesSection over the threshold', () => {
     expect(boxes.every((box) => box.tagName === 'INPUT')).toBe(true);
     expect(boxes[0]!.checked).toBe(true);
     expect(boxes.every((box) => box.tabIndex >= 0)).toBe(true);
+  });
+});
+
+/**
+ * One row's own toggle is the only thing that row refuses, and it refuses it without going
+ * `disabled`, which is what a browser blurs. jsdom does not run that focus fixup, so the
+ * assertion that carries the guarantee is `disabled === false`.
+ */
+describe('TaskAssigneesSection while one row is in flight', () => {
+  it('keeps the busy row focusable and swallows a second toggle on it', () => {
+    const { onToggle } = renderMembers(members(INLINE_PICKER_MAX), { pending: ['u3'] });
+    const box = screen.getByLabelText('Member 3') as HTMLInputElement;
+    box.focus();
+
+    fireEvent.click(box);
+
+    expect(document.activeElement).toBe(box);
+    expect(box.disabled).toBe(false);
+    expect(box.getAttribute('aria-disabled')).toBe('true');
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('leaves every other row usable', () => {
+    const { onToggle } = renderMembers(members(INLINE_PICKER_MAX), { pending: ['u3'] });
+
+    fireEvent.click(screen.getByLabelText('Member 4'));
+
+    expect(onToggle).toHaveBeenCalledWith('u4', false);
+  });
+
+  it('gates the popover rows the same way', () => {
+    const { onToggle } = renderMembers(members(INLINE_PICKER_MAX + 1), { pending: ['u3'] });
+    openPicker();
+    const box = screen.getByLabelText('Member 3') as HTMLInputElement;
+    box.focus();
+
+    fireEvent.click(box);
+    // `Enter` is the picker's own toggle path and has to refuse alongside the click.
+    fireEvent.keyDown(box, { key: 'Enter' });
+
+    expect(document.activeElement).toBe(box);
+    expect(box.disabled).toBe(false);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(
+      (screen.getByLabelText('Member 4') as HTMLInputElement).getAttribute('aria-disabled'),
+    ).toBeNull();
   });
 });
 

@@ -12,17 +12,25 @@ const PRIORITIES = [Priority.LOW, Priority.MEDIUM, Priority.HIGH, Priority.URGEN
 
 interface TaskDetailFieldsProps {
   task: TaskDto;
+  /** The reader may not write at all. A permission lock, never a request in flight. */
   disabled: boolean;
+  /** The `UpdateTaskRequest` keys whose own PATCH has not come back yet. */
+  pendingFields: ReadonlySet<keyof UpdateTaskRequest>;
   onPatch: (body: UpdateTaskRequest) => void;
 }
 
 /**
  * Priority, due date and estimate. The estimate is a draft until blur — a half-typed number
  * must not fire a request per keystroke — while the other two save on change.
+ *
+ * A field with its own write out goes `readOnly` and refuses the change; it never goes
+ * `disabled`, which is what a browser blurs (docs/design.md §6). The three are gated one at a
+ * time, so saving the priority leaves the estimate the reader is typing in alone.
  */
 export function TaskDetailFields({
   task,
   disabled,
+  pendingFields,
   onPatch,
 }: TaskDetailFieldsProps): React.ReactElement {
   const t = useTranslations('app.board.task');
@@ -45,7 +53,12 @@ export function TaskDetailFields({
 
   const dueValue = task.dueDate ? task.dueDate.slice(0, 10) : '';
 
+  const prioritySaving = pendingFields.has('priority');
+  const dueSaving = pendingFields.has('dueDate');
+  const estimateSaving = pendingFields.has('estimatedMinutes');
+
   function commitEstimate(): void {
+    if (estimateSaving) return;
     const raw = estimateDraft.trim();
     const next = raw.length > 0 ? Number.parseInt(raw, 10) : null;
     if (next === null) {
@@ -72,7 +85,14 @@ export function TaskDetailFields({
             size="sm"
             value={task.priority}
             disabled={disabled}
-            onChange={(event) => onPatch({ priority: event.target.value as Priority })}
+            // A native `<select>` has no `readOnly`, so it stays enabled and the handler is
+            // what refuses. React puts the shown value back, so a refused choice is never left
+            // on screen as one that saved.
+            aria-disabled={prioritySaving || undefined}
+            onChange={(event) => {
+              if (prioritySaving) return;
+              onPatch({ priority: event.target.value as Priority });
+            }}
           >
             {PRIORITIES.map((value) => (
               <option key={value} value={value}>
@@ -91,7 +111,9 @@ export function TaskDetailFields({
             type="date"
             value={dueValue}
             disabled={disabled}
+            readOnly={dueSaving}
             onChange={(event) => {
+              if (dueSaving) return;
               const value = event.target.value;
               onPatch({ dueDate: value.length > 0 ? `${value}T12:00:00.000Z` : null });
             }}
@@ -106,8 +128,12 @@ export function TaskDetailFields({
             step={15}
             value={estimateDraft}
             disabled={disabled}
+            readOnly={estimateSaving}
             placeholder={t('estimatePlaceholder')}
-            onChange={(event) => setEstimateDraft(event.target.value)}
+            onChange={(event) => {
+              if (estimateSaving) return;
+              setEstimateDraft(event.target.value);
+            }}
             onBlur={commitEstimate}
           />
         </div>

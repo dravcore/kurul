@@ -34,11 +34,28 @@ interface TaskPropertiesPanelProps {
 }
 
 /**
+ * Adds or removes ids, answering a new set: pending state is read as a value, never mutated.
+ */
+function withIds<T>(current: ReadonlySet<T>, ids: readonly T[], present: boolean): ReadonlySet<T> {
+  const next = new Set(current);
+  for (const id of ids) {
+    if (present) next.add(id);
+    else next.delete(id);
+  }
+  return next;
+}
+
+/**
  * What the task *is*: priority, due date, estimate, who is on it and how it is labelled.
  *
- * This module owns those writes (one `pending` flag disables the section while any of them is in
- * flight) and sits directly under the title and description, above the checklists, so the panel
- * reads in the same order as the card it was opened from.
+ * This module owns those writes and sits directly under the title and description, above the
+ * checklists, so the panel reads in the same order as the card it was opened from.
+ *
+ * Pending state is scoped to the control actually in flight, never shared across the section
+ * (docs/design.md §6). One shared flag meant that toggling a label re-rendered the priority
+ * select, the two fields and every other row as `disabled`, and a browser blurs a disabled
+ * control: the reader lost their caret to `<body>` on every edit. What says a write is
+ * happening is the live region below, not the control the reader is standing on.
  */
 export function TaskPropertiesPanel({
   workspaceId,
@@ -50,7 +67,15 @@ export function TaskPropertiesPanel({
   onUpdated,
 }: TaskPropertiesPanelProps): React.ReactElement {
   const t = useTranslations('app.board.task');
-  const [pending, setPending] = useState(false);
+  const [pendingFields, setPendingFields] = useState<ReadonlySet<keyof UpdateTaskRequest>>(
+    new Set(),
+  );
+  const [pendingUserIds, setPendingUserIds] = useState<ReadonlySet<string>>(new Set());
+  const [pendingLabelIds, setPendingLabelIds] = useState<ReadonlySet<string>>(new Set());
+  const [creatingLabel, setCreatingLabel] = useState(false);
+
+  const busy =
+    pendingFields.size > 0 || pendingUserIds.size > 0 || pendingLabelIds.size > 0 || creatingLabel;
 
   const { members, boardLabels, setBoardLabels, refreshActivities } = meta;
 
@@ -70,7 +95,8 @@ export function TaskPropertiesPanel({
   }
 
   async function patchTask(body: UpdateTaskRequest): Promise<void> {
-    setPending(true);
+    const fields = Object.keys(body) as Array<keyof UpdateTaskRequest>;
+    setPendingFields((current) => withIds(current, fields, true));
     const previous = task;
     try {
       const updated = await api.patch<TaskDto, UpdateTaskRequest>(
@@ -89,13 +115,13 @@ export function TaskPropertiesPanel({
       onUpdated(restore);
       toastMetaError(caught);
     } finally {
-      setPending(false);
+      setPendingFields((current) => withIds(current, fields, false));
     }
   }
 
   async function toggleAssignee(userId: string, assigned: boolean): Promise<void> {
     if (!canMutate) return;
-    setPending(true);
+    setPendingUserIds((current) => withIds(current, [userId], true));
     try {
       const updated = assigned
         ? await api.delete<TaskDto>(
@@ -112,13 +138,13 @@ export function TaskPropertiesPanel({
     } catch (caught) {
       toastMetaError(caught);
     } finally {
-      setPending(false);
+      setPendingUserIds((current) => withIds(current, [userId], false));
     }
   }
 
   async function toggleLabel(labelId: string, assigned: boolean): Promise<void> {
     if (!canMutate) return;
-    setPending(true);
+    setPendingLabelIds((current) => withIds(current, [labelId], true));
     try {
       const updated = assigned
         ? await api.delete<TaskDto>(`/workspaces/${workspaceId}/tasks/${task.id}/labels/${labelId}`)
@@ -130,13 +156,13 @@ export function TaskPropertiesPanel({
     } catch (caught) {
       toastMetaError(caught);
     } finally {
-      setPending(false);
+      setPendingLabelIds((current) => withIds(current, [labelId], false));
     }
   }
 
   async function createLabel(name: string, color: LabelColorSlot): Promise<boolean> {
     if (!canManageLabels) return false;
-    setPending(true);
+    setCreatingLabel(true);
     try {
       const body: CreateLabelRequest = { name, color };
       const created = await api.post<LabelDto, CreateLabelRequest>(
@@ -153,13 +179,13 @@ export function TaskPropertiesPanel({
       toastLabelError(caught);
       return false;
     } finally {
-      setPending(false);
+      setCreatingLabel(false);
     }
   }
 
   async function deleteBoardLabel(labelId: string): Promise<void> {
     if (!canManageLabels) return;
-    setPending(true);
+    setPendingLabelIds((current) => withIds(current, [labelId], true));
     try {
       await api.delete(`/workspaces/${workspaceId}/labels/${labelId}`);
       setBoardLabels((current) => current.filter((label) => label.id !== labelId));
@@ -179,7 +205,7 @@ export function TaskPropertiesPanel({
         }),
       );
     } finally {
-      setPending(false);
+      setPendingLabelIds((current) => withIds(current, [labelId], false));
     }
   }
 
@@ -192,17 +218,26 @@ export function TaskPropertiesPanel({
     >
       <p className="text-small font-strong text-foreground">{t('propertiesTitle')}</p>
 
+      {/* Mounted whether or not anything is in flight: a `role="status"` inserted at the same
+          moment as its own text is announced unevenly across screen readers, and with no
+          control going disabled this region is the only thing that says a write is out. */}
+      <p role="status" aria-busy={busy || undefined} className="sr-only">
+        {busy ? t('saving') : ''}
+      </p>
+
       <div className="flex flex-col gap-5">
         <TaskDetailFields
           task={task}
-          disabled={!canMutate || pending}
+          disabled={!canMutate}
+          pendingFields={pendingFields}
           onPatch={(body) => void patchTask(body)}
         />
 
         <TaskAssigneesSection
           members={members}
           assignedUserIds={assignedUserIds}
-          disabled={!canMutate || pending}
+          disabled={!canMutate}
+          pendingUserIds={pendingUserIds}
           onToggle={(userId, assigned) => void toggleAssignee(userId, assigned)}
         />
 
@@ -211,7 +246,8 @@ export function TaskPropertiesPanel({
           boardLabels={boardLabels}
           canMutate={canMutate}
           canManageLabels={canManageLabels}
-          pending={pending}
+          pendingLabelIds={pendingLabelIds}
+          creatingLabel={creatingLabel}
           onToggleLabel={(labelId, assigned) => void toggleLabel(labelId, assigned)}
           onDeleteBoardLabel={(labelId) => void deleteBoardLabel(labelId)}
           onCreateLabel={createLabel}

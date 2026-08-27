@@ -44,7 +44,14 @@ interface SearchablePickerProps {
   searchLabel: string;
   emptyLabel: string;
   options: PickerOption[];
-  disabled: boolean;
+  /** The reader may not write at all. A permission lock, never a request in flight. */
+  disabled?: boolean;
+  /**
+   * Options whose own write has not come back yet. Such a row stays enabled and reachable and
+   * refuses the toggle instead: `disabled` is what a browser blurs, and the reader is standing
+   * on the row they just pressed.
+   */
+  pendingIds: ReadonlySet<string>;
   onToggle: (id: string, selected: boolean) => void;
   /** Lets a caller latch its own flat-vs-popover layout decision while this is open. */
   onOpenChange?: (open: boolean) => void;
@@ -66,7 +73,8 @@ export function SearchablePicker({
   searchLabel,
   emptyLabel,
   options,
-  disabled,
+  disabled = false,
+  pendingIds,
   onToggle,
   onOpenChange,
 }: SearchablePickerProps): React.ReactElement {
@@ -132,6 +140,7 @@ export function SearchablePicker({
     }
     if (event.key === 'Enter') {
       event.preventDefault();
+      if (pendingIds.has(option.id)) return;
       onToggle(option.id, option.selected);
     }
   }
@@ -177,7 +186,11 @@ export function SearchablePicker({
                     type="checkbox"
                     checked={option.selected}
                     disabled={disabled}
-                    onChange={() => onToggle(option.id, option.selected)}
+                    aria-disabled={pendingIds.has(option.id) || undefined}
+                    onChange={() => {
+                      if (pendingIds.has(option.id)) return;
+                      onToggle(option.id, option.selected);
+                    }}
                     onKeyDown={(event) => onRowKeyDown(event, option)}
                   />
                   {option.accent}

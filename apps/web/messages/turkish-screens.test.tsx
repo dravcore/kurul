@@ -38,7 +38,6 @@ import { fetchWorkspaceBoards } from '@/lib/workspace-boards';
 import { Toaster } from '@/components/ui/sonner';
 import { EmailVerificationLink } from '@/components/auth/email-verification-link';
 import { ForgotPasswordView } from '@/components/auth/forgot-password-view';
-import { InviteAcceptView } from '@/components/auth/invite-accept-view';
 import { LoginView } from '@/components/auth/login-view';
 import { VerifyEmailView } from '@/components/auth/verify-email-view';
 import { BoardColumn } from '@/components/board/board-column';
@@ -468,11 +467,6 @@ const LONGEST_TURKISH: readonly LongString[] = [
     screen: 'components/settings/members-settings.tsx',
     ratio: 1.47,
   },
-  {
-    key: 'auth.invite.signInFirst',
-    screen: 'components/auth/invite-accept-view.tsx',
-    ratio: 1.46,
-  },
   { key: 'auth.login.subtitle', screen: 'components/auth/login-view.tsx', ratio: 1.48 },
   {
     key: 'app.board.import.setColumnCategories',
@@ -642,6 +636,11 @@ const LONGEST_TURKISH: readonly LongString[] = [
     ratio: 1.5,
   },
   { key: 'auth.login.registerLink', screen: 'components/auth/login-view.tsx', ratio: 1.5 },
+  {
+    key: 'app.board.task.saving',
+    screen: 'components/task/task-properties-panel.tsx',
+    ratio: 1.86,
+  },
   {
     key: 'app.board.column.categoryOption.CANCELED',
     screen: 'components/board/column-settings-dialog.tsx',
@@ -902,9 +901,15 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
   },
   {
     screen: 'components/task/task-properties-panel.tsx',
-    keys: ['app.board.task.labelForbidden'],
+    keys: ['app.board.task.labelForbidden', 'app.board.task.saving'],
     run: async () => {
-      apiPost.mockRejectedValue(forbidden());
+      let refuse: () => void = () => {};
+      apiPost.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            refuse = () => reject(forbidden());
+          }),
+      );
       render(
         trToasts(
           <TaskPropertiesPanel
@@ -924,6 +929,16 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       });
       fireEvent.click(screen.getByRole('button', { name: messages.app.board.task.createLabel }));
 
+      // Held mid-request on purpose: with no control going disabled, this live region is the
+      // only place the panel says a write is out, so Turkish has to reach it.
+      const region = screen.getByRole('region', {
+        name: messages.app.board.task.propertiesTitle,
+      });
+      await waitFor(() => {
+        expect(within(region).getByRole('status').textContent).toBe(messages.app.board.task.saving);
+      });
+
+      refuse();
       await waitFor(() => {
         expect(screen.getByText(messages.app.board.task.labelForbidden)).toBeDefined();
       });
@@ -1504,17 +1519,6 @@ const SCREEN_CHECKS: readonly ScreenCheck[] = [
       expect(
         await screen.findByText(messages.app.settings.members.inviteErrorForbidden),
       ).toBeDefined();
-    },
-  },
-  {
-    screen: 'components/auth/invite-accept-view.tsx',
-    keys: ['auth.invite.signInFirst'],
-    run: () => {
-      // `auth.session` is reset to `{ data: null, isPending: false }` in this describe's
-      // `beforeEach`: the "not signed in yet" branch this string lives on.
-      render(tr(<InviteAcceptView invitationId={INVITATION.id} />));
-
-      expect(screen.getByText(messages.auth.invite.signInFirst)).toBeDefined();
     },
   },
   {
