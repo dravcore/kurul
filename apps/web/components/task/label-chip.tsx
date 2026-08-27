@@ -41,7 +41,7 @@ export function LabelDots({ labels, className }: LabelDotsProps): React.ReactEle
  * job; the dot is the label's own addition on top of it.
  */
 export const chipShell =
-  'inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted px-1.5 py-0.5 text-small text-foreground';
+  'inline-flex items-center gap-1.5 rounded-sm border border-border bg-muted px-1.5 py-0.5 text-small text-foreground';
 
 type LabelChipProps = {
   label: LabelDto;

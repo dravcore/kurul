@@ -53,7 +53,7 @@ export function ImportReportPanel({
   return (
     <section
       aria-label={t('reportRegion')}
-      className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-border bg-card p-4"
+      className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">

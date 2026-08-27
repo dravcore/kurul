@@ -15,7 +15,7 @@ export default async function AppLayout({
           app shell's <main id="main-content">. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-[var(--radius-md)] focus:border focus:border-border focus:bg-background focus:px-3 focus:py-2 focus:text-body focus:text-foreground"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:border focus:border-border focus:bg-background focus:px-3 focus:py-2 focus:text-body focus:text-foreground"
       >
         {t('shell.skipToContent')}
       </a>

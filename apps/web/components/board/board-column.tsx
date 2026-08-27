@@ -266,7 +266,7 @@ export const BoardColumn = memo(function BoardColumn({
   return (
     <section
       className={cn(
-        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-[var(--radius-md)] bg-muted',
+        'flex w-[var(--column-width)] min-w-[280px] max-w-[320px] shrink-0 flex-col rounded-md bg-muted',
         // Below `md` the column is 85vw (`--column-width` in app/globals.css) and snaps under
         // the thumb, so the desktop 280-320px clamp has to come off or a wide phone would be
         // handed a 320px column inside a 430px viewport and the snap would leave a slice of the
@@ -357,7 +357,7 @@ export const BoardColumn = memo(function BoardColumn({
           <div ref={sentinelRef} aria-hidden className="h-px shrink-0" />
         ) : null}
         {tasks.length === 0 ? (
-          <div className="flex h-14 items-center justify-center rounded-[var(--radius-md)] border border-border-strong text-small text-muted-foreground">
+          <div className="flex h-14 items-center justify-center rounded-md border border-border-strong text-small text-muted-foreground">
             {t('emptyDrop')}
           </div>
         ) : null}

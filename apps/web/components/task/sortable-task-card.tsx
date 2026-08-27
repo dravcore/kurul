@@ -114,7 +114,7 @@ export const SortableTaskCard = memo(function SortableTaskCard({
 /** Drag overlay preview — matches design.md lift treatment. */
 export function TaskDragPreview({ task }: { task: TaskDto }): React.ReactElement {
   return (
-    <div className="w-[min(280px,80vw)] scale-[1.02] rotate-[1deg] rounded-[var(--radius-md)] border border-border bg-card px-3 py-2 shadow-drag motion-reduce:rotate-0 motion-reduce:scale-100">
+    <div className="w-[min(280px,80vw)] scale-[1.02] rotate-[1deg] rounded-md border border-border bg-card px-3 py-2 shadow-drag motion-reduce:rotate-0 motion-reduce:scale-100">
       <div className="flex items-start gap-1.5">
         <PriorityIcon priority={task.priority} className="mt-0.5" />
         <span className="line-clamp-2 min-w-0 flex-1 text-body text-foreground">{task.title}</span>

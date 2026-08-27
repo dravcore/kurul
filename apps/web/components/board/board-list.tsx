@@ -85,7 +85,7 @@ function BoardCard({
   }
 
   return (
-    <li className="group relative rounded-[var(--radius-lg)] border border-border bg-card p-4 transition-[color,background-color,border-color] hover:border-border-strong hover:bg-accent focus-within:border-border-strong">
+    <li className="group relative rounded-lg border border-border bg-card p-4 transition-[color,background-color,border-color] hover:border-border-strong hover:bg-accent focus-within:border-border-strong">
       {editing ? (
         <div className="pr-8">
           <InlineRename
@@ -240,7 +240,7 @@ export function BoardList(): React.ReactElement {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-busy>
           <span className="sr-only">{tShell('loading')}</span>
           {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-[88px] w-full rounded-[var(--radius-lg)]" />
+            <Skeleton key={index} className="h-[88px] w-full rounded-lg" />
           ))}
         </div>
       </div>

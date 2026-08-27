@@ -15,7 +15,7 @@
    and checks which selector the variant actually emits. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Kurul design tokens — values from docs/design.md §3 (Phase 3 validated). */
+/* Kurul design tokens (values from docs/design.md §3). */
 
 :root {
   /* Native controls and scrollbars (select, date/number inputs, the OS scrollbar chrome) key
@@ -26,7 +26,6 @@
   --background: #f7f8f7;
   --foreground: #191c1b;
   --card: #ffffff;
-  --card-foreground: #191c1b;
   --popover: #ffffff;
   --popover-foreground: #191c1b;
   --primary: #a85a28;
@@ -47,7 +46,6 @@
   --accent: #eaedea;
   --accent-foreground: #191c1b;
   --destructive: #c0281f;
-  --destructive-foreground: #ffffff;
   /* Same reason as --primary-hover above: a thinned --destructive mixes toward the page and
      takes white under 4.5:1 before the hover finishes fading in. */
   --destructive-hover: #b0241c;
@@ -69,7 +67,6 @@
      tree on every run, so one cannot arrive unnoticed. */
   --signature-subtle: #f2e6da;
   --foreground-secondary: #545a57;
-  --foreground-disabled: #7f8683;
 
   --priority-low: #6b726e;
   --priority-medium: #3f6b99;
@@ -90,8 +87,9 @@
   --label-slot-8: #e34948;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  /* docs/design.md §5 — the panel-and-sheet curve. The off-canvas drawer is the first thing
-     in the app to need it, which is why it was only a line in the spec until now. */
+  /* docs/design.md §5: the panel-and-sheet curve. The off-canvas drawer is the only surface
+     that reads it today, and it is declared as a token rather than folded into that drawer's
+     own styles so the next sheet cannot quietly pick a different curve. */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
@@ -114,8 +112,8 @@
    one number the bar is built from moves with them.
 
    A token override rather than `max-md:h-14` at each call site because four separate surfaces
-   read `var(--topbar-height)` — the shell skeleton, the board's Suspense fallback, `Topbar`
-   itself and the board page's own header — and a breakpoint only three of them knew about is
+   read `var(--topbar-height)` (the shell skeleton, the board's Suspense fallback, `Topbar`
+   itself, and the board page's own header), and a breakpoint only three of them knew about is
    exactly the kind of split this variable exists to prevent.
 
    `width < 48rem` and not `max-width: 767px`: `max-md:` compiles to the former, and the two
@@ -146,7 +144,6 @@
   --background: #131715;
   --foreground: #e8ecea;
   --card: #212523;
-  --card-foreground: #e8ecea;
   --popover: #272b29;
   --popover-foreground: #e8ecea;
   --primary: #d98a4e;
@@ -163,7 +160,6 @@
      (components/task/task-card.tsx) and the dropdown's destructive row. --status-danger and
      --priority-urgent below share it, being the same severity by another name. */
   --destructive: #f47a73;
-  --destructive-foreground: #131715;
   --destructive-hover: #b8524a;
   --border: #3a403d;
   --border-strong: #767d7a;
@@ -172,7 +168,6 @@
   --signature: #d98a4e;
   --signature-subtle: #37291d;
   --foreground-secondary: #bcc3bf;
-  --foreground-disabled: #7b837f;
 
   --priority-low: #8a928e;
   --priority-medium: #6ba3e8;
@@ -206,7 +201,6 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
@@ -219,7 +213,6 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-hover: var(--destructive-hover);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
@@ -229,7 +222,6 @@
   --color-signature-subtle: var(--signature-subtle);
   --color-overlay-scrim: var(--overlay-scrim);
   --color-foreground-secondary: var(--foreground-secondary);
-  --color-foreground-disabled: var(--foreground-disabled);
   --color-priority-low: var(--priority-low);
   --color-priority-medium: var(--priority-medium);
   --color-priority-high: var(--priority-high);
@@ -293,14 +285,6 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 18px;
-}
-
-.font-display {
-  font-family: var(--font-display);
-}
-
-.font-mono {
-  font-family: var(--font-mono);
 }
 
 @layer components {
@@ -485,19 +469,26 @@ body {
   }
 }
 
-/* The centred dialog's open and close (components/ui/dialog.tsx `DialogContent`/`DialogOverlay`).
+/* The one pair of keyframes every scaling surface reads: the centred dialog
+   (components/ui/dialog.tsx `DialogContent`), the dropdown menu and its submenus
+   (components/ui/dropdown-menu.tsx) and the popover (components/ui/popover.tsx).
 
    Written here for the same reason the drawer above is: this project imports plain `tailwindcss`
    with no animation plugin, so `animate-in`/`fade-in-0`/`zoom-in-95` and their `data-[state=]`
-   siblings generate no CSS and the dialog cut instead of animating.
+   siblings generate no CSS and every one of those surfaces cut instead of animating.
+
+   One pair rather than one per surface because there is nothing for a second pair to differ on:
+   what makes a menu grow out of its trigger while the dialog grows from its own centre is the
+   `origin-(--radix-*-content-transform-origin)` utility on the content element, not the
+   keyframe. A second copy would only be a second thing to keep in step.
 
    Tailwind v4 compiles `translate-x-*`/`translate-y-*` onto the standalone CSS `translate`
    property rather than composing them into `transform` (its upgrade from v3's behaviour), so the
-   `translate-x-[-50%] translate-y-[-50%]` utilities that centre the surface keep doing that
+   `translate-x-[-50%] translate-y-[-50%]` utilities that centre the dialog keep doing that
    undisturbed while this keyframe animates the equally standalone `scale` property instead of
    `transform`, per docs/design.md §5's "enter from `scale(0.96)` + `opacity: 0`", without ever
    touching, or needing to redeclare, the centring translate. */
-@keyframes dialog-content-in {
+@keyframes surface-scale-in {
   from {
     opacity: 0;
     scale: 0.96;
@@ -508,7 +499,7 @@ body {
   }
 }
 
-@keyframes dialog-content-out {
+@keyframes surface-scale-out {
   from {
     opacity: 1;
     scale: 1;
@@ -540,17 +531,17 @@ body {
 }
 
 [data-slot='dialog-content'][data-state='open'] {
-  animation-name: dialog-content-in;
+  animation-name: surface-scale-in;
 }
 
 [data-slot='dialog-content'][data-state='closed'] {
-  animation-name: dialog-content-out;
+  animation-name: surface-scale-out;
 }
 
 /* The overlay is already opacity-only, so reduced motion changes nothing about how it moves;
-   it is still restated here so every layer this phase touches carries the same explicit
-   reduced-motion rule instead of leaving one to an implicit "nothing to drop". The content
-   loses its scale and keeps the fade. */
+   it is still restated here so every animated layer names its reduced-motion twin explicitly
+   rather than leaving a reader to work out that one of them is opacity-only and needs none.
+   The content loses its scale and keeps the fade. */
 @media (prefers-reduced-motion: reduce) {
   [data-slot='dialog-overlay'][data-state='open'] {
     animation-name: layer-fade-in;
@@ -570,39 +561,16 @@ body {
 }
 
 /* The dropdown menu's open and close (components/ui/dropdown-menu.tsx `DropdownMenuContent` and
-   `DropdownMenuSubContent`), and the popover's (components/ui/popover.tsx `PopoverContent`).
-   Same dead-utility reason as the dialog above.
+   `DropdownMenuSubContent`), and the popover's (components/ui/popover.tsx `PopoverContent`), on
+   the shared keyframes declared above.
 
    Radix writes `--radix-dropdown-menu-content-transform-origin` from whichever side the menu
    actually opened on, and both components already carry the Tailwind utility that reads it
-   (`origin-(--radix-dropdown-menu-content-transform-origin)`), so scaling from `scale` here grows
-   the menu out of the corner nearest its trigger instead of its own centre, docs/design.md §5's
+   (`origin-(--radix-dropdown-menu-content-transform-origin)`), so scaling from `scale` grows the
+   menu out of the corner nearest its trigger instead of its own centre, docs/design.md §5's
    `transform-origin: var(--transform-origin)` for this row of the table. The popover reads its
-   own `--radix-popover-content-transform-origin` and joins the same keyframes: it is the same
-   gesture (a surface growing out of the control that opened it), so a second pair of keyframes
-   would only be a second thing to keep in step. */
-@keyframes menu-content-in {
-  from {
-    opacity: 0;
-    scale: 0.96;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
-}
-
-@keyframes menu-content-out {
-  from {
-    opacity: 1;
-    scale: 1;
-  }
-  to {
-    opacity: 0;
-    scale: 0.96;
-  }
-}
-
+   own `--radix-popover-content-transform-origin` and is the same gesture, a surface growing out
+   of the control that opened it, so it joins the same rule. */
 [data-slot='dropdown-menu-content'],
 [data-slot='dropdown-menu-sub-content'],
 [data-slot='popover-content'] {
@@ -613,14 +581,14 @@ body {
 [data-slot='dropdown-menu-content'][data-state='open'],
 [data-slot='dropdown-menu-sub-content'][data-state='open'],
 [data-slot='popover-content'][data-state='open'] {
-  animation-name: menu-content-in;
+  animation-name: surface-scale-in;
   animation-duration: 150ms;
 }
 
 [data-slot='dropdown-menu-content'][data-state='closed'],
 [data-slot='dropdown-menu-sub-content'][data-state='closed'],
 [data-slot='popover-content'][data-state='closed'] {
-  animation-name: menu-content-out;
+  animation-name: surface-scale-out;
   animation-duration: 150ms;
 }
 
@@ -640,8 +608,9 @@ body {
 
 /* The loading placeholder (components/ui/skeleton.tsx). docs/design.md §6 asks for a 1.6s
    opacity pulse from 1.0 to 0.6, its own keyframe rather than Tailwind's built-in `animate-pulse`
-   (2s, 1.0-0.5, and the one animation in the tree with no `prefers-reduced-motion` twin of its
-   own before this). `animation-duration` names the FULL loop period, the same convention
+   (2s, 1.0-0.5, and the only animation in the tree whose default already satisfies
+   `prefers-reduced-motion` on its own, since it neither moves nor scales).
+   `animation-duration` names the FULL loop period, the same convention
    Tailwind's own `pulse` keyframe uses (0%/100% implicit at opacity 1, a single 50% stop at the
    dim value, run once through with no `alternate`): a from/to pair plus `alternate` would instead
    spend the full duration on each one-way leg, doubling the period to 3.2s. A board loads dozens
@@ -770,8 +739,8 @@ body {
 }
 
 /* Forced colours replace every author colour with the user's palette, which erases exactly the
-   channel this phase's feedback leans on: a surface step and a tint. Every state built on one
-   carries a border-based twin here, per docs/design.md §9. */
+   channel most interactive-state feedback here relies on: a surface step and a tint. Every
+   state built on one carries a border-based twin here, per docs/design.md §9. */
 @media (forced-colors: active) {
   /* Selection and focus stay two marks. The outline is selection while the card is not focused;
      the moment it is, `:focus-visible` takes the outline back and this border is what still

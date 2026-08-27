@@ -430,6 +430,11 @@ beforeAll(async () => {
     'text-title-lg',
     'font-semibold',
     'font-strong',
+    // The real app's `@source` scan finds these two in the tree, which is what makes Tailwind
+    // generate them into `@layer utilities`. This synthetic build only compiles what it is
+    // handed, so they are named here or the utilities under test would not exist.
+    'font-display',
+    'font-mono',
   ]);
   sheet = parseStylesheet(css);
 }, 30_000);
@@ -690,29 +695,39 @@ describe('globals.css cascade layers', () => {
     ).toBe(false);
   });
 
-  // A theme font stack resolves on :root: `@theme inline` compiles `--font-sans` and its
-  // siblings onto `:root, :host` in `@layer theme`, and a custom property's `var()` reference
-  // only resolves against the element that defines it, so the next/font variable each stack
-  // names has to be defined on :root too, not on a descendant.
-  it('points every font-stack property at a next/font variable defined on html', async () => {
+  // A theme font stack resolves on :root: `@theme inline` compiles `--font-sans` onto
+  // `:root, :host` in `@layer theme` because `body` below reads it as a `var()`, and a custom
+  // property's `var()` reference only resolves against the element that defines it, so the
+  // next/font variable the stack names has to be defined on :root too, not on a descendant.
+  // The display and mono stacks reach the page as the generated `.font-display` / `.font-mono`
+  // utilities instead, which `@theme inline` compiles with the stack's value in place, so those
+  // are asserted where they land rather than on the theme block.
+  it('points every font stack at a next/font variable defined on html', async () => {
     const nextFontVariables = ['--font-archivo', '--font-fraunces', '--font-jetbrains'];
-    const fontStackProperties = ['--font-sans', '--font-display', '--font-mono'];
 
     const themeRule = requireRule(sheet, 'the compiled :root, :host theme block', (rule) => {
       return (
         rule.layer === 'theme' &&
-        fontStackProperties.every((property) => {
-          return rule.declarations.some((declaration) => declaration.property === property);
-        })
+        rule.declarations.some((declaration) => declaration.property === '--font-sans')
       );
     });
+    const sans = themeRule.declarations.find((entry) => entry.property === '--font-sans');
+    expect(sans?.value.startsWith('var(--font-archivo)')).toBe(true);
 
-    for (const property of fontStackProperties) {
-      const declaration = themeRule.declarations.find((entry) => entry.property === property);
-      expect(declaration).toBeDefined();
-      expect(
-        nextFontVariables.some((variable) => declaration!.value.startsWith(`var(${variable})`)),
-      ).toBe(true);
+    const familyUtilities: [string, string][] = [
+      ['.font-display', '--font-fraunces'],
+      ['.font-mono', '--font-jetbrains'],
+    ];
+    for (const [selector, variable] of familyUtilities) {
+      const rule = requireRule(sheet, `the ${selector} utility`, (candidate) => {
+        return (
+          candidate.selector === selector &&
+          candidate.declarations.some((declaration) => declaration.property === 'font-family')
+        );
+      });
+      expect(rule.layer).toBe('utilities');
+      const family = rule.declarations.find((entry) => entry.property === 'font-family');
+      expect(family?.value.startsWith(`var(${variable})`)).toBe(true);
     }
 
     const layoutSource = await readFile(path.join(webRoot, 'app/layout.tsx'), 'utf8');
@@ -1353,13 +1368,13 @@ describe('globals.css reduced-motion cascade', () => {
     {
       label: 'dialog surface, opening',
       target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'open' } },
-      moving: 'dialog-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'dialog surface, closing',
       target: { attrs: { 'data-slot': 'dialog-content', 'data-state': 'closed' } },
-      moving: 'dialog-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
@@ -1377,37 +1392,37 @@ describe('globals.css reduced-motion cascade', () => {
     {
       label: 'menu, opening',
       target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'open' } },
-      moving: 'menu-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'menu, closing',
       target: { attrs: { 'data-slot': 'dropdown-menu-content', 'data-state': 'closed' } },
-      moving: 'menu-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
       label: 'submenu, opening',
       target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'open' } },
-      moving: 'menu-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'submenu, closing',
       target: { attrs: { 'data-slot': 'dropdown-menu-sub-content', 'data-state': 'closed' } },
-      moving: 'menu-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {
       label: 'popover, opening',
       target: { attrs: { 'data-slot': 'popover-content', 'data-state': 'open' } },
-      moving: 'menu-content-in',
+      moving: 'surface-scale-in',
       visible: true,
     },
     {
       label: 'popover, closing',
       target: { attrs: { 'data-slot': 'popover-content', 'data-state': 'closed' } },
-      moving: 'menu-content-out',
+      moving: 'surface-scale-out',
       visible: false,
     },
     {

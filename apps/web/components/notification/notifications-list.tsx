@@ -195,9 +195,9 @@ export function NotificationsList(): React.ReactElement {
 
       {loading ? (
         <div className="flex flex-col gap-2">
-          <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
-          <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
-          <Skeleton className="h-16 w-full rounded-[var(--radius-md)]" />
+          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className="h-16 w-full rounded-md" />
+          <Skeleton className="h-16 w-full rounded-md" />
         </div>
       ) : error ? (
         // Same rule the bell's dropdown follows: a failed load clears the rows, so the empty

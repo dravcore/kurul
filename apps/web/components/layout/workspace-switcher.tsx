@@ -43,7 +43,7 @@ export function WorkspaceSwitcher({
               the chip's square into the button for as long as the pointer rests on it. */}
           <span
             aria-hidden
-            className="flex size-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-muted text-small font-strong text-foreground-secondary"
+            className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-muted text-small font-strong text-foreground-secondary"
           >
             {initial}
           </span>

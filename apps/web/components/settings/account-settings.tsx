@@ -42,7 +42,7 @@ export function AccountSettings(): React.ReactElement {
     return (
       <div className="flex flex-col gap-2" role="status" aria-busy>
         <span className="sr-only">{tShell('loading')}</span>
-        <Skeleton className="h-9 w-full rounded-[var(--radius-md)]" />
+        <Skeleton className="h-9 w-full rounded-md" />
       </div>
     );
   }

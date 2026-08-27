@@ -106,7 +106,8 @@ function blankComments(source: string): string {
 }
 
 /**
- * One `text-*` / `bg-*` / `border-*` / `font-*` / `shadow-*` token, variants (`hover:`, `dark:`,
+ * One `text-*` / `bg-*` / `border-*` / `font-*` / `shadow-*` / `rounded-*` token, variants
+ * (`hover:`, `dark:`,
  * stacked or not) and an optional opacity modifier included. The lookbehind's excluded set is
  * word characters, `.`, `/`, `,` and `-`: it admits `:` (every variant separator) and rejects
  * `-`, which is what keeps `border-border-strong` from also being read as a second, standalone
@@ -116,7 +117,7 @@ function blankComments(source: string): string {
  * class of its own: nothing this scanner is meant to catch is ever comma-separated.
  */
 const CLASS_TOKEN_RE =
-  /(?<![\w.,/-])(text|bg|border|font|shadow)-(\[[^\]]*\]|[a-z0-9]+(?:-[a-z0-9]+)*)(?:\/(\d{1,3}|\[[^\]]*\]))?(?![\w-])/g;
+  /(?<![\w.,/-])(text|bg|border|font|shadow|rounded)-(\[[^\]]*\]|[a-z0-9]+(?:-[a-z0-9]+)*)(?:\/(\d{1,3}|\[[^\]]*\]))?(?![\w-])/g;
 
 interface Occurrence {
   bareClass: string;
@@ -166,9 +167,9 @@ describe('theme-covered utility classes', () => {
 
   it('scanned at least one call site of every prefix under test', () => {
     // A prefix scoring zero call sites almost certainly means the regex broke, not that the
-    // codebase stopped using it: every one of these five is in wide use today.
+    // codebase stopped using it: every one of these six is in wide use today.
     const seen = new Set(occurrences.map((occurrence) => occurrence.bareClass.split('-')[0]));
-    expect([...seen].sort()).toEqual(['bg', 'border', 'font', 'shadow', 'text']);
+    expect([...seen].sort()).toEqual(['bg', 'border', 'font', 'rounded', 'shadow', 'text']);
   });
 
   it('resolves every scanned class against @theme inline or Tailwind’s built-in scale', () => {

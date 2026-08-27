@@ -107,7 +107,7 @@ export function DemoBanner(): React.ReactElement | null {
         type="button"
         onClick={dismiss}
         aria-label={t('dismiss')}
-        className="shrink-0 rounded-[var(--radius-sm)] p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="shrink-0 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <X className="size-4" aria-hidden />
       </button>
