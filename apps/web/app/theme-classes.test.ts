@@ -67,7 +67,11 @@ function resolves(css: string, className: string): boolean {
   return new RegExp(`${escaped}(?![\\w-])`).test(css);
 }
 
-const SCAN_DIRS = ['app', 'components'];
+// Widened to `lib/` to match `border-utilities.test.ts`'s scan roots: `lib/` carries only `.ts`
+// files today, none of them rendered markup, so this is a no-op until a `.tsx` file lands there,
+// but a gate this file exists to make complete should already say so rather than stay silent
+// until the first violation forces the question.
+const SCAN_DIRS = ['app', 'components', 'lib'];
 
 function sourceFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -218,5 +222,176 @@ describe('dead animation utility classes', () => {
     }
 
     expect(hits.sort()).toEqual([]);
+  });
+});
+
+/**
+ * Tailwind's own size and weight scale, the half of "no gap left for a Tailwind default to fill
+ * unnoticed" (docs/design.md §3) the scan above cannot see: `text-sm` resolves to real CSS, so
+ * the "resolves every scanned class" check above is satisfied by it, and only a denylist can
+ * still catch it. Kurul's scale is `text-display`/`title-lg`/`title`/`read`/`body`/`small`/
+ * `micro` (each a `@theme inline` step with its own line-height, and the heading steps their own
+ * weight); a raw Tailwind size or weight class is always a Kurul step recreated by hand instead
+ * of named, off the theme's own line-height and unable to move with it.
+ *
+ * `font-semibold` is deliberately not in this set. `font-medium` is the one docs/design.md names
+ * retired ("`font-medium` becomes `font-strong` (550) throughout"); `font-semibold` (600) is
+ * still load-bearing on headings the type scale gives no weighted step of their own to, and stays
+ * out of this ban until an audit gives each of those call sites a real step, the way it already
+ * has for `text-title`/`text-title-lg`/`text-display`.
+ */
+const BANNED_SIZE_AND_WEIGHT_CLASSES = new Set([
+  'text-xs',
+  'text-sm',
+  'text-base',
+  'text-lg',
+  'text-xl',
+  'text-2xl',
+  'text-3xl',
+  'text-4xl',
+  'text-5xl',
+  'text-6xl',
+  'text-7xl',
+  'text-8xl',
+  'text-9xl',
+  'font-thin',
+  'font-extralight',
+  'font-light',
+  'font-normal',
+  'font-medium',
+  'font-bold',
+  'font-extrabold',
+  'font-black',
+]);
+
+interface SizeWeightException {
+  file: string;
+  line: number;
+  bareClass: string;
+  reason: string;
+}
+
+/**
+ * `text-base`, 16px, stops iOS Safari zooming the viewport on focus: the OS only holds off below
+ * that size. Every field pairs it with `md:text-body`, handing the control back to `body` (13px)
+ * once the viewport is wide enough that the zoom guard no longer applies (docs/design.md §4).
+ * The three form primitives are the whole of it; nothing else carries a field's own text.
+ */
+const SIZE_WEIGHT_EXCEPTIONS: SizeWeightException[] = [
+  {
+    file: 'components/ui/input.tsx',
+    line: 13,
+    bareClass: 'text-base',
+    reason: 'the 16px iOS zoom floor, paired with md:text-body',
+  },
+  {
+    file: 'components/ui/select.tsx',
+    line: 23,
+    bareClass: 'text-base',
+    reason: 'the same iOS zoom floor, on the shared field base',
+  },
+  {
+    file: 'components/ui/textarea.tsx',
+    line: 18,
+    bareClass: 'text-base',
+    reason: 'the same iOS zoom floor, on the shared field base',
+  },
+];
+
+function occurrenceKey(occurrence: Occurrence): string {
+  return `${occurrence.file}:${occurrence.line}  ${occurrence.bareClass}`;
+}
+
+describe('Tailwind default size and weight classes', () => {
+  let occurrences: Occurrence[];
+
+  beforeAll(() => {
+    occurrences = collectOccurrences();
+  });
+
+  it('finds none of them outside the pinned exceptions', () => {
+    const exempt = new Set(
+      SIZE_WEIGHT_EXCEPTIONS.map(
+        (exception) => `${exception.file}:${exception.line}  ${exception.bareClass}`,
+      ),
+    );
+    const hits = occurrences
+      .filter((occurrence) => BANNED_SIZE_AND_WEIGHT_CLASSES.has(occurrence.bareClass))
+      .map(occurrenceKey)
+      .filter((key) => !exempt.has(key))
+      .sort();
+
+    expect(hits).toEqual([]);
+  });
+
+  it('keeps every pinned exception at the exact call site it excuses', () => {
+    const present = new Set(
+      occurrences
+        .filter((occurrence) => BANNED_SIZE_AND_WEIGHT_CLASSES.has(occurrence.bareClass))
+        .map(occurrenceKey),
+    );
+    const stale = SIZE_WEIGHT_EXCEPTIONS.map(
+      (exception) => `${exception.file}:${exception.line}  ${exception.bareClass}`,
+    ).filter((key) => !present.has(key));
+
+    expect(stale, 'an excused call site moved or its class changed: fix or delete its pin').toEqual(
+      [],
+    );
+  });
+});
+
+/**
+ * `font-display` switches an element onto Fraunces (docs/design.md §3's Display row): a register
+ * change, not a size, so a scan for it belongs beside the size-and-weight denylist above rather
+ * than in the contrast suite. The scan cannot tell a wordmark from a stray heading someone tried
+ * the display face on, so it is a closed list of reviewed files rather than a live pass-through:
+ * a new call site fails here until it is added with the context that justifies it, the same shape
+ * `border-utilities.test.ts`'s `stateTokenCallSites` holds its own reviewed call sites in.
+ */
+const FONT_DISPLAY_CALL_SITES: { file: string; reason: string }[] = [
+  { file: 'app/not-found.tsx', reason: 'the 404 headline' },
+  { file: 'app/(app)/workspaces/new/page.tsx', reason: 'the workspace-creation header' },
+  { file: 'components/layout/sidebar-body.tsx', reason: 'the sidebar wordmark' },
+  {
+    file: 'components/dashboard/dashboard-summary.tsx',
+    reason: 'the zero-board dashboard empty state',
+  },
+  { file: 'components/board/board-list.tsx', reason: 'the zero-board board-list empty state' },
+  { file: 'components/board/board-placeholders.tsx', reason: 'the empty-column placeholder' },
+  { file: 'components/auth/login-view.tsx', reason: 'auth view headline' },
+  { file: 'components/auth/register-view.tsx', reason: 'auth view headline' },
+  { file: 'components/auth/forgot-password-view.tsx', reason: 'auth view headline' },
+  {
+    file: 'components/auth/reset-password-view.tsx',
+    reason: 'auth view headline, all three of its states',
+  },
+  {
+    file: 'components/auth/verify-email-view.tsx',
+    reason: 'auth view headline, both of its states',
+  },
+  {
+    file: 'components/auth/invite-accept-view.tsx',
+    reason: 'auth view headline, all four of its states',
+  },
+];
+
+const FONT_DISPLAY_RE = /(?<![\w-])font-display(?![\w-])/;
+
+function filesUsingFontDisplay(): string[] {
+  const found = new Set<string>();
+  for (const dir of SCAN_DIRS) {
+    for (const file of sourceFiles(path.join(webRoot, dir))) {
+      const scannable = blankComments(readFileSync(file, 'utf8'));
+      if (FONT_DISPLAY_RE.test(scannable)) found.add(path.relative(webRoot, file));
+    }
+  }
+  return [...found].sort();
+}
+
+describe('font-display call sites', () => {
+  it('limits the Fraunces switch to its reviewed contexts', () => {
+    expect(filesUsingFontDisplay()).toEqual(
+      FONT_DISPLAY_CALL_SITES.map((site) => site.file).sort(),
+    );
   });
 });
