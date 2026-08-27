@@ -358,4 +358,39 @@ describe('useTaskMetadata', () => {
     expect(result.current.activities).toHaveLength(1);
     expect(result.current.activities.map((entry) => entry.id)).not.toContain('stale-a');
   });
+
+  /**
+   * The comment-page retry must be dropped the same way as the activities retry above: a stale
+   * closure from the old task must not land its page in the new task's thread.
+   */
+  it('drops a comment page retry that fires after the panel moved to another task', async () => {
+    stubMeta({ commentsCursor: 'cursor-1' });
+    const { result, rerender } = renderMeta();
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+
+    apiGet.mockImplementationOnce(() => Promise.reject(new Error('network')));
+    await act(() => result.current.loadMoreComments());
+    const action = retryAction(toastError.mock.calls[0] as unknown[]);
+
+    rerender({ taskId: OTHER_TASK_ID });
+    await waitFor(() => expect(result.current.loadingMeta).toBe(false));
+
+    apiGet.mockImplementation(
+      () =>
+        Promise.resolve({
+          items: [comment('stale')],
+          nextCursor: null,
+          hasMore: false,
+        }) as never,
+    );
+    const callsBeforeRetry = apiGet.mock.calls.length;
+    await act(async () => {
+      action.onClick();
+    });
+
+    expect(apiGet).toHaveBeenCalledTimes(callsBeforeRetry);
+    expect(result.current.comments.map((entry) => entry.id)).toEqual(['c1']);
+    expect(result.current.hasMoreComments).toBe(true);
+    expect(result.current.loadingMoreComments).toBe(false);
+  });
 });
