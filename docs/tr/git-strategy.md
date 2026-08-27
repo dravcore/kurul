@@ -32,11 +32,11 @@ merge sonrası silinir.
 | `hotfix/*`  | kısa ömürlü | `main`           | `main` + `develop` | Acil production fix'i                                                       |
 
 ```
-main     ──●───────────────────────●──────────────●──  tags: v0.1.0, v0.2.0, v0.3.0
-            \                     /              /
-release      \              ●────●              /      release/0.2.0
-              \            /                   /
-develop  ──────●──●──●────●───────●──●──●─────●─────
+main     ──●───────────────────────●──────────────●─────●──  tags: v0.1.0, v0.2.0, v0.3.0, v0.4.0
+            \                     /              /     /
+release      \              ●────●              /     /      release/0.2.0
+              \            /                   /     /
+develop  ──────●──●──●────●───────●──●──●─────●─────●─────
                   /        \         /  /
 feature          ●          └─ geri-merge
 

@@ -122,22 +122,22 @@ dig +short kurul.example.com
 
 ## 2. Fetch the compose file and configure
 
-The URLs below name a release tag, `v0.3.0`, and the same tag goes into `.env` as `TAG` a few
+The URLs below name a release tag, `v0.4.0`, and the same tag goes into `.env` as `TAG` a few
 lines further down. Fetch the files from the release you are going to run, not from `main`:
 `docker-compose.yml`, `docker/Caddyfile` and `scripts/backup.sh` are versioned with the images,
 and a compose file from a newer tree can name a service, a variable or an image the release you
-pinned never shipped. To install a different release, replace `v0.3.0` in every URL and in
+pinned never shipped. To install a different release, replace `v0.4.0` in every URL and in
 `TAG`.
 
 ```bash
 mkdir -p /opt/kurul && cd /opt/kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/docker-compose.yml
 curl -fsSL --create-dirs -o docker/Caddyfile \
-  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker/Caddyfile
+  https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/docker/Caddyfile
 curl -fsSL --create-dirs -o scripts/backup.sh \
-  https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/scripts/backup.sh
+  https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/scripts/backup.sh
 chmod +x scripts/backup.sh
-curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/.env.example
+curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/.env.example
 chmod 600 .env
 ```
 
@@ -151,7 +151,7 @@ Edit `.env`. For a Docker-only install these are the lines that matter — every
 file is either for the development loop or has a working default:
 
 ```bash
-TAG=v0.3.0                                  # the release the files above came from
+TAG=v0.4.0                                  # the release the files above came from
 
 SITE_URL=https://kurul.example.com          # your domain, scheme included
 
@@ -774,7 +774,7 @@ reason. Do the steps in this order, every time; none of them is long.
    archive you took in step 2. Neither is repeated here on purpose: the steps are the same
    whether an upgrade or anything else went wrong.
 
-Pin a release with `TAG=v0.3.0` in `.env` rather than tracking `latest`: an upgrade should be
+Pin a release with `TAG=v0.4.0` in `.env` rather than tracking `latest`: an upgrade should be
 a step you take deliberately, with the backup from step 2 in hand, not something the next
 `docker compose up` does to you.
 
@@ -783,7 +783,7 @@ a step you take deliberately, with the backup from step 2 in hand, not something
 What a release changes in the files this page has you fetch, or expects of you before `pull`.
 The full entries live in `CHANGELOG.md`; this list only points at them.
 
-- **Next release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.1 ships a
+- **0.4.0 ([CHANGELOG](../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1 ships a
   migration the `migrate` service applies on the first `up`; nothing to run, but the backup in
   step 2 is what covers it. `BACKUP_REMOTE` and the off-host copy need the `scripts/backup.sh`
   and `docker-compose.yml` from step 3 (v0.3.0's script ignores the variable without an
@@ -842,7 +842,7 @@ Then rename the directory and take the release's files, at the tag you are movin
 
 ```bash
 cd /opt && mv kurultay kurul && cd kurul
-curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.3.0/docker-compose.yml
+curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.4.0/docker-compose.yml
 # then docker/Caddyfile and scripts/backup.sh the same way
 ```
 
@@ -893,13 +893,13 @@ them.
 
 ```bash
 cosign verify \
-  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.3.0" \
+  --certificate-identity "https://github.com/dravcore/kurul/.github/workflows/release-images.yml@refs/tags/v0.4.0" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  ghcr.io/dravcore/kurul-api:v0.3.0
+  ghcr.io/dravcore/kurul-api:v0.4.0
 ```
 
 Repeat it for `kurul-web` and `kurul-migrate`, which are signed the same way, and replace
-`v0.3.0` in both places when you verify another release. The version appears twice for two different reasons:
+`v0.4.0` in both places when you verify another release. The version appears twice for two different reasons:
 once as the git ref the signing workflow ran on, and once as the image tag you are asking
 about.
 
@@ -914,7 +914,7 @@ pushed a tag to their own fork of this repository.
 A successful run prints the checks it performed and a JSON claim naming the digest it verified:
 
 ```
-Verification for ghcr.io/dravcore/kurul-api:v0.3.0 --
+Verification for ghcr.io/dravcore/kurul-api:v0.4.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -935,7 +935,7 @@ the digest is the stricter question — it asks about the exact bytes on disk ra
 whatever the tag points at now:
 
 ```bash
-docker image inspect ghcr.io/dravcore/kurul-api:v0.3.0 --format '{{index .RepoDigests 0}}'
+docker image inspect ghcr.io/dravcore/kurul-api:v0.4.0 --format '{{index .RepoDigests 0}}'
 ```
 
 ### Where the SBOM lives
@@ -945,20 +945,20 @@ downloadable assets — one per image per architecture, because the two architec
 do not contain the same packages:
 
 ```
-kurul-api-v0.3.0-linux-amd64.spdx.json
-kurul-api-v0.3.0-linux-arm64.spdx.json
-kurul-web-v0.3.0-linux-amd64.spdx.json
-kurul-web-v0.3.0-linux-arm64.spdx.json
-kurul-migrate-v0.3.0-linux-amd64.spdx.json
-kurul-migrate-v0.3.0-linux-arm64.spdx.json
+kurul-api-v0.4.0-linux-amd64.spdx.json
+kurul-api-v0.4.0-linux-arm64.spdx.json
+kurul-web-v0.4.0-linux-amd64.spdx.json
+kurul-web-v0.4.0-linux-arm64.spdx.json
+kurul-migrate-v0.4.0-linux-amd64.spdx.json
+kurul-migrate-v0.4.0-linux-arm64.spdx.json
 ```
 
 The format is SPDX 2.3 JSON, which is what `grype`, `trivy` and Dependency-Track all read
 without conversion:
 
 ```bash
-gh release download v0.3.0 --repo dravcore/kurul --pattern '*.spdx.json'
-grype sbom:./kurul-api-v0.3.0-linux-amd64.spdx.json
+gh release download v0.4.0 --repo dravcore/kurul --pattern '*.spdx.json'
+grype sbom:./kurul-api-v0.4.0-linux-amd64.spdx.json
 ```
 
 **The SBOM file itself is not signed** — the signature above covers the image, and the SBOM is a
@@ -968,7 +968,7 @@ trust the file: regenerate it yourself from the image you have already verified,
 [syft](https://github.com/anchore/syft), and compare.
 
 ```bash
-syft scan registry:ghcr.io/dravcore/kurul-api:v0.3.0 --platform linux/amd64 -o spdx-json
+syft scan registry:ghcr.io/dravcore/kurul-api:v0.4.0 --platform linux/amd64 -o spdx-json
 ```
 
 ## Bringing your own reverse proxy
@@ -1208,7 +1208,7 @@ clone the tag you run, and build from a copy of that `.env` so the result carrie
 `TAG` your install resolves:
 
 ```bash
-git clone --branch v0.3.0 https://github.com/dravcore/kurul.git /opt/kurul-src
+git clone --branch v0.4.0 https://github.com/dravcore/kurul.git /opt/kurul-src
 cp /opt/kurul/.env /opt/kurul-src/.env
 cd /opt/kurul-src && docker compose build web      # tags ghcr.io/dravcore/kurul-web:<TAG>
 cd /opt/kurul && docker compose up -d web          # no pull: uses the image just built
