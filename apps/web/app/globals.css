@@ -68,7 +68,7 @@
   --signature: #a85a28;
 
   /* Never copper (--signature) text on this tint: it measures 4.11:1 in light, under the 4.5
-     floor. Neutral --foreground text is allowed (13.98:1) and is measured against it like any
+     floor. Neutral --foreground text is allowed (12.64:1) and is measured against it like any
      other surface. No call site breaks the rule today: app/globals.contrast.test.ts rescans the
      tree on every run, so one cannot arrive unnoticed. */
   --signature-subtle: #f2e6da;
