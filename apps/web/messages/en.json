@@ -134,6 +134,7 @@
       "title": "Kurul",
       "createWorkspace": "New workspace",
       "switchWorkspace": "Switch workspace",
+      "switchWorkspaceNamed": "Switch workspace ({name})",
       "confirmEmail": "Confirm your email",
       "signOut": "Sign out",
       "loading": "Loading…",

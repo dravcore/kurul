@@ -134,6 +134,7 @@
       "title": "Kurul",
       "createWorkspace": "Yeni workspace",
       "switchWorkspace": "Workspace değiştir",
+      "switchWorkspaceNamed": "Workspace değiştir ({name})",
       "confirmEmail": "E-posta adresinizi doğrulayın",
       "signOut": "Çıkış yap",
       "loading": "Yükleniyor…",

@@ -84,3 +84,24 @@ describe('DashboardSummary empty state', () => {
     expect(screen.getByRole('link', { name: messages.app.dashboard.openBoard })).toBeDefined();
   });
 });
+
+/**
+ * The other half of the zero-task state: a workspace with no boards at all. `BoardList`,
+ * rendered below this section on the real `/dashboard` route, already draws its own damga mark,
+ * headline and "Create board" action for exactly this case, so this section renders nothing
+ * rather than a second mark stacked on top of it.
+ */
+describe('DashboardSummary with no boards at all', () => {
+  it('renders nothing, leaving the board list as the page’s one empty state', async () => {
+    vi.mocked(fetchWorkspaceBoards).mockResolvedValue([]);
+    vi.mocked(api.get).mockResolvedValue(EMPTY_SUMMARY);
+    const { container } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <DashboardSummary />
+      </NextIntlClientProvider>,
+    );
+
+    await waitFor(() => expect(container.textContent).toBe(''));
+    expect(screen.queryByRole('heading', { name: messages.app.dashboard.emptyTitle })).toBeNull();
+  });
+});

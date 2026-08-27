@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, type RenderResult } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/en.json';
 
@@ -31,8 +31,8 @@ vi.mock('./workspace-provider', () => ({
 
 import { AppShell } from './app-shell';
 
-function renderShell(): void {
-  render(
+function renderShell(): RenderResult {
+  return render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <AppShell>
         <p>Route content</p>
@@ -44,6 +44,7 @@ function renderShell(): void {
 afterEach(() => {
   cleanup();
   context.value.workspaces = [{ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70' }];
+  context.value.bootstrapped = true;
 });
 
 describe('AppShell', () => {
@@ -92,5 +93,32 @@ describe('AppShell', () => {
 
     expect(screen.queryByTestId('app-sidebar')).toBeNull();
     expect(screen.getByRole('main').textContent).toBe('Route content');
+  });
+});
+
+/**
+ * Before `bootstrapped` is true, `useApiResource` still hands back whatever the last load
+ * resolved to: the empty roster this provider defaults to before the very first one ever
+ * finishes. A returning reader whose account does have workspaces overwrites that default the
+ * moment their own bootstrap lands, so by the time a *second* load starts (a manual retry) the
+ * roster already on hand is the real signal to paint from.
+ */
+describe('AppShell loading skeleton', () => {
+  it('does not paint a sidebar shape before any roster is known', () => {
+    context.value.bootstrapped = false;
+    context.value.workspaces = [];
+
+    const { container } = renderShell();
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4);
+  });
+
+  it('keeps the sidebar shape once a roster is already on hand', () => {
+    context.value.bootstrapped = false;
+    context.value.workspaces = [{ id: '0198e2c0-9a1b-7f04-8c3d-2b5e7a9c1d70' }];
+
+    const { container } = renderShell();
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7);
   });
 });

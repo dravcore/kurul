@@ -30,7 +30,7 @@ export function NotificationsList(): React.ReactElement {
   const locale = useLocale();
   const router = useRouter();
   const { activeId: workspaceId } = useWorkspaceContext();
-  const { setCount: setUnreadCount } = useNotificationUnreadContext();
+  const { count: unreadCount, setCount: setUnreadCount } = useNotificationUnreadContext();
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -143,6 +143,7 @@ export function NotificationsList(): React.ReactElement {
       );
       if (updated) {
         setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+        setUnreadCount((current) => Math.max(0, current - 1));
       }
       if (notification.taskId && !navigated) {
         toast.error(t('openTaskError'));
@@ -151,8 +152,6 @@ export function NotificationsList(): React.ReactElement {
       toast.error(t('markReadError'));
     }
   }
-
-  const hasUnread = items.some((item) => !item.readAt);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -186,7 +185,7 @@ export function NotificationsList(): React.ReactElement {
           type="button"
           variant="outline"
           size="sm"
-          disabled={!hasUnread}
+          disabled={unreadCount === 0}
           onClick={() => void markAllRead()}
         >
           {t('markAllRead')}

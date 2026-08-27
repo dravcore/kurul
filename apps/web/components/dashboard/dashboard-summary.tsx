@@ -33,7 +33,7 @@ const CompletionChart = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-56 w-full rounded-lg" /> },
 );
 
-export function DashboardSummary(): React.ReactElement {
+export function DashboardSummary(): React.ReactElement | null {
   const t = useTranslations('app.dashboard');
   const tErrors = useTranslations('app.errors');
   const { activeId } = useWorkspaceContext();
@@ -102,6 +102,13 @@ export function DashboardSummary(): React.ReactElement {
   }
 
   if (summary.totalTasks === 0) {
+    // A workspace with no boards at all has nothing of its own to say here: `BoardList` below
+    // already carries the one damga mark, the one headline and the one primary action for that
+    // exact state (docs/design.md §2's two-marks budget), and rendering this section's own
+    // empty state on top of it would put a second mark and a second action on the same screen.
+    if (boards.length === 0) {
+      return null;
+    }
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
         <DamgaMark size={64} />

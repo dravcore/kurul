@@ -22,12 +22,21 @@ function AppShellFrame({
       <div className="flex h-dvh overflow-hidden bg-background" aria-busy>
         <p className="sr-only">{t('shell.loading')}</p>
         {/* `md:flex`, matching `AppSidebar`: the skeleton used to appear only from `lg` up, so
-            between 768px and 1024px the shell painted with no sidebar and then grew one. */}
-        <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 md:flex">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="mt-4 h-9 w-full" />
-          <Skeleton className="h-9 w-2/3" />
-        </div>
+            between 768px and 1024px the shell painted with no sidebar and then grew one.
+
+            `workspaces` is the last bootstrap's roster, which a plain reload keeps standing
+            while a fresh one is in flight (`useApiResource` only clears it on failure), so on
+            the very first load it is the same empty array as an account with no workspaces.
+            Painting this block on that guess is what a first-time signup used to watch flash
+            and disappear on its way to `/workspaces/new`, whose own layout carries no sidebar
+            at all: skip the shape until a roster is actually known to be there. */}
+        {workspaces.length > 0 ? (
+          <div className="hidden w-[var(--sidebar-width)] shrink-0 flex-col gap-2 border-r border-border bg-card p-3 md:flex">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="mt-4 h-9 w-full" />
+            <Skeleton className="h-9 w-2/3" />
+          </div>
+        ) : null}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-[var(--topbar-height)] items-center border-b border-border px-3">
             <Skeleton className="h-5 w-40" />
