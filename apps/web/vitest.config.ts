@@ -84,6 +84,12 @@ export default defineConfig({
       // panel and settings IA changes, well past the figures above, so the floor moves up with
       // it (branch stays at 86, a few points under the measured 88.27, for the same margin the
       // rest of this file keeps).
+      //
+      // `components/board/**` and `components/task/**` (2026-08-27, P8 gate-and-evidence sweep,
+      // re-measured): board 87.06/80.16/81.67/91.15, task 85.62/82.44/84.94/89.51 (stmts/branch/
+      // funcs/lines), both well past the 2026-08-12 figures the old floors were set from. Moved
+      // up with them, a few points under each measured number, the same margin the rest of this
+      // file keeps.
       thresholds: {
         'app/**': {
           statements: 97,
@@ -92,16 +98,16 @@ export default defineConfig({
           lines: 97,
         },
         'components/board/**': {
-          statements: 65,
-          branches: 54,
-          functions: 54,
-          lines: 70,
+          statements: 84,
+          branches: 77,
+          functions: 78,
+          lines: 88,
         },
         'components/task/**': {
-          statements: 60,
-          branches: 60,
-          functions: 58,
-          lines: 62,
+          statements: 82,
+          branches: 79,
+          functions: 81,
+          lines: 86,
         },
         'components/layout/**': {
           statements: 75,
