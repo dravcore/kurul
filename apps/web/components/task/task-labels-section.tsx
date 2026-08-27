@@ -166,7 +166,15 @@ export function TaskLabelsSection({
               ))}
             </Select>
           </div>
-          <Button type="button" size="sm" disabled={pending} onClick={() => void createLabel()}>
+          {/* Outline, not the default fill: docs/design.md §2 allows one full-strength copper
+              action per view beside the rail, and this section action is not the panel's. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            onClick={() => void createLabel()}
+          >
             {t('createLabel')}
           </Button>
         </div>

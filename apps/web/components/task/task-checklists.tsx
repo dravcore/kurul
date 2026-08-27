@@ -65,7 +65,10 @@ export function TaskChecklists({
   if (!loading && !loadFailed && checklists.length === 0 && !canAdd) return null;
 
   return (
-    <section aria-label={t('sectionLabel')} className="flex flex-col gap-3">
+    <section
+      aria-label={t('sectionLabel')}
+      className="flex flex-col gap-3 border-t border-border pt-4"
+    >
       <p className="text-small font-strong text-foreground">{t('sectionLabel')}</p>
 
       {loading ? (
@@ -144,8 +147,11 @@ export function TaskChecklists({
                   }}
                 />
               </div>
+              {/* Outline, not the default fill: docs/design.md §2 allows one full-strength
+                  copper action per view beside the rail, and this one is not the panel's. */}
               <Button
                 type="button"
+                variant="outline"
                 size="sm"
                 disabled={pending}
                 onClick={() => void addChecklist()}

@@ -568,6 +568,39 @@ describe('TaskPanel section order', () => {
     }
   });
 
+  it('spends no full-strength copper of its own', () => {
+    // docs/design.md §2 budgets a screen at two full-strength marks: the sancak rail plus, on a
+    // view that has one, its single primary action. The board behind this panel already spends
+    // one on the selected card's rail, and the panel's section actions are not that view's one
+    // action - they are three peers (create label, add checklist, post comment). Measured on
+    // the running app, a default-variant Button here put four copper marks on one screen.
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    const copper = screen
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('data-variant') === 'default');
+
+    expect(copper.map((button) => button.textContent)).toEqual([]);
+  });
+
+  it('rules every titled section off the one above it, not two of the four', () => {
+    // Four sections carrying the same heading weight, two of them with a rule above and two
+    // without, reads as an arbitrary rule rather than as grouping: nothing on screen says the
+    // checklists belong under the properties. Either all four are separated or none is, and at
+    // this section gap (16px) the rule is what makes a heading start something.
+    render(<Board open selected={{ ...task, checklists: [] }} />);
+
+    for (const name of [
+      messages.app.board.task.propertiesTitle,
+      messages.app.board.task.checklist.sectionLabel,
+      messages.app.board.task.attachments.sectionLabel,
+      messages.app.board.task.discussionTitle,
+    ]) {
+      expect(region(name).className).toContain('border-t');
+      expect(region(name).className).toContain('pt-4');
+    }
+  });
+
   it('keeps the delete footer the last child of the scroll column', () => {
     // The footer is `mt-auto` and only reaches the bottom of the scroll column while it is the
     // last child of it. A section appended after it looks fine in a screenshot of a long task

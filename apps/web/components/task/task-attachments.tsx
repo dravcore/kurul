@@ -77,7 +77,10 @@ export function TaskAttachments({
   }
 
   return (
-    <section aria-label={t('sectionLabel')} className="flex flex-col gap-3">
+    <section
+      aria-label={t('sectionLabel')}
+      className="flex flex-col gap-3 border-t border-border pt-4"
+    >
       <p className="text-small font-strong text-foreground">{t('sectionLabel')}</p>
 
       {loading ? (
