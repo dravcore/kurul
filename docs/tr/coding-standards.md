@@ -241,6 +241,13 @@ components/
   ölçülmüş durumda. Chevron bir token'ı hiç okuyamaz: kontrolün kendi background'una bir
   `data:` URI olarak çizilir ve orada `var()` çözülmez. Bu ikisinin dışındaki her şey bir
   defect'tir.
+- Tek bir çağrı noktası bilerek `outline-none` taşır: `components/ui/dialog.tsx`'in
+  `DialogContent` ve `SheetContent`'i; Radix content wrapper'ları açıldıklarında focus'u Tab, ok
+  tuşu veya bir link değil script taşır, yani tek focus işaretinin böleceği bir klavye yolculuğu
+  yoktur. Ham renk istisnalarıyla aynı şekilde korunur:
+  `apps/web/app/globals-css-layers.test.ts` ağacın tamamını `outline-none` / `outline-hidden`
+  için tarar ve sonuç adı konmuş, gerekçelendirilmiş bu tek istisnadan başka bir şeyse kırmızıya
+  döner.
 - `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa
   `@layer base` içine girer. Katmansız bir kural özgüllüğünden bağımsız olarak her cascade
   katmanını yener; bu yüzden katmansız bir `*` seçici, Tailwind'in `@layer utilities` içine

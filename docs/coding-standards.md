@@ -237,6 +237,12 @@ components/
   measured in `RAW_COLOUR_CALL_SITES` (`apps/web/app/globals.contrast.test.ts`). The chevron
   cannot read a token at all: it is drawn into the control's own background as a `data:` URI,
   where `var()` is not resolved. Anything outside those two is a defect.
+- One call site keeps `outline-none` on purpose: `components/ui/dialog.tsx`'s `DialogContent` and
+  `SheetContent`, whose Radix content wrappers take focus by script when they open, not by Tab, an
+  arrow key or a link, so there is no keyboard journey for the single focus mark to interrupt.
+  Guarded the same way as the raw-colour exceptions: `apps/web/app/globals-css-layers.test.ts`
+  scans the whole tree for `outline-none` / `outline-hidden` and fails if the result is anything
+  other than this one named, reasoned exception.
 - Author CSS in `apps/web/app/globals.css` goes inside `@layer base` unless there is a written
   reason not to, stated next to the rule. An unlayered rule outranks every cascade layer whatever
   its specificity, so an unlayered `*` selector repaints the utilities Tailwind emits into
