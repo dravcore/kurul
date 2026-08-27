@@ -156,13 +156,13 @@ function clickLastButton(label: string): void {
 }
 
 /**
- * The role `<select>` on a specific member's row, scoped by the row it sits in: every
- * manageable row carries one, all sharing the same `Role` accessible name.
+ * The role `<select>` on a specific member's row, scoped by the row it sits in and named for
+ * that member (`Role for {name}`), unlike the invite dialog's plain `Role`.
  */
 function roleSelectFor(name: string): HTMLSelectElement {
   const row = screen.getByText(name).closest('li');
   if (!row) throw new Error(`no row found for ${name}`);
-  return within(row).getByLabelText(copy.inviteRole) as HTMLSelectElement;
+  return within(row).getByLabelText(`Role for ${name}`) as HTMLSelectElement;
 }
 
 beforeAll(() => {
@@ -339,6 +339,16 @@ describe('MembersSettings — changing a role', () => {
     fireEvent.change(roleSelectFor('Bora'), { target: { value: MemberRole.ADMIN } });
 
     expect(await screen.findByText(copy.roleHints.ADMIN)).toBeTruthy();
+  });
+
+  it('points the select at its own hint with aria-describedby', async () => {
+    renderSection();
+    await screen.findByText('Bora');
+
+    const select = roleSelectFor('Bora');
+    const hint = await screen.findByText(copy.roleHints.MEMBER);
+
+    expect(select.getAttribute('aria-describedby')).toBe(hint.id);
   });
 
   it('disables the select while its own patch is in flight, and re-enables it after', async () => {

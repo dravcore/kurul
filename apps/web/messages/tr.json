@@ -191,6 +191,7 @@
         "you": "Siz",
         "cancel": "Vazgeç",
         "memberMenu": "{name} için işlemler",
+        "memberRole": "{name} için rol",
         "roles": {
           "OWNER": "Sahip",
           "ADMIN": "Yönetici",

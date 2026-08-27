@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -186,7 +186,7 @@ export function MembersSettings(): React.ReactElement {
           heading is a section that only ever reports its own absence. */}
       {canManage && roster.invitations.length > 0 ? (
         <div className="flex flex-col gap-1">
-          <h3 className="text-small font-strong text-muted-foreground">{t('pendingTitle')}</h3>
+          <h2 className="text-small font-strong text-muted-foreground">{t('pendingTitle')}</h2>
           <ul className="divide-y divide-border">
             {roster.invitations.map((invitation) => (
               <li key={invitation.id} className={ROW}>
@@ -331,6 +331,7 @@ function MemberRow({
   // Set only while the owner confirmation is open. The `<select>` shows this value until it is
   // either confirmed (PATCHed) or cancelled (reverted back to `role`).
   const [confirmRole, setConfirmRole] = useState<MemberRole | null>(null);
+  const roleHintId = useId();
 
   function resolveRoleError(caught: unknown): string {
     return resolveApiMessage(caught, t, {
@@ -426,7 +427,8 @@ function MemberRow({
         <p className="min-w-0 truncate text-body text-foreground">{member.name}</p>
         <div className="flex shrink-0 items-center gap-2">
           <Select
-            aria-label={t('inviteRole')}
+            aria-label={t('memberRole', { name: member.name })}
+            aria-describedby={roleHintId}
             value={shownRole}
             disabled={pending}
             aria-busy={pending}
@@ -458,7 +460,9 @@ function MemberRow({
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <p className="text-small text-muted-foreground">{t(`roleHints.${shownRole}`)}</p>
+        <p id={roleHintId} className="text-small text-muted-foreground">
+          {t(`roleHints.${shownRole}`)}
+        </p>
         {/* Focus stays on the row's own control rather than jumping here: the reader just
             chose a value on this exact `<select>`, unlike a dialog submit their focus was
             already waiting on. */}

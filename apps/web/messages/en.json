@@ -191,6 +191,7 @@
         "you": "You",
         "cancel": "Cancel",
         "memberMenu": "Actions for {name}",
+        "memberRole": "Role for {name}",
         "roles": {
           "OWNER": "Owner",
           "ADMIN": "Admin",
