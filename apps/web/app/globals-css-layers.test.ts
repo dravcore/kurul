@@ -282,32 +282,50 @@ function requireRule(
 }
 
 /**
- * Every element a keyboard can land on whose own class string could outrank the base outline:
- * the four form primitives, each of which used to carry an `outline-none` next to a ring
- * pair of their own, the dropdown rows, which carried `outline-hidden` while their `bg-accent`
- * step was read as the indicator, the shell `main`, which is where the skip link lands, and the
- * task panel's heading, which a keyboard user reaches by pressing Enter on a task card, and the
- * popover surface and the picker rows inside it, which a large workspace's assignee and label
- * lists moved behind. The panel heading and the shell `main` each carried a suppressor as a
- * programmatic focus container until a keyboard accessibility pass measured both of them
- * matching `:focus-visible` in Chromium and Firefox. Both utilities
- * compile into `utilities`, which outranks `base`, so either one leaves the element focusing
- * with nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor
- * computes `outline-style: none`. The scan reads the whole source rather than the class strings
- * alone, so a comment in one of these files names the utility as `outline-*` instead of
- * spelling it.
+ * Every keyboard-reachable control relies on the one `:focus-visible` outline `base` draws below,
+ * so an `outline-none` or `outline-hidden` anywhere in app/, components/ or lib/ either replaces
+ * that mark with nothing or hides a container Radix moves focus onto by script when it opens
+ * rather than by Tab, an arrow key or a link, docs/design.md §5's one exception. Both utilities
+ * compile into `utilities`, which outranks `base`, so either one leaves the element focusing with
+ * nothing drawn at all: in Chromium a `:focus-visible` element under that suppressor computes
+ * `outline-style: none`.
+ *
+ * A fixed file list only guards a regression on files that used to carry one (the four form
+ * primitives, the dropdown rows, the shell `main` and the task panel heading all did, before the
+ * single focus mark); it says nothing about a new file. This reads the whole tree instead, and
+ * the result has to equal this named list exactly, the same shape `RAW_COLOUR_CALL_SITES` in
+ * `app/globals.contrast.test.ts` holds its own reviewed exceptions in. Comments are stripped
+ * first, so `components/board/board-template-picker.tsx`'s own comment naming `outline-none` to
+ * explain why the fieldset legend avoids it does not read as a call site.
  */
-const singleIndicatorTargets = [
-  'components/layout/app-shell.tsx',
-  'components/task/searchable-picker.tsx',
-  'components/task/task-panel.tsx',
-  'components/ui/button.tsx',
-  'components/ui/dropdown-menu.tsx',
-  'components/ui/input.tsx',
-  'components/ui/popover.tsx',
-  'components/ui/select.tsx',
-  'components/ui/textarea.tsx',
+const OUTLINE_SUPPRESSOR_EXCEPTIONS: { file: string; reason: string }[] = [
+  {
+    file: 'components/ui/dialog.tsx',
+    reason:
+      'DialogContent and SheetContent: Radix moves focus onto the panel itself when it opens, ' +
+      'not something a reader tabbed to, so there is no keyboard journey for the outline to mark',
+  },
 ];
+
+const OUTLINE_SUPPRESSOR_RE = /\boutline-(none|hidden)\b/;
+
+/** Comments are prose, not code, the same carve-out `border-utilities.test.ts` makes: a line
+ * comment is only stripped when it opens the line, which keeps the `http://` inside
+ * `select.tsx`'s data URI out of the strip. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+}
+
+function filesWithOutlineSuppressor(): string[] {
+  const found = new Set<string>();
+  for (const dir of ['app', 'components', 'lib']) {
+    for (const file of sourceFiles(path.join(webRoot, dir))) {
+      const source = stripComments(readFileSync(file, 'utf8'));
+      if (OUTLINE_SUPPRESSOR_RE.test(source)) found.add(path.relative(webRoot, file));
+    }
+  }
+  return [...found].sort();
+}
 
 const borderUtilities = {
   'border-border': 'var(--border)',
@@ -592,9 +610,9 @@ describe('globals.css cascade layers', () => {
     expect(width).toContain('box-shadow');
   }, 30_000);
 
-  it.each(singleIndicatorTargets)('leaves no outline suppressor on %s', async (file) => {
-    expect(await readFile(path.join(webRoot, file), 'utf8')).not.toMatch(
-      /\boutline-(none|hidden)\b/,
+  it('confines the outline suppressor to its reviewed exceptions', () => {
+    expect(filesWithOutlineSuppressor()).toEqual(
+      OUTLINE_SUPPRESSOR_EXCEPTIONS.map((exception) => exception.file).sort(),
     );
   });
 
