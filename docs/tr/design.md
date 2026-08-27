@@ -164,13 +164,13 @@ kelimeyle** birlikte shiplenir, asla yalnızca renkle değil. priority, label'la
 sıralı bir skalerdir; sırası artan kroma ile taşınır, böylece renk körlüğünden, grayscale
 baskıdan ve sesli tarif edilmekten sağ çıkar.
 
-| Anlam                            | priority | Token                                 | Açık      | Koyu      | Kontrast A / K | İkon           |
-| -------------------------------- | -------- | ------------------------------------- | --------- | --------- | -------------- | -------------- |
-| Nötr / inaktif                   | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9      | `chevron-down` |
-| Bilgi                            | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9      | `minus`        |
-| İyi / tamamlandı                 | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7      | `check`        |
-| Uyarı / süresi yaklaşıyor        | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8      | `chevron-up`   |
-| Tehlike / gecikmiş / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8      | `chevrons-up`  |
+| Anlam                            | priority | Token                                 | Açık      | Koyu      | `--card` üzerinde kontrast, A / K | İkon           |
+| -------------------------------- | -------- | ------------------------------------- | --------- | --------- | --------------------------------- | -------------- |
+| Nötr / inaktif                   | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9                         | `chevron-down` |
+| Bilgi                            | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9                         | `minus`        |
+| İyi / tamamlandı                 | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7                         | `check`        |
+| Uyarı / süresi yaklaşıyor        | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8                         | `chevron-up`   |
+| Tehlike / gecikmiş / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8                         | `chevrons-up`  |
 
 priority, full-kroma bir ikon artı metin olarak render edilir; label'lar ise renkli bir nokta ile
 tonlanmış bir chip olarak render edilir — farklı ağırlıklar, böylece kırmızı bir priority ile
@@ -243,18 +243,18 @@ figure veya bir stat-tile değeri üzerinde değil.
 App shell, [architecture.md §4](architecture.md#4-appsweb--yapı)'teki `(app)` route group'una
 göre.
 
-| Bölge                | Spec                                                                                                                                                                                                                                                                                                                    |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                                                                                                                                                                                               |
-| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas                                                                                                                                                                           |
-| Topbar               | 48px sticky — board adı, filter girişi, overflow (presence avatar'ları henüz gelmedi); **768px altında 56px**, ve orada gezinme trigger'ını da taşır                                                                                                                                                                    |
-| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                                                                                                                                                                                                       |
-| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px); 48rem altında bir column 85vw'dir ve strip ona snap eder (mandatory scroll snap), scroll edilecek column'un kaldığı kenara 24px'lik edge mask (`--background`'dan transparent'a) çizilir |
-| Card                 | 10px 12px padding, 8px gap, min 36px (yalnızca title), tipik 56px (tek meta satırı, seed'deki board üzerinde ölçüldü); hiçbir şeyin ~140px'i aşmaması için title 3 satırda clamp'lenir                                                                                                                                  |
-| Card içerik sırası   | priority ikonu + title · meta satırı (label dot'ları, birleşik due date + estimate, assignee'ler), tek satır, asla iki değil                                                                                                                                                                                            |
-| List / table satırı  | 36px; 768px altında 44px                                                                                                                                                                                                                                                                                                |
-| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                                                                                                                                                                                                |
-| Touch target         | **768px altında 44px minimum**, istisnasız her etkileşimli öğede                                                                                                                                                                                                                                                        |
+| Bölge                | Spec                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                                                                                                                                                                                                                                        |
+| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas                                                                                                                                                                                                                    |
+| Topbar               | 48px sticky — board adı, filter girişi, overflow (presence avatar'ları henüz gelmedi); **768px altında 56px**, ve orada gezinme trigger'ını da taşır                                                                                                                                                                                                             |
+| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                                                                                                                                                                                                                                                |
+| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px); 48rem altında bir column 85vw'dir ve strip ona snap eder (mandatory scroll snap), scroll edilecek column'un kaldığı kenara 24px'lik edge mask (`--background`'dan transparent'a) çizilir                                          |
+| Card                 | 8px 12px padding, artı drag grip'i için 32px sağ kanal (768px altında 48px); title bloğu ile meta satırı arasında 6px, meta satırının içindeki sinyaller arasında 8px; yalnızca title **36px**, tipik **56px** (tek meta satırı), clamp'te **76px**: title 2 satırda clamp'lenir, yani hiçbir kart bundan uzun olmaz. Dördü de seed'deki board üzerinde ölçüldü. |
+| Card içerik sırası   | priority ikonu + title · meta satırı (label dot'ları, birleşik due date + estimate, assignee'ler), tek satır, asla iki değil                                                                                                                                                                                                                                     |
+| List / table satırı  | 36px; 768px altında 44px                                                                                                                                                                                                                                                                                                                                         |
+| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                                                                                                                                                                                                                                         |
+| Touch target         | **768px altında 44px minimum**, her kontrolde, tek istisnası WCAG 2.5.5'in kendi istisnası: bir cümlenin içindeki, boyutunu çevresindeki metnin line-height'ından alan link (`/settings/members` üzerindeki e-posta kurulum linki, ölçülen 12/16)                                                                                                                |
 
 **Shell tam olarak bir viewport yüksekliğindedir ve bu taşıyıcı bir karardır.**
 `min-height: 100dvh` "en az" der ve altındaki hiçbir şeyi sınırlamaz — yaptığı da buydu, ve
@@ -334,6 +334,15 @@ full-screen bir sheet'e dönüşür. Confirmation'lar, board oluşturma ve destr
 | Ekranın kendisinin zaten gösteremediği bir aksiyonun sonucu                                                                                                                                 | Toast                                        | §7'nin üçüncü vuruş kuralına göre: etki ekran dışında, ekranda bir karşılığı yok, ya da view'ın kabul ettiğinden daha uzağa uzanıyor                                                                                          |
 | Field-level bir `400` veya `422` failure'ı                                                                                                                                                  | Inline hata                                  | Field'ın altında, focus ilkine gider (§6 Error'lar)                                                                                                                                                                           |
 
+**Kaç dialog var ve bu nasıl sayılıyor.**
+`find apps/web/components -iname '*dialog*.tsx' ! -iname '*.test.tsx'` bütün listeyi verir;
+dosyalarından dördü kimsenin karşılaşmadığı bir dialog değildir ve sayıdan düşer: `ui/dialog.tsx`
+primitifi, `common/form-dialog.tsx` ile `common/confirm-dialog.tsx` sarmalayıcıları, ve yalnızca
+board'un kendi dialog'larını mount eden `board/board-dialogs.tsx`. Geriye **15 somut dialog**
+kalıyor; bu faz başlarken 19'du: bir board'u ve bir workspace'i yeniden adlandırmak satır içi
+düzenlemeye, rol değiştirmek ile hesap silmek de yukarıdaki iki alt rotaya taşındı. Her düşüş bir
+yüzeyin rubrikte aşağı inmesiydi, sayı için silinen bir dialog değil.
+
 **Panel sırası.** `TaskPanel`, yukarıdan aşağı şunları compose eder: `TaskPanelFields` (title,
 `title-lg`'de, durağanken borderless ve yalnızca focus'ta border'lı, `border-transparent
 focus:border-input` üzerinden; description ise `read`'de), `TaskPropertiesPanel` (priority, due
@@ -343,6 +352,14 @@ footer'ı. Bu, kartın kendisinin okuduğu aynı sıra: önce task'ın ne olduğ
 olduğu, sonra hakkında ne söylendiği. Footer `mt-auto`'dur ve yalnızca o flex column'un son
 child'ı olduğu sürece panelin altına ulaşır (`components/task/task-panel.tsx`,
 `task-panel.test.tsx` tarafından sabitlenmiş), bu yüzden ardına hiçbir şey eklenemez.
+
+Field'ların altındaki başlıklı her section aynı 1px üst çizgiyi 16px padding ile taşır. Dördü de,
+ikisi değil: aynı ağırlıkta dört başlığın yalnızca ikisinin üstünde çizgi olması gruplama gibi
+değil, keyfi bir çizgi gibi okunuyor. Ve panel kendi adına **hiç** tam güç bakır harcamaz. Section
+aksiyonları (label oluştur, checklist ekle, comment gönder) outline button'dır, çünkü bunlar
+§2'nin bütçelediği tek birincil aksiyon değil üç eşittir, ve panelin arkasındaki board ekranın
+diğer işaretini zaten seçili kartın rail'ine harcıyor. `task-panel.test.tsx` panelin herhangi bir
+yerindeki default varyant button'da kırılır.
 
 Assignee ve label picker'ları, panelin kendisinin search'süz taradığı aynı sayıda katlanır:
 `INLINE_PICKER_MAX = 7` (`components/task/searchable-picker.tsx`), 7 veya daha az seçeneği düz
@@ -377,8 +394,8 @@ silmek bu workspace'in ötesine, kişinin bu instance'ta bulunduğu her workspac
 | Realtime değişikliği   | Surfacing (asla bir layout jump)                                                                                                                                                                                                                               |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Remote create / update | 1200ms boyunca fade out olan bir `--signature-subtle` background. Hareket yok, size değişimi yok. Yalnızca renk, böylece `prefers-reduced-motion`'dan değişmeden çıkar.                                                                                        |
-| Remote move            | Kart 220ms boyunca yeni pozisyonuna animate olur; local bir drag sırasında update queue'lanır ve drop'ta uygulanır                                                                                                                                             |
-| Remote delete          | 160ms boyunca 0'a fade olur, ardından gap 160ms boyunca kapanır — iki beat, gözün takip edebilmesi için                                                                                                                                                        |
+| Remote move            | Kart, column'un kendi sortable transition'ı ile hareket eder (dnd-kit'in 200ms varsayılanı); local bir drag sırasında update queue'lanır ve drop'ta uygulanır                                                                                                  |
+| Remote delete          | **Henüz gelmedi:** kart gider ve gap aynı sortable transition ile kapanır. Olması gereken iki beat, 160ms'te 0'a fade ve ardından 160ms'te gap'in kapanması, hâlâ hedeflenen biçim                                                                             |
 | Presence · disconnect  | Henüz gelmedi (topbar/kart presence'ı). Disconnect: sessiz, inline bir "Connection lost, changes may not be showing" ("Bağlantı koptu, değişiklikler görünmüyor olabilir") bar'ı, socket geri gelene kadar duruyor ve kapatılamıyor, asla blocking bir overlay |
 
 **Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px offset'te
@@ -419,17 +436,17 @@ tarafından kırpılır.
 **Motion.** Yalnızca amaçlı micro-interaction'lar, **view başına en fazla bir orchestrated an** —
 board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 
-| Durum                                                      | Süre                          | Curve                                                     |
-| ---------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail'inin hareketi | 100–160ms                     | `--ease-out`                                              |
-| Tooltip, küçük popover                                     | 125–200ms                     | `--ease-out`                                              |
-| Dropdown, select, menu                                     | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detay paneli, sheet                                        | 220ms                         | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                        | 200ms                         | `--ease-out`, dialog origin ortalanmış                    |
-| Dialog perdesi                                             | 200ms                         | `--ease-out`                                              |
-| Başarısız bir drop'tan sonra kartın geri dönmesi           | 220ms                         | `--ease-in-out`                                           |
-| İlk board paint'inde column stagger'ı                      | column'lar arası 40ms         | `--ease-out`                                              |
-| Skeleton pulse (loop, tek seferlik bir transition değil)   | 1.6s, opaklık 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
+| Durum                                                    | Süre                          | Curve                                                     |
+| -------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Sancak rail'inin hareketi                                | 150ms                         | `--ease-out`                                              |
+| Tooltip, küçük popover                                   | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                                   | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detay paneli, sheet                                      | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)                      | 200ms                         | `--ease-out`, dialog origin ortalanmış                    |
+| Dialog perdesi                                           | 200ms                         | `--ease-out`                                              |
+| Başarısız bir drop'tan sonra kartın geri dönmesi         | 220ms                         | `--ease-in-out`                                           |
+| İlk board paint'inde column stagger'ı                    | column'lar arası 40ms         | `--ease-out`                                              |
+| Skeleton pulse (loop, tek seferlik bir transition değil) | 1.6s, opaklık 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
@@ -445,6 +462,9 @@ submenu, off-canvas drawer, keyframe'lerini bir Tailwind animation plugin class'
 `tailwindcss` kullanır, böyle bir plugin yok: o class'lar hiçbir CSS üretmezdi ve her açılış
 transition yerine kesme olurdu.
 
+- **Press feedback ship edilmedi.** Hiçbir şey `:active` üzerinde ölçeklenmiyor; basılan bir
+  kontrol yalnızca renk adımı değiştirir ve yerinde kalır. Yukarıdaki tablo uygulamanın çizdiğidir,
+  çizebileceği değil.
 - **Keyboard-initiated aksiyonlarda animasyon yok** — command palette anında açılır; günde yüz
   kere çalışır ve motion onu yavaş hissettirir.
 - **Yalnızca `transform` ve `opacity`** (accordion height hariç). Asla `transition: all`, asla
@@ -478,6 +498,13 @@ burasıdır.
 **Bir primary action, tüm ekranda bir tane demektir.** Aksiyonu empty state taşıyorsa, sayfa
 başlığındaki aynı aksiyonun kopyası ekran boşken gizlenir ve ilk satırla birlikte geri gelir.
 İlk çalıştırmada birbirinin aynısı iki primary buton, okuyucunun sahip olmadığı bir seçimdir.
+
+Dashboard, iki bölgesinin aynı anda boş olabildiği tek ekran, ve oradaki iki aksiyon aynı aksiyon
+değil: board varken hiç task yoksa, chart'lar "Open a board" davetini taşırken altındaki board
+listesi kendi sabit "Create board"unu taşımaya devam ediyor. Çalışan uygulamada ölçüldü: ikisi de
+dolguyu çiziyordu, bu da kenar çubuğundaki rail ile birlikte tek ekrana üç tam güç işaret koyuyor.
+Dolgu, rotanın her durumda taşıdığı aksiyonda kalıyor, dolayısıyla chart'ların kısayolu outline bir
+button (`components/dashboard/dashboard-summary.tsx`).
 
 | Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                                              | Action                                                                         |
 | --------------------------------- | ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -656,7 +683,7 @@ verify edilmiş olarak.
 | Büyük metin (≥18.66px bold / 24px)       | 3:1                                      | Title'lar, hero figure'lar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Component sınırları ve state'leri        | 3:1                                      | Input border'ları, focus ring, sancak rail'i, chart mark'ları                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Disabled metin                           | muaf, yine de 3:1'e tutulur              | Placeholder'lar, disabled control'ler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Chart surface'i üzerinde chart mark'ları | 3:1, ya da direct label'lar / table view | Açık slot 3, 4, 5 relief route'unu alır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Chart surface'i üzerinde chart mark'ları | 3:1, ya da direct label'lar / table view | Açık slot 2, 3, 4, 5 relief route'unu alır (§8 dördünü de signature tint üzerinde nokta olarak 3:1'in altında ölçer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 | Kural                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -157,13 +157,13 @@ One reserved severity family serves both, always shipped with an **icon and a wo
 color alone. Priority is an ordered scalar kept separate from labels; its order is carried by
 escalating chroma, so it survives colorblindness, grayscale print, and being described aloud.
 
-| Meaning                        | Priority | Token                                 | Light     | Dark      | Contrast L / D | Icon           |
-| ------------------------------ | -------- | ------------------------------------- | --------- | --------- | -------------- | -------------- |
-| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9      | `chevron-down` |
-| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9      | `minus`        |
-| Good / done                    | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7      | `check`        |
-| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8      | `chevron-up`   |
-| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8      | `chevrons-up`  |
+| Meaning                        | Priority | Token                                 | Light     | Dark      | Contrast on `--card`, L / D | Icon           |
+| ------------------------------ | -------- | ------------------------------------- | --------- | --------- | --------------------------- | -------------- |
+| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9                   | `chevron-down` |
+| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9                   | `minus`        |
+| Good / done                    | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7                   | `check`        |
+| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8                   | `chevron-up`   |
+| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8                   | `chevrons-up`  |
 
 Priority renders as a full-chroma icon plus text; labels render as a tinted chip with a
 colored dot — different weights, so a red priority and a red label never read alike.
@@ -233,18 +233,18 @@ a stat-tile value.
 
 App shell per the `(app)` route group in [architecture.md §4](architecture.md#4-appsweb--structure).
 
-| Region             | Spec                                                                                                                                                                                                                                                                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                                                                                                                                                                                  |
-| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                                                                                                                                                                                     |
-| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger                                                                                                                                                                   |
-| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                                                                                                                                                                                        |
-| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px); below 48rem a column is 85vw and the strip snaps to it (mandatory scroll snap), with 24px edge masks (`--background` fading to transparent) drawn on whichever side still has a column to scroll to |
-| Card               | 10px 12px padding, 8px gap, min 36px (title only), typical 56px (one meta line, measured on the seeded board); title clamps at 3 lines so nothing exceeds ~140px                                                                                                                                                              |
-| Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                                                                                                                                                                                   |
-| List / table row   | 36px; 44px below 768px                                                                                                                                                                                                                                                                                                        |
-| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                                                                                                                                                                                  |
-| Touch target       | **44px minimum below 768px**, on every interactive element without exception                                                                                                                                                                                                                                                  |
+| Region             | Spec                                                                                                                                                                                                                                                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                                                                                                                                                                                                       |
+| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                                                                                                                                                                                                          |
+| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger                                                                                                                                                                                        |
+| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                                                                                                                                                                                                             |
+| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px); below 48rem a column is 85vw and the strip snaps to it (mandatory scroll snap), with 24px edge masks (`--background` fading to transparent) drawn on whichever side still has a column to scroll to                      |
+| Card               | 8px 12px padding plus a 32px right gutter for the drag grip (48px below 768px); 6px between the title block and the meta row, 8px between the signals inside it; **36px** title only, **56px** typical (one meta line), **76px** at the clamp: the title clamps at 2 lines, so no card is taller than that. All four measured on the seeded board. |
+| Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                                                                                                                                                                                                        |
+| List / table row   | 36px; 44px below 768px                                                                                                                                                                                                                                                                                                                             |
+| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                                                                                                                                                                                                       |
+| Touch target       | **44px minimum below 768px** on every control, with one exception, WCAG 2.5.5's own: a link inside a sentence, sized by the line-height of the text around it (the mail-setup link on `/settings/members`, measured 12/16)                                                                                                                         |
 
 **The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
 would say "at least" and bound nothing below it — which is what it did, and why a column's
@@ -323,6 +323,15 @@ creation, and destructive actions stay **dialogs**; those genuinely need to bloc
 | The result of an action the screen cannot already show for itself                                                                                      | Toast                                     | Per §7's third-beat rule: the effect is off-screen, has no on-screen representation, or reaches further than the view admits                                                                                          |
 | A field-level `400` or `422` failure                                                                                                                   | Inline error                              | Under the field, focus moves to the first (§6 Errors)                                                                                                                                                                 |
 
+**How many dialogs there are, and how that is counted.**
+`find apps/web/components -iname '*dialog*.tsx' ! -iname '*.test.tsx'` is the whole list; four of
+its files are not a dialog anyone meets, and come off the count: the `ui/dialog.tsx` primitive,
+the `common/form-dialog.tsx` and `common/confirm-dialog.tsx` wrappers, and
+`board/board-dialogs.tsx`, which only mounts the board's own. That leaves **15 concrete dialogs**,
+down from 19 when this phase started: renaming a board and renaming a workspace became inline
+edits, and changing a role and deleting an account became the two sub-routes above. Every removal
+was a surface moving down the rubric, never a dialog deleted for the count's sake.
+
 **Panel order.** `TaskPanel` composes, top to bottom: `TaskPanelFields` (title at `title-lg`,
 borderless at rest and bordered only on focus via `border-transparent focus:border-input`,
 description at `read`), `TaskPropertiesPanel` (priority, due date, estimate, assignees, labels),
@@ -332,6 +341,14 @@ task is, then what is in it, then what was said about it. The footer is `mt-auto
 reaches the bottom of the panel while it is the last child of that flex column
 (`components/task/task-panel.tsx`, pinned by `task-panel.test.tsx`), so nothing may be appended
 after it.
+
+Every titled section below the fields carries the same 1px top rule at 16px of padding. All four
+of them, not two: four headings of one weight with a rule above only two of them reads as an
+arbitrary line rather than as grouping. And the panel spends **no** full-strength copper of its own. Its
+section actions (create label, add checklist, post comment) are outline buttons, because they are
+three peers rather than the one primary action §2 budgets, and the board behind the panel is
+already spending the screen's other mark on the selected card's rail. `task-panel.test.tsx` fails
+on a default-variant button anywhere in the panel.
 
 The assignee and label pickers fold at the same number the panel itself scans without searching:
 `INLINE_PICKER_MAX = 7` (`components/task/searchable-picker.tsx`) renders 7 or fewer options as
@@ -362,12 +379,12 @@ every other section stays inline as a `SettingsSection` (`components/settings/se
 | Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Moved _Fix login redirect_ to In Progress, position 2 of 5."                                       |
 | Autoscroll    | Both axes, 24px edge zone                                                                                                                                                                                                                                                 |
 
-| Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged.                                                 |
-| Remote move            | Card animates to its new position over 220ms; during a local drag the update is queued and applied on drop                                                                                          |
-| Remote delete          | Fade to 0 over 160ms, then close the gap over 160ms — two beats, so the eye can follow                                                                                                              |
-| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Connection lost, changes may not be showing" bar, kept until the socket is back and never dismissible, never a blocking overlay |
+| Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged.                                                    |
+| Remote move            | The card moves on the column's own sortable transition (dnd-kit's 200ms default); during a local drag the update is queued and applied on drop                                                         |
+| Remote delete          | **Not shipped yet:** the card goes and the gap closes on that same sortable transition. The two beats it should have, fade to 0 over 160ms then close the gap over 160ms, are still the intended shape |
+| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Connection lost, changes may not be showing" bar, kept until the socket is back and never dismissible, never a blocking overlay    |
 
 **Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at 2px
 offset, and `outline: none` without a replacement is a review blocker. That single mark is drawn
@@ -406,17 +423,17 @@ box scrolls away with the content and is clipped by it.
 **Motion.** Purposeful micro-interactions only, **at most one orchestrated moment per view** —
 on the board that is the first paint of the columns, and nothing else.
 
-| Case                                                | Duration                      | Curve                                                     |
-| --------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
-| Press feedback (`scale(0.97)`) · sancak rail moving | 100–160ms                     | `--ease-out`                                              |
-| Tooltip, small popover                              | 125–200ms                     | `--ease-out`                                              |
-| Dropdown, select, menu                              | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detail panel, sheet                                 | 220ms                         | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)                 | 200ms                         | `--ease-out`, dialog origin centered                      |
-| Dialog scrim                                        | 200ms                         | `--ease-out`                                              |
-| Card returning after a failed drop                  | 220ms                         | `--ease-in-out`                                           |
-| Column stagger on first board paint                 | 40ms between columns          | `--ease-out`                                              |
-| Skeleton pulse (loop, not a one-shot transition)    | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
+| Case                                             | Duration                      | Curve                                                     |
+| ------------------------------------------------ | ----------------------------- | --------------------------------------------------------- |
+| Sancak rail moving                               | 150ms                         | `--ease-out`                                              |
+| Tooltip, small popover                           | 125–200ms                     | `--ease-out`                                              |
+| Dropdown, select, menu                           | 150–250ms                     | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detail panel, sheet                              | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)              | 200ms                         | `--ease-out`, dialog origin centered                      |
+| Dialog scrim                                     | 200ms                         | `--ease-out`                                              |
+| Card returning after a failed drop               | 220ms                         | `--ease-in-out`                                           |
+| Column stagger on first board paint              | 40ms between columns          | `--ease-out`                                              |
+| Skeleton pulse (loop, not a one-shot transition) | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
@@ -432,6 +449,8 @@ the off-canvas drawer all bind their keyframes through `data-slot`/`data-state` 
 plain `tailwindcss` with no such plugin: those classes would compile to nothing and every
 open would cut instead of transition.
 
+- **Press feedback is not shipped.** Nothing scales on `:active`; a pressed control steps its
+  colour and stays where it is. The table above is what the app draws, not what it could.
 - **No animation on keyboard-initiated actions** — the command palette opens instantly; it runs
   a hundred times a day and motion makes it feel slow.
 - **`transform` and `opacity` only** (accordion height excepted). Never `transition: all`, never
@@ -463,6 +482,13 @@ the next move; they do not explain the feature. This is the only place damga mar
 **One primary action counts the whole screen.** Where the empty state carries the action, the
 page header's copy of the same action is hidden while the screen is empty and comes back with the
 first row. Two identical primary buttons on a first run is a choice the reader does not have.
+
+The dashboard is the one screen where two regions can be empty at once, and there the two actions
+are not the same action: with boards but no tasks, the charts invite "Open a board" while the board
+list below still carries its standing "Create board". Measured on the running app, both drew the
+fill, which with the sidebar rail put three full-strength marks on one screen. The fill stays with
+the action the route carries in every state, so the charts' shortcut is an outline button
+(`components/dashboard/dashboard-summary.tsx`).
 
 | Surface               | Mark       | Headline                     | Body                                                                                                  | Action                           |
 | --------------------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------- |
@@ -632,7 +658,7 @@ Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per s
 | Large text (≥18.66px bold / 24px) | 3:1                                | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Component boundaries and states   | 3:1                                | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Disabled text                     | exempt, held to 3:1 anyway         | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 3, 4, 5 take the relief route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Chart marks on the chart surface  | 3:1, or direct labels / table view | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 | Rule                         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
