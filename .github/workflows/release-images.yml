@@ -533,7 +533,7 @@ jobs:
       # release, so the SHA above pins the scanner too (v0.24.0 installs syft v1.42.3), and
       # Dependabot bumping the action bumps the scanner with it.
       # ---------------------------------------------------------------------------------
-      - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+      - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
 
       - name: Generate an SBOM per published platform
         env:
