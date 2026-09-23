@@ -2,8 +2,8 @@
 
 Kurul is an open-source, self-hosted, Kanban-focused project management tool. The MVP is
 complete: Phases 0-9 and the hardening pass that followed shipped as
-[`v0.1.0`](CHANGELOG.md#010---2026-08-12), and [`v0.4.0`](CHANGELOG.md#040---2026-08-27) is the
-current release, cut on 2026-08-27. The next release is `v0.5.0`. The work ahead is
+[`v0.1.0`](CHANGELOG.md#010---2026-08-12), and [`v0.4.1`](CHANGELOG.md#041---2026-09-23) is the
+current release, cut on 2026-09-23. The next release is `v0.5.0`. The work ahead is
 turning a finished MVP into a launched, trusted product: standing up the demo host the
 announcement wave is gated on, and growing the API surface toward a 1.0 compatibility promise.
 Work runs on **two parallel tracks**, Hardening and New Features, so stability debt and user
@@ -134,7 +134,7 @@ used to sit under the deferred table each carried a quarter of it, and now link 
 1. **Provision the host and DNS, and name an owner.** One small VPS with `kurul.dev` pointed at
    it. The owner is whoever answers when the demo stops answering; the step is not done until
    that is a name rather than "us".
-2. **Pin `TAG=v0.4.0` in the host's `.env`.** `.env.example` leaves `TAG` empty, which resolves
+2. **Pin `TAG=v0.4.1` in the host's `.env`.** `.env.example` leaves `TAG` empty, which resolves
    to `latest`, and a demo the announcement points at has to be the build the announcement
    names. See [self-hosting.md](docs/self-hosting.md#upgrading).
 3. **Write the rest of the demo `.env`** exactly as
