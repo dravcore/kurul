@@ -555,7 +555,7 @@ describe('Trello import (e2e)', () => {
   describe('the body limit', () => {
     it.each([
       ['one byte under the limit', MAX_BYTES - 1, 201],
-      // busboy fires its limit on equality, which is what the `+ 1` in `import.module.ts` buys.
+      // busboy fires its limit on equality; multer 2.3.0 adds the byte that makes this a 201.
       ['exactly at the limit', MAX_BYTES, 201],
       ['one byte over the limit', MAX_BYTES + 1, 413],
     ])('answers %s (%i bytes) with %i', async (_name, size, expected) => {

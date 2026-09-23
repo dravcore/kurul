@@ -57,7 +57,7 @@ Kurul'un cevabı bilinçli olarak dar:
 - **Realtime ve çok-kiracılılık çekirdekte.** Socket.io board senkronu ve workspace'e
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
-Ve `v0.4.0` itibarıyla olmayanlar: subtask yok, zaman takibi yok, webhook yok. Personal access
+Ve `v0.4.1` itibarıyla olmayanlar: subtask yok, zaman takibi yok, webhook yok. Personal access
 token'lar bu sürümle çıkıyor: workspace'e scope'lanıyor ve `Authorization: Bearer` ile
 gönderiliyor, yani bir script ya da bir CI job'ı bir board'u sürebiliyor; bunu stabil bir API'ye
 çeviren `/v1` öneki ise 1.0'da geliyor, öncesinde değil
