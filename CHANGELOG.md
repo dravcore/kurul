@@ -17,16 +17,19 @@ require. Nothing to migrate and no new setting.
 
 ### Changed
 
-- **Dependabot holds Node base-image majors.** The `docker` block in `.github/dependabot.yml`
-  now ignores `node` majors the way the npm block holds TypeScript 7, so `node:24-alpine` moves
-  by digest and minor only until a Node major is scheduled. The same entry reached `develop` on
-  2026-08-27 ([#349](https://github.com/dravcore/kurul/pull/349)) and changed nothing, because
-  Dependabot reads its configuration from the default branch, `main`, even for the pull
-  requests it opens against `develop`: it proposed `node:25-alpine` for both Dockerfiles on
-  2026-09-20 ([#364](https://github.com/dravcore/kurul/pull/364),
-  [#365](https://github.com/dravcore/kurul/pull/365)). A base-image major moves `.nvmrc`,
-  `engines`, the CI `setup-node` step and the docs with it, so it is scheduled, not taken from
-  a bot.
+- **Dependabot holds Node base-image majors.** Two days after the docker block began reading
+  `apps/*/Dockerfile`, it proposed `node:26-alpine` for both images
+  ([#346](https://github.com/dravcore/kurul/pull/346),
+  [#347](https://github.com/dravcore/kurul/pull/347)). Node 26 is a Current release until
+  October 2026, and a base-image major moves `.nvmrc`, `engines`, the CI `setup-node` step and
+  the docs with it, so the docker block now ignores Node majors the way the npm block holds
+  TypeScript 7, with the trigger recorded in `ROADMAP.md` (DEP-26). Digest and minor bumps, the
+  reason the block exists, are unaffected. The hold went to `develop` first
+  ([#349](https://github.com/dravcore/kurul/pull/349)) and did nothing there: Dependabot reads
+  its configuration from the default branch, `main`, even for the pull requests it opens
+  against `develop`, and on 2026-09-20 it proposed `node:25-alpine` for both Dockerfiles
+  ([#364](https://github.com/dravcore/kurul/pull/364),
+  [#365](https://github.com/dravcore/kurul/pull/365)). It takes effect once this reaches `main`.
 
 ### Security
 
@@ -45,7 +48,7 @@ require. Nothing to migrate and no new setting.
   role, which Nest checks before `FileInterceptor` runs; with sign-up open, the default, anyone
   can own a workspace and reach both.
 
-  The bump alone would not have reached them. It moved the multer `apps/api` imports for
+  The bump alone would not have reached them. It moved the multer that `apps/api` imports for
   `memoryStorage()`, while the one that reads the request body is the copy
   `@nestjs/platform-express` 11.2.1 pins at exactly 2.2.0: a `multer@<2.3.0` entry in
   `pnpm.overrides` lifts that copy, and the tree now holds one multer. Nor does the upgrade close
