@@ -140,6 +140,16 @@ updates:
     # security updates bypass it.
     cooldown:
       default-days: 7
+    ignore:
+      # Node majors are held, not skipped, the way the npm block above holds TypeScript 7.
+      # `node:24-alpine` is the current LTS line. Node 26 is a Current release until it enters
+      # LTS in October 2026, and a base-image major is never a Dockerfile-only change: `.nvmrc`,
+      # `engines`, the `setup-node` step in ci.yml and docs/tech-stack.md move with it, after
+      # the runtime stack (Prisma, Nest, Next, Better Auth) has been tested on it. Remove this
+      # entry when that bump is scheduled (ROADMAP.md row DEP-26); the digest and minor bumps
+      # this block exists for are unaffected.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
 
   # Bumps the base images pinned in the compose files: `postgres` and `redis` in both
   # `docker-compose.yml` and `docker-compose.dev.yml`, `caddy` in `docker-compose.yml`, and
