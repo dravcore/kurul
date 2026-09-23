@@ -72,21 +72,42 @@ yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
 
 ## Özellikler
 
-MVP’de gelenler — sıralama geçmişi için [ROADMAP.md](ROADMAP.md):
+### MVP'de gelenler
+
+Faz 1–9 (Faz 0 docs/standartlardı), `v0.1.0` ile geldi. Sıralama geçmişi için
+[ROADMAP.md](ROADMAP.md):
 
 - **Board'lar ve kolonlar** — sürükle-bırakla yeniden sıralanabilen klasik Kanban düzeni
 - **Task'lar** — çoklu atanan kişi, label'lar, (label'lardan bağımsız tutulan) priority,
   ayrı alanlar olarak due date ve süre tahmini
-- **Checklist'ler** — bir task'ta birden çok adlandırılmış checklist, her birinin kendi
+- **Fractional-indexed sıralama** — bir kartı yeniden sıralamak yalnızca o kartın position'ına
+  dokunur, tüm listeyi yeniden numaralandırmaz
+- **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır
+- **Filtreleme ve arama** — board task filtreleri, cursor pagination
+- **Dashboard** — agregasyon görünümleri ve grafikler (created vs completed dahil)
+- **Aktivite log'u ve bildirimler** — atama, mention, due-soon; uygulama içi; `/notifications`
+- **Realtime senkronizasyon** — board değişiklikleri Socket.io üzerinden canlı yayılır
+
+### MVP sonrası
+
+`v0.2.0`, `v0.3.0` ve `v0.4.0` sürümlerinde, o sırayla geldi. Tam geçmiş için
+[ROADMAP.md](ROADMAP.md):
+
+- **İngilizce ve Türkçe**: workspace başına değil, kullanıcı başına bir tercih; böylece tek bir
+  workspace farklı diller okuyan insanları bir arada tutabilir. Giriş yaptığınız her cihaza
+  gelir, oluşturduğunuz board'un başladığı column adlarını belirler ve size gönderilen e-postanın
+  dilini seçer. Bir katalogda olup diğerinde olmayan bir key build'i düşürür
+  ([ADR 0018](docs/tr/decisions/0018-localization-strategy.md))
+- **Checklist'ler**: bir task'ta birden çok adlandırılmış checklist, her birinin kendi
   item'ları; board kartında ilerleme rozeti (`3/5`) görünür, task'ta checklist yoksa hiç
   görünmez ([ADR 0023](docs/tr/decisions/0023-checklist-data-model.md))
-- **Ek'ler** — kartta dosya ve bağlantı. Dosyalar kendi diskinizde saklanır, uzantısına değil
+- **Ek'ler**: kartta dosya ve bağlantı. Dosyalar kendi diskinizde saklanır, uzantısına değil
   magic byte'larına bakılarak kabul edilir ve sizin belirlediğiniz boyut limitiyle geri servis
   edilir; görseller panelde önizlenir. Bağlantı saklanır, gösterilir ve açılır — sunucu o URL'e
   hiç istek atmaz, yani hiçbir önizleme fetch'i ağınızı yoklayan bir araca dönüşemez
   ([ADR 0022](docs/tr/decisions/0022-attachment-storage.md),
   [ADR 0024](docs/tr/decisions/0024-attachment-kinds-and-serving-policy.md))
-- **Trello import'u (tek yönlü)** — bir Trello board'unun JSON export'unu yükleyin, karşılığında
+- **Trello import'u (tek yönlü)**: bir Trello board'unun JSON export'unu yükleyin, karşılığında
   bir Kurul board'u alın: list'ler, kart'lar, label'lar ve checklist'ler. Tek yönlüdür ve
   tekrarlanabilir değildir: **aynı export'u iki kez import etmek iki board yaratır** — yerinde
   güncelleme de yok, tekilleştirme de. Üç şey bilinçli olarak gelmez ve import raporu her birinin
@@ -98,18 +119,20 @@ MVP’de gelenler — sıralama geçmişi için [ROADMAP.md](ROADMAP.md):
   etmez, onu sonradan siz ayarlarsınız. Rapor yalnız cevabın içindedir: bir kez gösterilir,
   saklanmaz, kapatmak kalıcıdır
   ([ADR 0025](docs/tr/decisions/0025-trello-import-mapping.md))
-- **Fractional-indexed sıralama** — bir kartı yeniden sıralamak yalnızca o kartın position'ına
-  dokunur, tüm listeyi yeniden numaralandırmaz
-- **Workspace'ler** — temelden itibaren multi-tenant; her sorgu workspace'e göre scope'lanır
-- **Filtreleme ve arama** — board task filtreleri, cursor pagination
-- **Dashboard** — agregasyon görünümleri ve grafikler (created vs completed dahil)
-- **Aktivite log'u ve bildirimler** — atama, mention, due-soon; uygulama içi ve e-postayla (kullanıcı başına anahtar); `/notifications`
-- **Realtime senkronizasyon** — board değişiklikleri Socket.io üzerinden canlı yayılır
-- **İngilizce ve Türkçe** — workspace başına değil, kullanıcı başına bir tercih; böylece tek bir
-  workspace farklı diller okuyan insanları bir arada tutabilir. Giriş yaptığınız her cihaza
-  gelir, oluşturduğunuz board'un başladığı column adlarını belirler ve size gönderilen e-postanın
-  dilini seçer. Bir katalogda olup diğerinde olmayan bir key build'i düşürür
-  ([ADR 0018](docs/tr/decisions/0018-localization-strategy.md))
+- **Hesap silme**: kendi kendine silme talebi `User` satırınızı silmek yerine yerinde
+  anonimleştirir ([ADR 0026](docs/tr/decisions/0026-account-deletion-anonymisation.md))
+- **E-posta bildirimleri**: atama, mention ve due-soon uyarıları artık alıcının dilinde
+  e-postayla da gidiyor, kullanıcı başına açılıp kapatılabilir
+- **Board şablonları**: yeni bir board artık her zaman aynı varsayılan kolonlar yerine dört
+  şablondan biriyle (Kanban, Scrum Sprint, Bug Triage, Content Pipeline) başlar
+- **Personal access token'lar**: workspace'e scope'lanmış `Authorization: Bearer` token'ları;
+  bir script ya da CI job'ının board'u sürmesini sağlar, API 1.0'ın ilk dilimi
+- **E-postayla parola sıfırlama**: kendi kendine "parolanızı mı unuttunuz" bağlantısı.
+  Sıfırlama hesaptaki her oturumu kapatır, yani çalınan bir oturum parolayla birlikte ölür
+- **Plan limitleri**: koltuk, board, workspace ve hesap sayısına isteğe bağlı tavanlar; bir
+  operatör ayarlamadıkça sınırsız ([ADR 0032](docs/tr/decisions/0032-plan-limits.md))
+- **Demo modu**: herkese açık, kendi kendini sıfırlayan bir demo instance çalıştırmak için
+  `DEMO_MODE=true` anahtarı
 
 ## Hızlı başlangıç
 
@@ -223,7 +246,7 @@ Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
 | Backend           | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                     |
 | Frontend          | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts       |
 | Auth              | Better Auth (organization plugin → Workspace)                                  |
-| E-posta           | SMTP üzerinden `nodemailer` (davet doğrulaması)                                |
+| E-posta           | SMTP üzerinden `nodemailer` (davet doğrulaması, bildirimler, parola sıfırlama) |
 | Paylaşılan tipler | `packages/shared-types` + `packages/auth-access` (DTO'lar / BA org AC rolleri) |
 | Deployment        | Docker Compose                                                                 |
 | Mimari            | Monorepo, modüler monolit — mikroservis yok                                    |
@@ -236,14 +259,14 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
 Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe harita:
 **[docs/tr/README.md](docs/tr/README.md)**.
 
-| Doküman                                                  | Kapsam                           |
-| -------------------------------------------------------- | -------------------------------- |
-| [docs/tr/architecture.md](docs/tr/architecture.md)       | Modül haritası, veri modeli      |
-| [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                       |
-| [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar |
-| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination        |
-| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | MVP bitti; Beyond MVP listesi    |
-| [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                          |
+| Doküman                                                  | Kapsam                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------ |
+| [docs/tr/architecture.md](docs/tr/architecture.md)       | Modül haritası, veri modeli                            |
+| [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                                             |
+| [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar                       |
+| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination                              |
+| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | Sağlamlaştırma + özellik hatları, beyond-MVP backlog'u |
+| [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                                                |
 
 ## Katkıda bulunma
 
@@ -278,7 +301,10 @@ Bir güvenlik açığı bildirmek için [SECURITY.md](SECURITY.md)'ye bakın.
 Kurul'u kendi sunucunuzda çalıştırmak sonsuza kadar ücretsiz. Kendi kurduğunuz bir instance'tan
 hiçbir şey esirgenmiyor, open core yok, ayrıca satılan bir sürüm de yok. Dravcore'un para
 istediği tek şey isteğe bağlı bir barındırma servisi: bizim sunucularımızda bir hesap,
-yayınlanmış limitlerin (koltuk, board, depolama) içinde ücretsiz, üzerinde ücretli. O servis de
-bu depodaki aynı AGPL-3.0 kodunu çalıştırıyor, plan limitleri ve faturalama dahil; yani kendi
+yayınlanmış limitlerin (koltuk, board, depolama) içinde ücretsiz, üzerinde ücretli
+([ADR 0028](docs/tr/decisions/0028-open-contributions-hosted-service.md)). O servis de bu
+depodaki aynı AGPL-3.0 kodunu çalıştırıyor. Plan limitleri katmanı çoktan sevkedildi, yani kendi
 instance'ını çalıştıran herkes o limitleri kendi belirleyebilir ya da tümüyle kapatabilir
-([ADR 0028](docs/tr/decisions/0028-open-contributions-hosted-service.md)).
+([ADR 0032](docs/tr/decisions/0032-plan-limits.md)). Bu limitlerin üzerine faturalama ise hâlâ
+önerilen bir tasarım, henüz inşa edilmedi
+([ADR 0034](docs/tr/decisions/0034-hosted-billing-and-plan-assignment.md)).

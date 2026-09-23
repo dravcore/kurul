@@ -500,7 +500,7 @@ and generates the Prisma client on its own, and `test-integration` is the only j
 and Redis service containers, so the unit suites in `test-unit` start without a container pull.
 The pipeline's wall time is therefore its longest job rather than the sum of them, and it is
 tracked against the OPS-10 row in
-[ROADMAP.md](../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit).
+[ROADMAP.md](../ROADMAP.md#hardening-track).
 
 **All steps must pass before merge.** Branch protection on `main` and `develop` names two
 required contexts, `ci-ok` and `CodeQL`. `ci-ok` is the gate over this workflow: if any upstream
