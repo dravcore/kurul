@@ -1724,6 +1724,178 @@ the 2026-08-18 "atlas" audit. See
   the last image published under that name, silently and indefinitely, which is exactly what a
   rename cannot fix for you.
 
+- **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
+  Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
+  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
+  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
+  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
+  in `docs/development.md`, because they are far enough apart that quoting one alone would be
+  choosing a flattering number.
+
+  Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
+  package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
+  package itself marked `"optional": true`, which pnpm's `auto-install-peers` had resolved
+  anyway. `better-auth` declares those on `next`, `react`, `react-dom`, `svelte`, `vue`,
+  `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`;
+  `@prisma/client` declares them on `prisma` and `typescript`. Following those edges shipped
+  `@next/swc-linux-arm64-{gnu,musl}` (169 MB), `@prisma/studio-core`, `@electric-sql/pglite`,
+  `@prisma/engines`, `sharp`'s libvips builds, Playwright, `vite`, `rollup`, `esbuild` and the
+  TypeScript compiler into an image whose only job is to run `node dist/main.js`.
+  `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
+  `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
+  deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
+  those entries are off the primary resolution path, so this is not a judgement about which code
+  "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
+
+  The residual risk, named in the script's header rather than left for someone to discover: a
+  package that `require`s something it never declared used to resolve through pnpm's flat
+  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
+  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
+  suite, and a boot with the three opt-in paths that load code no default boot touches:
+  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
+  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
+  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
+
+  `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
+  image was the entire assembled workspace — every dev dependency of every package, the
+  sources, and pnpm — kept alive to run one command. It now starts from the same clean
+  `node:24-alpine` the API does and carries the Prisma CLI, `prisma.config.ts`, the schema and
+  the migrations. It also drops root: the old stage ran as root only because it inherited no
+  `USER` from `build`, and `prisma migrate deploy` never needed one. Both images run as
+  `USER node`, as before for `api` and newly so for `migrate`.
+
+  Nothing about the compose contract moved: `docker compose up -d` still brings the stack up
+  with `migrate` at `Exited (0)` and `api` `(healthy)`, `/health/ready` answers 200 through the
+  proxy, and the web image is untouched — no build-time API URL was reintroduced.
+- **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
+  `docs/git-strategy.md` had promised that since the branch table was written, and no staging
+  environment has ever existed — no host, no workflow, no secret in this repository points at
+  one (audit finding OPS-08). A standing promise nothing enforces is worse than no promise,
+  because it is quoted as though it were a safety net. The table now says `develop` must
+  **start**, which is verifiable, and the release process gained the verification as part of
+  step 4: `docker compose up -d --build`, `docker compose ps -a`, `curl` the readiness endpoint,
+  `docker compose down -v`. It is deliberately a release-time step rather than a CI job — a full
+  compose boot on every pull request costs more than it catches — and it runs the same stack a
+  self-hoster runs, `SITE_URL` at its `http://localhost` default, so what is checked is the real
+  deployment shape and not a staging-only approximation. Step numbering is unchanged; the boot
+  and the release PR share step 4.
+- **`docs/self-hosting.md` now covers the host, not just the stack.** The guide arrived with
+  automatic HTTPS but said nothing about what the machine around it should allow: it now states
+  the inbound firewall rule (SSH, 80, 443 and nothing else), why the rest of the stack is
+  already private without one (`proxy` is the only service in `docker-compose.yml` with a
+  `ports:` entry — everything else is on Docker's internal network, checkable with
+  `docker compose ps`), and the trap that makes a firewall alone insufficient on Linux: Docker
+  publishes ports through its own iptables rules, which are consulted before ufw's, so a port
+  published in an override is internet-facing despite a `ufw deny` covering it. Verifying the
+  deployment also no longer stops at "the page loads" — step 4 checks the thing HTTPS was for,
+  by reading the session cookie back. `SITE_URL=https://…` yields
+  `__Secure-better-auth.session_token=…; HttpOnly; Secure; SameSite=Lax`; the same request under
+  `SITE_URL=http://…` yields `better-auth.session_token=…; HttpOnly; SameSite=Lax`, no prefix
+  and no `Secure`, with the session token crossing the network in clear text. Both measured on a
+  running stack. Better Auth derives both properties from the scheme of the URL it is configured
+  with, which makes the scheme in `SITE_URL` the single switch behind them — now stated where an
+  operator will read it, along with what the wrong answer looks like.
+- **The nightly retention sweep now covers a fifth table.** `UsagePing` — the deduplicated
+  "somebody opened a board / the dashboard" rows the activation funnel above needed — is swept
+  under the existing `ACTIVITY_RETENTION_DAYS` rather than growing a window of its own: it is
+  the same class of row (instance history naming a user), and two settings on one class of data
+  can only ever disagree with each other. `0` still means "keep forever" for both. The job's
+  nightly JSON log line gains a `usagePings` count alongside the four it already carried; it is
+  still counts only, with nothing from the rows themselves.
+- **`api` and `web` no longer publish host ports in `docker-compose.yml`.** Both are reached
+  through the new `proxy` service on port 80/443, so a Docker install is now at
+  `http://localhost`, not `http://localhost:3000`. This closes a real gap rather than just
+  tidying: with no route around the proxy, the API's `TRUST_PROXY` can be fixed at `1` (it is),
+  which restores the per-client rate-limit buckets and access-log IPs that would otherwise have
+  collapsed onto the proxy's own container address. `docker-compose.dev.yml` and the `pnpm dev`
+  loop are unchanged — they still run the two apps on `:3000`/`:4000` as separate origins.
+- **The `web` image bakes `NEXT_PUBLIC_API_URL=/api`** instead of `http://localhost:4000`, and
+  the variable was removed from `docker-compose.yml`'s build `args:` so a local
+  `docker compose build web` produces the same bundle as the release image rather than baking
+  whatever the dev loop left in `.env`. Next.js still inlines `NEXT_PUBLIC_*` at build time —
+  that cannot change — but the value being inlined is now correct on every domain. A deployment
+  that wants the API on its own hostname can still build with
+  `--build-arg NEXT_PUBLIC_API_URL=https://api.example.com` and accept a domain-specific image.
+- The web app's CSP `connect-src` collapses to `'self'` for a same-origin API instead of naming
+  an origin and a derived `ws(s)://` one. `'self'` covers the same-origin WebSocket upgrade
+  (CSP Level 3), confirmed in a browser against the real stack rather than taken from the
+  spec — had it not, Socket.io would have quietly fallen back to its polling transport.
+
+  **Upgrading an existing Docker install:** set `SITE_URL` in `.env` (`http://localhost` keeps
+  today's behaviour, on the standard port), then `docker compose pull && docker compose up -d`.
+  `WEB_URL` and `BETTER_AUTH_URL` in `.env` no longer affect the compose stack — they belong to
+  the dev loop now — so a deployment that set them must move that value to `SITE_URL`. If port
+  80 is taken on your host, override `proxy`'s `ports:` rather than re-publishing `web`'s.
+
+- **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
+  batch as the reader scrolls toward the end of the current one, and cards are marked
+  `content-visibility: auto` so the mounted ones nobody is looking at cost no paint. Nothing
+  about loading changed: every task page still drains into state, the column header still
+  reports the column's true total, and the board still paints on the first page. What changed
+  is how many of those rows exist as DOM at once — which is the number the cost of *dragging*
+  scales with, because every mounted card is a dnd-kit sortable that re-runs on every pointer
+  move. Measured on a seeded 1 000-task board (`SEED_LARGE_BOARD_TASKS=1000`, five columns,
+  the largest holding 333), production build, drag driven at ~120 pointer moves per second for
+  four seconds: the main thread went from **99.9% busy with 28 long tasks totalling 3.8 s** to
+  **34.1% busy with none**, per processed pointer move from **84 ms to 2.6 ms**, DOM nodes from
+  **18 421 to 3 854**, and heap after a drag from **117 MB to 19 MB**. Time to the board's first
+  paint was already good and is unchanged (~130–165 ms, first page then stream). Dragging,
+  keyboard reordering and drops all behave as before, including onto and out of columns whose
+  tail is not mounted. `content-visibility` alone was measured too and is not a substitute: it
+  halved the frame time and left the main thread saturated (audit finding FE-03,
+  [#125](https://github.com/dravcore/kurul/issues/125)).
+- CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
+  instead of relying on multiple job names in branch protection. The gate runs only when all
+  upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
+  if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
+  renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
+  [#145](https://github.com/dravcore/kurul/issues/145).
+- **BREAKING:** `docker-compose.yml` and `docker-compose.dev.yml` no longer bake a fixed
+  `kurul`/`kurul` Postgres password (or a passwordless Redis by omission of any choice)
+  into the compose files themselves — every container on the same Docker network could
+  previously connect to the database with a password identical across every Kurul install,
+  with no separate secret to guess. `POSTGRES_PASSWORD` is now a required `.env` value with no
+  default, using the same fail-loud pattern as `BETTER_AUTH_SECRET`: `docker compose config`/
+  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurul`
+  default so an otherwise-unmodified `.env` still works once the password is filled in, and
+  `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
+  as before, so this half is not a breaking change on its own. See
+  [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
+
+  **Migration for existing installs:** add `POSTGRES_PASSWORD=<your-password>` to `.env`
+  before the next `docker compose up` — without it, compose now fails before creating a single
+  container. **Picking a value here does not, by itself, change anything about an already
+  initialized database:** the official Postgres image applies `POSTGRES_PASSWORD` only during
+  `initdb`, i.e. only the very first time the `postgres_data` volume is created, so an existing
+  volume keeps the role's original password no matter what `.env` now says. Two ways to bring
+  them back in sync:
+  - Set `POSTGRES_PASSWORD` in `.env` to whatever the running role's password **already is**
+    (`kurul`, if this is the first time upgrading past this change) — the value only needs
+    to be present and correct, not different from today.
+  - Or actually rotate the role's password to a new value, on the running instance, before
+    updating `.env` to match:
+
+    ```bash
+    docker compose exec -T postgres psql -U kurul -d postgres \
+      -c "ALTER USER kurul WITH PASSWORD 'the-new-password';"
+    ```
+
+    then set `POSTGRES_PASSWORD=the-new-password` in `.env` and restart the stack. Doing this
+    out of order — restarting with a `.env` password that does not match the volume's actual
+    role password — makes `migrate`/`api` fail to authenticate against a Postgres container
+    that otherwise reports healthy.
+- Docker Compose now survives crashes and host reboots: every long-running service carries
+  `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
+  deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
+  means DB and Redis actually answer, `web` gains a root-page healthcheck, and `web` now waits
+  on `api` being *healthy* rather than merely started.
+- Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
+  project-skeleton archived, TR design status synced.
+- Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
+  `ROADMAP.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
+  `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
+  `docs/archive/specs/` (CHANGELOG links updated).
+
 ### Added
 
 - **An OpenAPI specification, generated from the running API, with a CI gate that fails when it
@@ -2342,180 +2514,6 @@ the 2026-08-18 "atlas" audit. See
   supported single-instance configuration and does not make the instance unready. `GET /health`
   stays exactly as it was — liveness, dependency-free, so a dependency blip never gets a
   healthy API restarted.
-
-### Changed
-
-- **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
-  Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
-  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
-  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
-  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
-  in `docs/development.md`, because they are far enough apart that quoting one alone would be
-  choosing a flattering number.
-
-  Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
-  package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
-  package itself marked `"optional": true`, which pnpm's `auto-install-peers` had resolved
-  anyway. `better-auth` declares those on `next`, `react`, `react-dom`, `svelte`, `vue`,
-  `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`;
-  `@prisma/client` declares them on `prisma` and `typescript`. Following those edges shipped
-  `@next/swc-linux-arm64-{gnu,musl}` (169 MB), `@prisma/studio-core`, `@electric-sql/pglite`,
-  `@prisma/engines`, `sharp`'s libvips builds, Playwright, `vite`, `rollup`, `esbuild` and the
-  TypeScript compiler into an image whose only job is to run `node dist/main.js`.
-  `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
-  `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
-  deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
-  those entries are off the primary resolution path, so this is not a judgement about which code
-  "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
-
-  The residual risk, named in the script's header rather than left for someone to discover: a
-  package that `require`s something it never declared used to resolve through pnpm's flat
-  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
-  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
-  suite, and a boot with the three opt-in paths that load code no default boot touches:
-  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
-  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
-  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
-
-  `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
-  image was the entire assembled workspace — every dev dependency of every package, the
-  sources, and pnpm — kept alive to run one command. It now starts from the same clean
-  `node:24-alpine` the API does and carries the Prisma CLI, `prisma.config.ts`, the schema and
-  the migrations. It also drops root: the old stage ran as root only because it inherited no
-  `USER` from `build`, and `prisma migrate deploy` never needed one. Both images run as
-  `USER node`, as before for `api` and newly so for `migrate`.
-
-  Nothing about the compose contract moved: `docker compose up -d` still brings the stack up
-  with `migrate` at `Exited (0)` and `api` `(healthy)`, `/health/ready` answers 200 through the
-  proxy, and the web image is untouched — no build-time API URL was reintroduced.
-- **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
-  `docs/git-strategy.md` had promised that since the branch table was written, and no staging
-  environment has ever existed — no host, no workflow, no secret in this repository points at
-  one (audit finding OPS-08). A standing promise nothing enforces is worse than no promise,
-  because it is quoted as though it were a safety net. The table now says `develop` must
-  **start**, which is verifiable, and the release process gained the verification as part of
-  step 4: `docker compose up -d --build`, `docker compose ps -a`, `curl` the readiness endpoint,
-  `docker compose down -v`. It is deliberately a release-time step rather than a CI job — a full
-  compose boot on every pull request costs more than it catches — and it runs the same stack a
-  self-hoster runs, `SITE_URL` at its `http://localhost` default, so what is checked is the real
-  deployment shape and not a staging-only approximation. Step numbering is unchanged; the boot
-  and the release PR share step 4.
-- **`docs/self-hosting.md` now covers the host, not just the stack.** The guide arrived with
-  automatic HTTPS but said nothing about what the machine around it should allow: it now states
-  the inbound firewall rule (SSH, 80, 443 and nothing else), why the rest of the stack is
-  already private without one (`proxy` is the only service in `docker-compose.yml` with a
-  `ports:` entry — everything else is on Docker's internal network, checkable with
-  `docker compose ps`), and the trap that makes a firewall alone insufficient on Linux: Docker
-  publishes ports through its own iptables rules, which are consulted before ufw's, so a port
-  published in an override is internet-facing despite a `ufw deny` covering it. Verifying the
-  deployment also no longer stops at "the page loads" — step 4 checks the thing HTTPS was for,
-  by reading the session cookie back. `SITE_URL=https://…` yields
-  `__Secure-better-auth.session_token=…; HttpOnly; Secure; SameSite=Lax`; the same request under
-  `SITE_URL=http://…` yields `better-auth.session_token=…; HttpOnly; SameSite=Lax`, no prefix
-  and no `Secure`, with the session token crossing the network in clear text. Both measured on a
-  running stack. Better Auth derives both properties from the scheme of the URL it is configured
-  with, which makes the scheme in `SITE_URL` the single switch behind them — now stated where an
-  operator will read it, along with what the wrong answer looks like.
-- **The nightly retention sweep now covers a fifth table.** `UsagePing` — the deduplicated
-  "somebody opened a board / the dashboard" rows the activation funnel above needed — is swept
-  under the existing `ACTIVITY_RETENTION_DAYS` rather than growing a window of its own: it is
-  the same class of row (instance history naming a user), and two settings on one class of data
-  can only ever disagree with each other. `0` still means "keep forever" for both. The job's
-  nightly JSON log line gains a `usagePings` count alongside the four it already carried; it is
-  still counts only, with nothing from the rows themselves.
-- **`api` and `web` no longer publish host ports in `docker-compose.yml`.** Both are reached
-  through the new `proxy` service on port 80/443, so a Docker install is now at
-  `http://localhost`, not `http://localhost:3000`. This closes a real gap rather than just
-  tidying: with no route around the proxy, the API's `TRUST_PROXY` can be fixed at `1` (it is),
-  which restores the per-client rate-limit buckets and access-log IPs that would otherwise have
-  collapsed onto the proxy's own container address. `docker-compose.dev.yml` and the `pnpm dev`
-  loop are unchanged — they still run the two apps on `:3000`/`:4000` as separate origins.
-- **The `web` image bakes `NEXT_PUBLIC_API_URL=/api`** instead of `http://localhost:4000`, and
-  the variable was removed from `docker-compose.yml`'s build `args:` so a local
-  `docker compose build web` produces the same bundle as the release image rather than baking
-  whatever the dev loop left in `.env`. Next.js still inlines `NEXT_PUBLIC_*` at build time —
-  that cannot change — but the value being inlined is now correct on every domain. A deployment
-  that wants the API on its own hostname can still build with
-  `--build-arg NEXT_PUBLIC_API_URL=https://api.example.com` and accept a domain-specific image.
-- The web app's CSP `connect-src` collapses to `'self'` for a same-origin API instead of naming
-  an origin and a derived `ws(s)://` one. `'self'` covers the same-origin WebSocket upgrade
-  (CSP Level 3), confirmed in a browser against the real stack rather than taken from the
-  spec — had it not, Socket.io would have quietly fallen back to its polling transport.
-
-  **Upgrading an existing Docker install:** set `SITE_URL` in `.env` (`http://localhost` keeps
-  today's behaviour, on the standard port), then `docker compose pull && docker compose up -d`.
-  `WEB_URL` and `BETTER_AUTH_URL` in `.env` no longer affect the compose stack — they belong to
-  the dev loop now — so a deployment that set them must move that value to `SITE_URL`. If port
-  80 is taken on your host, override `proxy`'s `ports:` rather than re-publishing `web`'s.
-
-- **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
-  batch as the reader scrolls toward the end of the current one, and cards are marked
-  `content-visibility: auto` so the mounted ones nobody is looking at cost no paint. Nothing
-  about loading changed: every task page still drains into state, the column header still
-  reports the column's true total, and the board still paints on the first page. What changed
-  is how many of those rows exist as DOM at once — which is the number the cost of *dragging*
-  scales with, because every mounted card is a dnd-kit sortable that re-runs on every pointer
-  move. Measured on a seeded 1 000-task board (`SEED_LARGE_BOARD_TASKS=1000`, five columns,
-  the largest holding 333), production build, drag driven at ~120 pointer moves per second for
-  four seconds: the main thread went from **99.9% busy with 28 long tasks totalling 3.8 s** to
-  **34.1% busy with none**, per processed pointer move from **84 ms to 2.6 ms**, DOM nodes from
-  **18 421 to 3 854**, and heap after a drag from **117 MB to 19 MB**. Time to the board's first
-  paint was already good and is unchanged (~130–165 ms, first page then stream). Dragging,
-  keyboard reordering and drops all behave as before, including onto and out of columns whose
-  tail is not mounted. `content-visibility` alone was measured too and is not a substitute: it
-  halved the frame time and left the main thread saturated (audit finding FE-03,
-  [#125](https://github.com/dravcore/kurul/issues/125)).
-- CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
-  instead of relying on multiple job names in branch protection. The gate runs only when all
-  upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
-  if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
-  renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
-  [#145](https://github.com/dravcore/kurul/issues/145).
-- **BREAKING:** `docker-compose.yml` and `docker-compose.dev.yml` no longer bake a fixed
-  `kurul`/`kurul` Postgres password (or a passwordless Redis by omission of any choice)
-  into the compose files themselves — every container on the same Docker network could
-  previously connect to the database with a password identical across every Kurul install,
-  with no separate secret to guess. `POSTGRES_PASSWORD` is now a required `.env` value with no
-  default, using the same fail-loud pattern as `BETTER_AUTH_SECRET`: `docker compose config`/
-  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurul`
-  default so an otherwise-unmodified `.env` still works once the password is filled in, and
-  `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
-  as before, so this half is not a breaking change on its own. See
-  [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
-
-  **Migration for existing installs:** add `POSTGRES_PASSWORD=<your-password>` to `.env`
-  before the next `docker compose up` — without it, compose now fails before creating a single
-  container. **Picking a value here does not, by itself, change anything about an already
-  initialized database:** the official Postgres image applies `POSTGRES_PASSWORD` only during
-  `initdb`, i.e. only the very first time the `postgres_data` volume is created, so an existing
-  volume keeps the role's original password no matter what `.env` now says. Two ways to bring
-  them back in sync:
-  - Set `POSTGRES_PASSWORD` in `.env` to whatever the running role's password **already is**
-    (`kurul`, if this is the first time upgrading past this change) — the value only needs
-    to be present and correct, not different from today.
-  - Or actually rotate the role's password to a new value, on the running instance, before
-    updating `.env` to match:
-
-    ```bash
-    docker compose exec -T postgres psql -U kurul -d postgres \
-      -c "ALTER USER kurul WITH PASSWORD 'the-new-password';"
-    ```
-
-    then set `POSTGRES_PASSWORD=the-new-password` in `.env` and restart the stack. Doing this
-    out of order — restarting with a `.env` password that does not match the volume's actual
-    role password — makes `migrate`/`api` fail to authenticate against a Postgres container
-    that otherwise reports healthy.
-- Docker Compose now survives crashes and host reboots: every long-running service carries
-  `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
-  deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
-  means DB and Redis actually answer, `web` gains a root-page healthcheck, and `web` now waits
-  on `api` being *healthy* rather than merely started.
-- Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
-  project-skeleton archived, TR design status synced.
-- Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
-  `ROADMAP.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
-  `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
-  `docs/archive/specs/` (CHANGELOG links updated).
 
 ### Removed
 
