@@ -69,21 +69,42 @@ projects above is the better choice.
 
 ## Features
 
-Shipped in the MVP — sequencing history in [ROADMAP.md](ROADMAP.md):
+### Shipped in the MVP
+
+Phases 1–9 (Phase 0 was docs/standards), shipped in `v0.1.0`. Sequencing history in
+[ROADMAP.md](ROADMAP.md):
 
 - **Boards and columns** — classic Kanban layout with drag-and-drop reordering
 - **Tasks** — multi-assignee, labels, priority (kept independent of labels), due date and
   time estimate as separate fields
-- **Checklists** — multiple named checklists per task, each with its own items; a progress
+- **Fractional-indexed ordering** — reordering a card only touches that card's position,
+  never a full-list renumber
+- **Workspaces** — multi-tenant from the ground up, every query scoped by workspace
+- **Filtering and search** — board task filters with cursor pagination
+- **Dashboard** — aggregation views and charts (including created vs completed)
+- **Activity log and notifications** — assignment, mention, due-soon, in-app; `/notifications`
+- **Realtime sync** — board changes propagate live via Socket.io
+
+### Since the MVP
+
+Shipped across `v0.2.0`, `v0.3.0` and `v0.4.0`, in that order. Full history in
+[ROADMAP.md](ROADMAP.md):
+
+- **English and Turkish**: a per-user preference, not a per-workspace one, so one workspace
+  can hold people who read different languages. It follows you to every device you sign in on,
+  names the columns a board you create starts with, and picks the language of the email we
+  send you. A build fails on a key one catalog has and the other does not
+  ([ADR 0018](docs/decisions/0018-localization-strategy.md))
+- **Checklists**: multiple named checklists per task, each with its own items; a progress
   badge (`3/5`) shows on the board card and disappears when a task has none
   ([ADR 0023](docs/decisions/0023-checklist-data-model.md))
-- **Attachments** — files and links on a card. Files are stored on your own disk, accepted on
+- **Attachments**: files and links on a card. Files are stored on your own disk, accepted on
   their magic bytes rather than their extension, and served back with a size limit you set;
   images preview in the panel. A link is stored, shown and opened — the server never requests
   the URL, so no preview fetch can be turned into a probe of your network
   ([ADR 0022](docs/decisions/0022-attachment-storage.md),
   [ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md))
-- **Trello import (one-way)** — upload a Trello board's JSON export and get a Kurul board:
+- **Trello import (one-way)**: upload a Trello board's JSON export and get a Kurul board:
   lists, cards, labels and checklists. It is one-way and not repeatable: **importing the same
   export twice creates two boards** — there is no update-in-place and no dedupe. Three things
   deliberately do not come across, and the import report tells you how many of each: **files**
@@ -94,18 +115,19 @@ Shipped in the MVP — sequencing history in [ROADMAP.md](ROADMAP.md):
   columns means "done", so you set that yourself afterwards. The report exists only in the
   response: it is shown once, it is not stored, and dismissing it is permanent
   ([ADR 0025](docs/decisions/0025-trello-import-mapping.md))
-- **Fractional-indexed ordering** — reordering a card only touches that card's position,
-  never a full-list renumber
-- **Workspaces** — multi-tenant from the ground up, every query scoped by workspace
-- **Filtering and search** — board task filters with cursor pagination
-- **Dashboard** — aggregation views and charts (including created vs completed)
-- **Activity log and notifications** — assignment, mention, due-soon, in-app and by email (per-user switch); `/notifications`
-- **Realtime sync** — board changes propagate live via Socket.io
-- **English and Turkish** — a per-user preference, not a per-workspace one, so one workspace
-  can hold people who read different languages. It follows you to every device you sign in on,
-  names the columns a board you create starts with, and picks the language of the email we
-  send you. A build fails on a key one catalog has and the other does not
-  ([ADR 0018](docs/decisions/0018-localization-strategy.md))
+- **Account deletion**: a self-service erase request anonymizes your `User` row in place
+  rather than deleting it ([ADR 0026](docs/decisions/0026-account-deletion-anonymisation.md))
+- **Email notifications**: assignment, mention and due-soon alerts also go out by email, in
+  the recipient's language, behind a per-user switch
+- **Board templates**: start a new board from one of four shapes (Kanban, Scrum Sprint, Bug
+  Triage, Content Pipeline) instead of always the same default columns
+- **Personal access tokens**: workspace-scoped `Authorization: Bearer` tokens a script or a
+  CI job can use to drive a board, the first slice of API 1.0
+- **Password reset by email**: a self-service "forgot your password" link. Resetting revokes
+  every session on the account, so a stolen session dies with the password
+- **Plan limits**: optional ceilings on seats, boards, workspaces and accounts, unlimited
+  until an operator sets one ([ADR 0032](docs/decisions/0032-plan-limits.md))
+- **Demo mode**: a `DEMO_MODE=true` flag for running a public, self-resetting demo instance
 
 ## Quick start
 
@@ -210,15 +232,15 @@ Day-to-day details: [docs/development.md](docs/development.md).
 
 ## Stack
 
-| Layer        | Choice                                                                    |
-| ------------ | ------------------------------------------------------------------------- |
-| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                |
-| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts  |
-| Auth         | Better Auth (organization plugin → Workspace)                             |
-| Email        | `nodemailer` over SMTP (invitation verification)                          |
-| Shared types | `packages/shared-types` + `packages/auth-access` (DTOs / BA org AC roles) |
-| Deployment   | Docker Compose                                                            |
-| Architecture | Monorepo, modular monolith — no microservices                             |
+| Layer        | Choice                                                                          |
+| ------------ | ------------------------------------------------------------------------------- |
+| Backend      | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8 + Socket.io                      |
+| Frontend     | Next.js 16 (App Router) + Tailwind CSS + shadcn/ui + @dnd-kit + Recharts        |
+| Auth         | Better Auth (organization plugin → Workspace)                                   |
+| Email        | `nodemailer` over SMTP (invitation verification, notifications, password reset) |
+| Shared types | `packages/shared-types` + `packages/auth-access` (DTOs / BA org AC roles)       |
+| Deployment   | Docker Compose                                                                  |
+| Architecture | Monorepo, modular monolith — no microservices                                   |
 
 Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 [docs/decisions/](docs/decisions/).
@@ -228,14 +250,14 @@ Full rationale for each choice: [docs/tech-stack.md](docs/tech-stack.md) and
 Start with the five-minute map: **[docs/README.md](docs/README.md)** (what to read for
 product, coding, API, releases, roadmap).
 
-| Doc                                                | Covers                         |
-| -------------------------------------------------- | ------------------------------ |
-| [docs/architecture.md](docs/architecture.md)       | Module map, data model         |
-| [docs/design.md](docs/design.md)                   | UI/UX language                 |
-| [docs/development.md](docs/development.md)         | Local setup and daily commands |
-| [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination       |
-| [ROADMAP.md](ROADMAP.md)                           | MVP done; beyond-MVP backlog   |
-| [docs/decisions/](docs/decisions/)                 | ADRs                           |
+| Doc                                                | Covers                                         |
+| -------------------------------------------------- | ---------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)       | Module map, data model                         |
+| [docs/design.md](docs/design.md)                   | UI/UX language                                 |
+| [docs/development.md](docs/development.md)         | Local setup and daily commands                 |
+| [docs/api-conventions.md](docs/api-conventions.md) | REST, errors, pagination                       |
+| [ROADMAP.md](ROADMAP.md)                           | Hardening + feature tracks, beyond-MVP backlog |
+| [docs/decisions/](docs/decisions/)                 | ADRs                                           |
 
 ## Contributing
 
@@ -269,7 +291,10 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
 Kurul is free to self-host, forever. Nothing is withheld from a self-hosted instance, there is
 no open core, and no edition is sold on the side. The one thing Dravcore ever charges for is an
 optional hosted service: an account on our servers, free within published limits (seats,
-boards, storage) and paid above them. That service runs the same AGPL-3.0 code that sits in
-this repository, plan limits and billing included, so anyone running their own instance can set
-those limits or switch them off entirely
-([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)).
+boards, storage) and paid above them
+([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)). That service runs the
+same AGPL-3.0 code that sits in this repository. Its plan-limit layer has already shipped, so
+anyone running their own instance can set those limits or switch them off entirely
+([ADR 0032](docs/decisions/0032-plan-limits.md)). Billing on top of those limits is still a
+proposed design, not yet built
+([ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md)).
