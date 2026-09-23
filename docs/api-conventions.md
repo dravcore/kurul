@@ -479,6 +479,13 @@ up space, and clients branch on `statusCode` and `error`, never on `message` (se
 like the per-file one. LINK attachments store no bytes: they neither count against a quota nor
 are refused by a full one.
 
+**A multipart body multer refuses is `400`.** A second file, a file part under any name but
+`file`, more text fields than the route takes, or a field name carrying an array index above `0`
+(`items[1]`: the limit that closes
+[GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)) never reaches the
+handler. The envelope's `message` is multer's own sentence with the part name after it;
+[Errors](#errors) says why the wording is multer's.
+
 **Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
 media type (never the one the client declared at upload), `Content-Length`, and
 `Content-Disposition`. Disposition is `attachment` for everything except the four image types,
@@ -519,13 +526,13 @@ its caller could not do in several.
 
 **Errors:**
 
-| Status | When                                                                                                                                                                                                |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export; the export has more cards than `TRELLO_IMPORT_MAX_CARDS` or more lists than `TRELLO_IMPORT_MAX_LISTS`      |
-| `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits)) |
-| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                |
-| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                     |
-| `429`  | More than three imports in a rolling minute                                                                                                                                                         |
+| Status | When                                                                                                                                                                                                                                                             |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export; the export has more cards than `TRELLO_IMPORT_MAX_CARDS` or more lists than `TRELLO_IMPORT_MAX_LISTS`; multer refuses the multipart body itself (see [Errors](#errors)) |
+| `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits))                                                              |
+| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                                                                             |
+| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                                                                                  |
+| `429`  | More than three imports in a rolling minute                                                                                                                                                                                                                      |
 
 A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
 export is read and mapped entirely before the transaction opens, so a rejected import leaves the
@@ -633,6 +640,14 @@ the framework's built-in exceptions and hand-written ones look identical):
   which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
   with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx
   from the same source is still a server fault and keeps the `500` envelope _and_ the report.
+- A multipart body multer refuses is answered **`400`** in this envelope (**`413`** when the
+  refusal is the file's size) and is not reported. Nest translates most of multer's error codes
+  before the filter sees them, and the filter maps the rest by `code`, never by message. Here the
+  wording _is_ the library's, on purpose: it is what Nest already returns for the codes it
+  translates, so a refusal reads the same whichever layer caught it. That is multer's sentence,
+  then the part name when there is one (`Field name array index too large - items[4294967294]`).
+  `STREAM_DESTROYED`, which multer's disk storage raises when an upload's own stream has failed,
+  is the one code that stays a `500`.
 
 ### Request correlation
 

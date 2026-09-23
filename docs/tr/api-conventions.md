@@ -489,6 +489,13 @@ gerektiğini söyleyemez ve istemciler `statusCode` ile `error` üzerinden dalla
 başına olan gibi kapsayıcıdır. LINK ekleri byte saklamaz: ne kotadan düşerler ne de dolu bir
 kota tarafından reddedilirler.
 
+**Multipart gövdeyi multer reddederse cevap `400`'dür.** İkinci bir dosya, `file` dışında bir
+adla gelen bir dosya parçası, rotanın aldığından fazla metin alanı ya da `0`'dan büyük bir dizi
+indeksi taşıyan bir alan adı (`items[1]`:
+[GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)'ü kapatan limit)
+handler'a hiç ulaşmaz. Zarfın `message`'ı multer'ın kendi cümlesi ve ardından parça adıdır;
+metnin neden multer'ın olduğunu [Hatalar](#hatalar) anlatır.
+
 **İndirme.** `GET .../attachments/:attachmentId/content` byte'ları **sniff edilmiş** medya tipiyle
 (asla istemcinin yüklemede beyan ettiğiyle değil), `Content-Length` ve `Content-Disposition` ile
 akıtır. Disposition, panelin önizleyebilmesi için `inline` servis edilen dört görsel tipi
@@ -529,13 +536,13 @@ yapamayacağı şeyi tek istekte yapmamalı.
 
 **Hatalar:**
 
-| Durum | Ne zaman                                                                                                                                                                                         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil; export'un kart sayısı `TRELLO_IMPORT_MAX_CARDS`'ı ya da liste sayısı `TRELLO_IMPORT_MAX_LISTS`'i aşıyor |
-| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri)) |
-| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                              |
-| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                 |
-| `429` | Bir dakikalık pencerede üçten fazla import                                                                                                                                                       |
+| Durum | Ne zaman                                                                                                                                                                                                                                                                    |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil; export'un kart sayısı `TRELLO_IMPORT_MAX_CARDS`'ı ya da liste sayısı `TRELLO_IMPORT_MAX_LISTS`'i aşıyor; multipart gövdeyi multer'ın kendisi reddediyor (bkz. [Hatalar](#hatalar)) |
+| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri))                                                                            |
+| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                                                                                                         |
+| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                                                                                            |
+| `429` | Bir dakikalık pencerede üçten fazla import                                                                                                                                                                                                                                  |
 
 Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
 açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
@@ -644,6 +651,14 @@ isimleriyle):
   Express'in body parser'larının fırlattığı `http-errors` — bu zarf içinde **kendi 4xx'i** ile
   cevaplanır; metin kütüphanenin değil, burada seçilendir. Eşleme bilinçli olarak 4xx'te durur:
   aynı kaynaktan gelen bir 5xx hâlâ bir sunucu hatasıdır, `500` zarfını **ve** raporunu korur.
+- multer'ın reddettiği bir multipart gövde bu zarf içinde **`400`** ile cevaplanır (ret dosyanın
+  boyutu yüzündense **`413`**) ve raporlanmaz. Nest, multer'ın hata kodlarının çoğunu filter'a
+  ulaşmadan kendisi çevirir; filter geri kalanını mesaja göre değil, `code`'a göre eşler. Burada
+  metin _kütüphanenin_ metnidir, bilinçli olarak: Nest'in çevirdiği kodlar için zaten döndürdüğü
+  metin budur, yani bir ret hangi katmanda yakalanırsa yakalansın aynı okunur. Bu metin multer'ın
+  cümlesi, varsa ardından parça adıdır (`Field name array index too large - items[4294967294]`).
+  multer'ın disk depolamasının, bir yüklemenin kendi akışı bozulduğunda fırlattığı
+  `STREAM_DESTROYED`, `500` olarak kalan tek koddur.
 
 ### Request korelasyonu
 
