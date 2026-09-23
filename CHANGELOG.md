@@ -7,6 +7,104 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-23
+
+A security release on top of 0.4.0: the dependency updates Dependabot opened against `main`
+([#357](https://github.com/dravcore/kurul/pull/357) to
+[#360](https://github.com/dravcore/kurul/pull/360)), what it took for the multer one to reach the
+code that parses uploads, and two transitive fixes the `pnpm audit` and `image-scan` gates
+require. Nothing to migrate and no new setting.
+
+### Changed
+
+- **Dependabot holds Node base-image majors.** The `docker` block in `.github/dependabot.yml`
+  now ignores `node` majors the way the npm block holds TypeScript 7, so `node:24-alpine` moves
+  by digest and minor only until a Node major is scheduled. The same entry reached `develop` on
+  2026-08-27 ([#349](https://github.com/dravcore/kurul/pull/349)) and changed nothing, because
+  Dependabot reads its configuration from the default branch, `main`, even for the pull
+  requests it opens against `develop`: it proposed `node:25-alpine` for both Dockerfiles on
+  2026-09-20 ([#364](https://github.com/dravcore/kurul/pull/364),
+  [#365](https://github.com/dravcore/kurul/pull/365)). A base-image major moves `.nvmrc`,
+  `engines`, the CI `setup-node` step and the docs with it, so it is scheduled, not taken from
+  a bot.
+
+### Security
+
+- **multer 2.2.0 → 2.3.0, and it is now the multer that parses uploads**
+  ([#357](https://github.com/dravcore/kurul/pull/357),
+  [#359](https://github.com/dravcore/kurul/pull/359)). 2.3.0 closes a process crash from crafted
+  field names ([GHSA-wc9g-mqfw-jrwm](https://github.com/advisories/GHSA-wc9g-mqfw-jrwm)), CPU
+  exhaustion from an oversized array index in a field name
+  ([GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)), a file-descriptor
+  leak on aborted uploads to disk storage
+  ([GHSA-qfvm-cv95-jqjf](https://github.com/advisories/GHSA-qfvm-cv95-jqjf)) and a `fileSize`
+  bypass through an asynchronous `fileFilter`
+  ([GHSA-qvfw-j98x-7q72](https://github.com/advisories/GHSA-qvfw-j98x-7q72)). Kurul uses memory
+  storage and no `fileFilter`, so the first two are the ones that applied. Both multipart
+  routes, the attachment upload and the Trello import, need a signed-in user with a workspace
+  role, which Nest checks before `FileInterceptor` runs; with sign-up open, the default, anyone
+  can own a workspace and reach both.
+
+  The bump alone would not have reached them. It moved the multer `apps/api` imports for
+  `memoryStorage()`, while the one that reads the request body is the copy
+  `@nestjs/platform-express` 11.2.1 pins at exactly 2.2.0: a `multer@<2.3.0` entry in
+  `pnpm.overrides` lifts that copy, and the tree now holds one multer. Nor does the upgrade close
+  GHSA-535w-7cp7-47q4 on its own: the fix is an opt-in `limits.fieldArrayIndexLimit`, now `0` in
+  both modules. Measured through `FileInterceptor` on 2.3.0 without it, one request with the
+  fields `items[4294967294]` and `items[foo]` held the event loop for 74 seconds; with it, the
+  request is refused in a millisecond. The refusal is a `500` for now, since Nest 11.2.1 does not
+  translate the new multer error code.
+
+  2.3.0 also moves a boundary: it hands busboy `limits.fileSize + 1`, the byte
+  `attachment.module.ts` and `import.module.ts` used to add themselves to make the published
+  ceiling inclusive. Both now pass `ATTACHMENT_MAX_BYTES` and `TRELLO_IMPORT_MAX_BYTES` as they
+  are, so a file of exactly the limit is still accepted and one byte over is still a `413`. It
+  also decodes `%22`, `%0D` and `%0A` in a multipart filename back into `"`, CR and LF, which
+  `displayFilename` already strips before a name is stored.
+
+- **nodemailer 9.0.5 → 9.1.1** ([#358](https://github.com/dravcore/kurul/pull/358)): quadratic
+  time in the address parser on a crafted address list
+  ([GHSA-2x7j-588g-ccc2](https://github.com/advisories/GHSA-2x7j-588g-ccc2), high), two
+  recipient-domain check bypasses, through an RFC 5322 comment and through IDN/Punycode
+  ([GHSA-cc9r-2j5m-2m83](https://github.com/advisories/GHSA-cc9r-2j5m-2m83),
+  [GHSA-wmmp-3585-3rmp](https://github.com/advisories/GHSA-wmmp-3585-3rmp)), and
+  `resolveContent()` ignoring `disableFileAccess` and `disableUrlAccess`
+  ([GHSA-8m3c-c648-2xjj](https://github.com/advisories/GHSA-8m3c-c648-2xjj)). Kurul's transport
+  (`smtp-mail-sender.ts`) sets host, port, TLS, credentials and timeouts, and each message
+  carries `from`, `to`, `subject`, `text` and `html` and nothing else.
+
+- **next 16.3.2 → 16.3.3** ([#360](https://github.com/dravcore/kurul/pull/360)): two critical
+  remote code execution advisories, one in the Image Optimization API when AVIF files are
+  involved ([GHSA-2xp9-vwfh-vxw4](https://github.com/advisories/GHSA-2xp9-vwfh-vxw4)), which
+  16.3.3 answers by turning AVIF optimisation off, and one on Windows-hosted servers only
+  ([GHSA-p293-qw3h-jr36](https://github.com/advisories/GHSA-p293-qw3h-jr36)). The same lockfile
+  update takes `sharp`, the image library Next optimises with, from 0.35.3 to 0.35.4 for its
+  bundled libheif ([GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c),
+  high). `kurul-web` runs on Linux and renders no `next/image`, but every Next server answers
+  `/_next/image`, so neither advisory was argued away.
+
+- **fast-uri 3.1.5 → 3.1.8**: four high-severity advisories, host confusion and server-side
+  request forgery through URI normalisation
+  ([GHSA-5jgf-p345-68v8](https://github.com/advisories/GHSA-5jgf-p345-68v8),
+  [GHSA-f65p-4m7j-42xc](https://github.com/advisories/GHSA-f65p-4m7j-42xc),
+  [GHSA-fph4-wmhf-6fwf](https://github.com/advisories/GHSA-fph4-wmhf-6fwf),
+  [GHSA-jqff-g426-hqxp](https://github.com/advisories/GHSA-jqff-g426-hqxp)). It arrives through
+  `ajv`, under build tooling and under the Prisma CLI, and the Prisma CLI ships in
+  `kurul-migrate`, so `pnpm audit` and the migrate leg of `image-scan` both failed on it. Every
+  `ajv` in the tree asks for `^3.0.1`, so this is a lockfile change and nothing more.
+
+- **The Prisma CLI's mysql2 moves from 3.15.3 to 3.24.4, through an override.** `prisma` 7.9.1
+  pins it at exactly 3.15.3, which carries an authentication-plugin downgrade that sends the
+  password in clear ([GHSA-3f6p-5ww8-9rcr](https://github.com/advisories/GHSA-3f6p-5ww8-9rcr),
+  high) and an unbounded inflate in the compressed protocol handler
+  ([GHSA-rgwj-5xj2-c3m3](https://github.com/advisories/GHSA-rgwj-5xj2-c3m3), moderate). Prisma
+  7.10.0 pins the same version, so there is no upgrade to take, and `mysql2@<3.23.1` in
+  `pnpm.overrides` does for this pin what the `deepmerge-ts` entry does for another one in the
+  same CLI. Nothing in a Kurul install reaches mysql2, which the CLI imports only for Studio
+  against a MySQL datasource, but it ships in `kurul-migrate`, where the image scan and
+  `pnpm audit` count it. With the override in place, `prisma --version`, `validate`, `generate`
+  and `migrate diff` run as before.
+
 ## [0.4.0] - 2026-08-27
 
 ### Added
@@ -3034,7 +3132,8 @@ commit; this is the point it becomes a version.
   session cookie cache, batch due-soon scans and rebalance SQL, paginate comments, and add
   `pg_trgm` search indexes.
 
-[unreleased]: https://github.com/dravcore/kurul/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/dravcore/kurul/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/dravcore/kurul/releases/tag/v0.4.1
 [0.4.0]: https://github.com/dravcore/kurul/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dravcore/kurul/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dravcore/kurul/releases/tag/v0.2.0
