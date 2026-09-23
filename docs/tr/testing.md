@@ -507,7 +507,7 @@ Kapının üstündeki altı job paralel koşar ve hiçbiri bir diğerine `needs`
 container'ı olan tek job `test-integration`'dır, bu yüzden `test-unit` içindeki unit suite'ler
 container çekmeden başlar. Pipeline'ın duvar saati süresi dolayısıyla job'ların toplamı değil
 en uzun job'ıdır ve
-[ROADMAP.md](../../ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit) içindeki
+[ROADMAP.md](../../ROADMAP.md#hardening-track) içindeki
 OPS-10 satırına karşı izlenir.
 
 **Merge öncesi tüm adımlar geçmelidir.** `main` ve `develop` üzerindeki branch koruması iki
