@@ -25,6 +25,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Nest's own fix for the same gap ([nestjs/nest#17857](https://github.com/nestjs/nest/pull/17857)),
   which no Nest release carries yet.
 
+### Security
+
+- **qs 6.15.3 → 6.16.0**: two moderate advisories, an array-limit bypass through comma-separated
+  bracket keys ([GHSA-x5fp-wj9c-mxmx](https://github.com/advisories/GHSA-x5fp-wj9c-mxmx)) and a
+  denial of service through an attacker-controlled `isBuffer` check
+  ([GHSA-4mjr-xmp4-gh2g](https://github.com/advisories/GHSA-4mjr-xmp4-gh2g)). It arrives through
+  `express`, directly and through the `body-parser` it depends on, into `apps/api`'s tree under
+  `@nestjs/platform-express`. Express asks for `qs@^6.14.0` and body-parser for `qs@^6.15.2`;
+  every range already admits 6.16.0, so this is a lockfile change and nothing more.
+
 ## [0.4.1] - 2026-09-23
 
 A security release on top of 0.4.0: the dependency updates Dependabot opened against `main`
