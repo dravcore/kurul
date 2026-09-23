@@ -7,6 +7,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A field name multer refuses is a `400`, not a `500` filed in Sentry.** 0.4.1 set multer's
+  `limits.fieldArrayIndexLimit` to `0` on both multipart routes, the attachment upload and the
+  Trello import, to close [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4),
+  and the request that limit refuses, a field such as `items[4294967294]` or any other index above
+  `0`, reached the client as a `500` and error tracking as a server fault.
+  `@nestjs/platform-express` 11.2.1 translates the nine error codes multer had up to 2.2.0 and
+  passes the three 2.3.0 added through unchanged, so `LIMIT_FIELD_ARRAY_INDEX` and
+  `INVALID_FIELD_NAME` fell to the catch-all in `AllExceptionsFilter`. The filter now maps a multer
+  refusal Nest passes on, keyed on the error's `code` rather than its message: a `400` in the
+  standard envelope, with multer's sentence and the part name as `message`
+  (`Field name array index too large - items[4294967294]`, the wording Nest already gives the codes
+  it translates), a `413` for an oversized file, and no report. `STREAM_DESTROYED`, which multer's
+  disk storage raises and the memory storage Kurul uses never does, stays a `500`, as it does in
+  Nest's own fix for the same gap ([nestjs/nest#17857](https://github.com/nestjs/nest/pull/17857)),
+  which no Nest release carries yet.
+
 ## [0.4.1] - 2026-09-23
 
 A security release on top of 0.4.0: the dependency updates Dependabot opened against `main`

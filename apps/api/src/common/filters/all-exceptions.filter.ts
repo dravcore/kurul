@@ -218,6 +218,104 @@ function mapHttpClientError(exception: unknown): { statusCode: number; message: 
   };
 }
 
+/**
+ * Every multer error code that refuses the request, and the status it is answered with. A closed
+ * list: see `mapMulterError` for why a code missing from it keeps the `500` path.
+ */
+const MULTER_CLIENT_ERROR_STATUSES: ReadonlyMap<string, HttpStatus> = new Map([
+  ['LIMIT_FILE_SIZE', HttpStatus.PAYLOAD_TOO_LARGE],
+  ['LIMIT_PART_COUNT', HttpStatus.BAD_REQUEST],
+  ['LIMIT_FILE_COUNT', HttpStatus.BAD_REQUEST],
+  ['LIMIT_FIELD_KEY', HttpStatus.BAD_REQUEST],
+  ['LIMIT_FIELD_VALUE', HttpStatus.BAD_REQUEST],
+  ['LIMIT_FIELD_COUNT', HttpStatus.BAD_REQUEST],
+  ['LIMIT_UNEXPECTED_FILE', HttpStatus.BAD_REQUEST],
+  ['MISSING_FIELD_NAME', HttpStatus.BAD_REQUEST],
+  ['LIMIT_FIELD_NESTING', HttpStatus.BAD_REQUEST],
+  ['LIMIT_FIELD_ARRAY_INDEX', HttpStatus.BAD_REQUEST],
+  ['INVALID_FIELD_NAME', HttpStatus.BAD_REQUEST],
+]);
+
+/**
+ * Maps a multer refusal that `@nestjs/platform-express` passed on untranslated onto a client
+ * status.
+ *
+ * `FileInterceptor` runs every multer failure through Nest's `transformException`
+ * (`@nestjs/platform-express/multer/multer/multer.utils.js`), which turns the codes it knows into
+ * a `BadRequestException`, or a `PayloadTooLargeException` for `LIMIT_FILE_SIZE`, and returns
+ * anything else unchanged. Nest 11.2.1 knows the nine codes multer had up to 2.2.0; multer 2.3.0
+ * added three (`lib/multer-error.js`). `LIMIT_FIELD_ARRAY_INDEX` is the refusal the
+ * `fieldArrayIndexLimit: 0` in `attachment.module.ts` and `import.module.ts` exists to produce
+ * (GHSA-535w-7cp7-47q4), and `INVALID_FIELD_NAME` is raised when append-field throws on a field
+ * name. Both reached the `instanceof Error` fallback below as a plain `MulterError`: a `500` and a
+ * Sentry report, for a request whose only fault was its field names.
+ *
+ * ## Every refusal code, keyed on `code`
+ *
+ * Nest 11.2.1 matches on `error.message`, and messages move: multer 2.4.0 rewords
+ * `LIMIT_UNEXPECTED_FILE` from `Unexpected field` to `Unexpected file field`, which is how Nest
+ * 12.0.3, pinning 2.4.0, answered a misnamed file part with a 500 (nestjs/nest#17769). From 2.4.0
+ * on, multer's own JSDoc says to check `err.code` rather than the message. So the table holds all
+ * eleven codes that refuse the request, not only the two Nest missed: the nine it translates first
+ * cost nothing here, and the next rewording lands on this branch as a `400` instead of on the
+ * fallback as a `500`. `LIMIT_FILE_SIZE` keeps the `413` Nest gives it, so the status of an
+ * oversized file never depends on which layer caught it. The match never reads the message, so the
+ * string collision ADR 0022 records for `transformException` (a storage error that happens to read
+ * `File too large`) cannot happen here.
+ *
+ * ## `STREAM_DESTROYED` keeps the 500, and so does a code nobody has classified
+ *
+ * multer's disk storage raises `STREAM_DESTROYED` when the file stream is already gone by the time
+ * it opens its output file: the upload's own plumbing failing, not a refusal of anything the client
+ * sent. Nest's own fix for the other two (nestjs/nest#17857, in neither 11.2.6 nor 12.1.0) keeps
+ * it a 500 for that reason, and the `memoryStorage()` this API uses never raises it. The list is
+ * closed for the reason `mapHttpClientError` stops at 4xx: a code multer adds later reaches the
+ * fallback and is reported, which is how this gap was found, instead of being answered `400` and
+ * silenced before anyone has decided what it means.
+ *
+ * ## Matched by shape, not by `instanceof`
+ *
+ * `name === 'MulterError'` and a string `code` are what multer's constructor sets. The error comes
+ * from the multer `@nestjs/platform-express` resolves, not the one `apps/api` declares: they are
+ * one copy today only because the root `pnpm.overrides` entry lifts Nest's pin to the same 2.3.0,
+ * and an `instanceof` against a second copy would fail silently and bring the 500 back. multer
+ * also ships no types, `attachment/multer.d.ts` declares `memoryStorage` alone on purpose, and
+ * importing the class at runtime would make the filter every failure passes through depend on an
+ * upload library.
+ *
+ * ## The message is multer's, unlike `mapHttpClientError`'s
+ *
+ * multer's messages are fixed sentences looked up by code, with no configured limit or received
+ * size in them, and they are what Nest already puts in this envelope for the codes it translates:
+ * the sentence alone on the 413, the part name after ` - ` on a 400. The same two spellings here
+ * give a client one message per refusal whichever layer caught it, and they are what
+ * nestjs/nest#17857 produces for these codes. The part name is the client's own input, echoed
+ * back as Nest echoes it for the codes it knows.
+ */
+function mapMulterError(exception: unknown): { statusCode: number; message: string } | null {
+  if (!(exception instanceof Error) || exception.name !== 'MulterError') {
+    return null;
+  }
+
+  const candidate = exception as unknown as Record<string, unknown>;
+  const statusCode =
+    typeof candidate.code === 'string'
+      ? MULTER_CLIENT_ERROR_STATUSES.get(candidate.code)
+      : undefined;
+  if (statusCode === undefined) {
+    return null;
+  }
+
+  const field = candidate.field;
+  return {
+    statusCode,
+    message:
+      statusCode === HttpStatus.BAD_REQUEST && typeof field === 'string' && field !== ''
+        ? `${exception.message} - ${field}`
+        : exception.message,
+  };
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -244,9 +342,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
    * The split falls out of the control flow for free: this method is called only on
    * `statusCode >= 500` and on the branches that could not resolve a client status, so
    * reporting rides along with logging and the two can never drift apart. The
-   * `mapHttpClientError` branch is the one place where that had to be arranged rather than
-   * inherited — it sits ahead of the `instanceof Error` fallback precisely so a `413` never
-   * reaches a call site here (issue #214).
+   * `mapHttpClientError` and `mapMulterError` branches are the two places where that had to be
+   * arranged rather than inherited: both sit ahead of the `instanceof Error` fallback precisely so
+   * a body parser's `413` (issue #214) or a multer refusal's `400` never reaches a call site here.
    */
   private reportFailure(
     error: unknown,
@@ -287,6 +385,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let planLimit: PlanLimitDetail | undefined;
 
     const httpClientError = mapHttpClientError(exception);
+    const multerError = mapMulterError(exception);
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -348,6 +447,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode = httpClientError.statusCode;
       error = reasonPhrase(statusCode);
       message = httpClientError.message;
+    } else if (multerError !== null) {
+      // Beside the branch above and for the same reason: a `MulterError` is an `Error`, so the
+      // fallback would claim it and answer 500 with a report. See `mapMulterError`.
+      statusCode = multerError.statusCode;
+      error = reasonPhrase(statusCode);
+      message = multerError.message;
     } else if (exception instanceof Error) {
       this.reportFailure(
         exception,

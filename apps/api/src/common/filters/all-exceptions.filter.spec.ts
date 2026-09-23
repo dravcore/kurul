@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { ArgumentsHost, HttpException, HttpStatus, Logger, ValidationPipe } from '@nestjs/common';
+import { transformException } from '@nestjs/platform-express/multer/multer/multer.utils';
+import { MulterError } from 'multer';
 import { IsInt, IsNotEmpty, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AllExceptionsFilter } from './all-exceptions.filter';
@@ -62,6 +66,22 @@ function httpError(status: number, message: string, extra: Record<string, unknow
     expose: status < 500,
     ...extra,
   });
+}
+
+/**
+ * Every code the multer that parses requests can raise, read from its own `lib/multer-error.js`.
+ *
+ * Read from the installed file rather than listed here, for the reason `two-layer-limit.spec.ts`
+ * reads the Caddyfile: a copy would still pass on the day multer adds a code, the one day this
+ * needs to fail. multer 2.3.0 added three, and nothing noticed until one of them answered 500.
+ * Resolved through `@nestjs/platform-express`, because `FileInterceptor` runs that copy.
+ */
+function installedMulterCodes(): string[] {
+  const nest = dirname(require.resolve('@nestjs/platform-express/package.json'));
+  const multer = dirname(require.resolve('multer/package.json', { paths: [nest] }));
+  const source = readFileSync(join(multer, 'lib', 'multer-error.js'), 'utf8');
+  const table = /errorMessages\s*=\s*\{([^}]*)\}/.exec(source)?.[1] ?? '';
+  return [...table.matchAll(/^\s*([A-Z][A-Z_]*)\s*:/gm)].map(([, code]) => code ?? '');
 }
 
 class AssigneeDto {
@@ -345,6 +365,160 @@ describe('AllExceptionsFilter', () => {
       const { host, response } = createHost();
 
       filter.catch({ status: 413, statusCode: 413, expose: true }, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+    });
+  });
+
+  /**
+   * multer 2.3.0 added three error codes `@nestjs/platform-express` 11.2.1 has no case for, and
+   * `transformException` hands them to this filter unchanged. Before `mapMulterError`, the one
+   * `fieldArrayIndexLimit: 0` produces (GHSA-535w-7cp7-47q4) fell through to the `instanceof
+   * Error` fallback: a 500, and a Sentry report, for a request whose only fault was a field name.
+   *
+   * The errors are real `MulterError` instances, the change nestjs/nest#17769 made to Nest's own
+   * spec, so a rewording or a reshaped error in multer fails here rather than in production. The
+   * end-to-end proof, through `FileInterceptor` and each route's own multer options, is
+   * `all-exceptions.filter.multipart.spec.ts`.
+   */
+  describe('multer refusals', () => {
+    /** The three envelope fields a client reads, for one exception. */
+    function answer(exception: unknown): Record<string, unknown> {
+      const { host, response } = createHost();
+      filter.catch(exception, host);
+      const { statusCode, error, message } = body(response);
+      return { statusCode, error, message };
+    }
+
+    // Each code with the part name multer attaches to it, or none where multer attaches none
+    // (`lib/make-middleware.js`, `index.js`). The first two are the ones Nest 11.2.1 passes on;
+    // Nest translates the other eight before this filter runs, and they are here so a rewording
+    // like multer 2.4.0's, which Nest's message-keyed switch stops recognising, still lands on a
+    // 400 instead of on the 500 fallback.
+    it.each<[string, string | undefined]>([
+      ['LIMIT_FIELD_ARRAY_INDEX', 'items[4294967294]'],
+      ['INVALID_FIELD_NAME', 'items[]'],
+      ['LIMIT_PART_COUNT', undefined],
+      ['LIMIT_FILE_COUNT', undefined],
+      ['LIMIT_FIELD_KEY', undefined],
+      ['LIMIT_FIELD_VALUE', 'kind'],
+      ['LIMIT_FIELD_COUNT', undefined],
+      ['LIMIT_UNEXPECTED_FILE', 'photo'],
+      ['MISSING_FIELD_NAME', undefined],
+      ['LIMIT_FIELD_NESTING', 'a[b][c]'],
+    ])('answers %s with 400, in the envelope and unreported', (code, field) => {
+      const refusal = new MulterError(code, field);
+      const { host, response } = createHost();
+
+      filter.catch(refusal, host);
+
+      expect(response.status).toHaveBeenCalledWith(400);
+      expect(body(response)).toMatchObject({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: field === undefined ? refusal.message : `${refusal.message} - ${field}`,
+        path: '/workspaces/w_1/tasks',
+        requestId: REQUEST_ID,
+      });
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('answers LIMIT_FILE_SIZE with the 413 Nest gives it, and without the part name', () => {
+      expect(answer(new MulterError('LIMIT_FILE_SIZE', 'file'))).toEqual({
+        statusCode: 413,
+        error: 'Payload Too Large',
+        message: 'File too large',
+      });
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    // One spelling per refusal, whichever layer caught it: the envelope for a code Nest translates
+    // is the envelope this branch produces for the same error untranslated.
+    it.each<[string, string | undefined]>([
+      ['LIMIT_FILE_SIZE', 'file'],
+      ['LIMIT_PART_COUNT', undefined],
+      ['LIMIT_FILE_COUNT', undefined],
+      ['LIMIT_FIELD_KEY', undefined],
+      ['LIMIT_FIELD_VALUE', 'kind'],
+      ['LIMIT_FIELD_COUNT', undefined],
+      ['LIMIT_UNEXPECTED_FILE', 'photo'],
+      ['MISSING_FIELD_NAME', undefined],
+      ['LIMIT_FIELD_NESTING', 'a[b][c]'],
+    ])('words %s exactly as Nest does when Nest translates it', (code, field) => {
+      const translated: unknown = transformException(new MulterError(code, field));
+      expect(translated).toBeInstanceOf(HttpException);
+
+      expect(answer(new MulterError(code, field))).toEqual(answer(translated));
+    });
+
+    it('leaves STREAM_DESTROYED to the 500 path, which logs and reports it', () => {
+      // Raised by multer's disk storage when the file stream is gone before it opens its output
+      // file: the upload's own plumbing failing, not a refusal of anything the client sent.
+      // nestjs/nest#17857 keeps it a 500 for that reason. This API's memory storage never raises
+      // it, which is why nothing is lost by keeping it where a failure gets looked at.
+      const { host, response } = createHost();
+      const failure = new MulterError('STREAM_DESTROYED');
+
+      filter.catch(failure, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+      expect(logError).toHaveBeenCalledWith(
+        `${failure.message} (requestId=${REQUEST_ID})`,
+        failure.stack,
+      );
+    });
+
+    it('leaves a code nobody has classified yet to the 500 path', () => {
+      // The table is closed: a code multer adds later is reported once and then decided on,
+      // rather than answered 400 and silenced before anyone has looked at what it means.
+      const { host, response } = createHost();
+
+      filter.catch(new MulterError('LIMIT_SOMETHING_NEW', 'items'), host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+      expect(logError).toHaveBeenCalled();
+    });
+
+    it('classifies every code the installed multer can raise', () => {
+      const codes = installedMulterCodes();
+      // The read is under test too: an empty list would make the comparison below vacuous.
+      expect(codes).toEqual(expect.arrayContaining(['LIMIT_FILE_SIZE', 'LIMIT_FIELD_ARRAY_INDEX']));
+
+      const answered = Object.fromEntries(
+        codes.map((code) => [code, answer(new MulterError(code, 'items')).statusCode]),
+      );
+      // A new code fails this until it is given a status on purpose, here and in the filter.
+      const decided = Object.fromEntries(
+        codes.map((code) => [
+          code,
+          code === 'STREAM_DESTROYED' ? 500 : code === 'LIMIT_FILE_SIZE' ? 413 : 400,
+        ]),
+      );
+      expect(answered).toEqual(decided);
+    });
+
+    it('ignores an Error that merely carries a multer code', () => {
+      // The name is half of the shape. Without it, any library's `code: 'LIMIT_PART_COUNT'` would
+      // be answered as the client's fault, and a server-side failure would go unreported.
+      const { host, response } = createHost();
+      const error = Object.assign(new Error('Too many parts'), { code: 'LIMIT_PART_COUNT' });
+
+      filter.catch(error, host);
+
+      expect(response.status).toHaveBeenCalledWith(500);
+      expect(logError).toHaveBeenCalledWith(
+        `Too many parts (requestId=${REQUEST_ID})`,
+        error.stack,
+      );
+    });
+
+    it('ignores a plain object shaped like one: a stack is what makes it an error worth mapping', () => {
+      const { host, response } = createHost();
+
+      filter.catch(
+        { name: 'MulterError', code: 'LIMIT_PART_COUNT', message: 'Too many parts' },
+        host,
+      );
 
       expect(response.status).toHaveBeenCalledWith(500);
     });
@@ -650,6 +824,30 @@ describe('AllExceptionsFilter', () => {
       filter.catch(error, createHost().host);
 
       expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    // The second half of the multer 2.3.0 gap: the refusal was not only a 500, it was an event
+    // on a self-hoster's Sentry quota for every request carrying a crafted field name.
+    it('does not report a multer refusal: the client chose the field names', async () => {
+      const { captureException } = await enableFakeSentry();
+
+      filter.catch(
+        new MulterError('LIMIT_FIELD_ARRAY_INDEX', 'items[4294967294]'),
+        createHost().host,
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('still reports STREAM_DESTROYED, the multer code that is not a refusal', async () => {
+      // The control: the same class of error is reported when it means the server broke.
+      const { captureException } = await enableFakeSentry();
+      const failure = new MulterError('STREAM_DESTROYED');
+
+      filter.catch(failure, createHost().host);
+
+      expect(captureException).toHaveBeenCalledWith(failure);
     });
 
     it('reports a plain Error', async () => {

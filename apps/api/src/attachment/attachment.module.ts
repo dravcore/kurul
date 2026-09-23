@@ -98,8 +98,11 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // and with it the same request is refused in a millisecond. No client of this route
         // sends a bracketed field name (the web app sends `kind` and `file`), so 0, the smallest
         // value the option takes, costs nothing. The refusal is a `MulterError` code Nest
-        // 11.2.1's `transformException` does not know, so it reaches `AllExceptionsFilter`'s
-        // `instanceof Error` branch: a 500 and a Sentry report, for a request no client sends.
+        // 11.2.1's `transformException` does not know, so `AllExceptionsFilter` maps it itself
+        // (`mapMulterError`): a `400` in the error envelope, reading `Field name array index too
+        // large - items[4294967294]`, and no Sentry report, since the client chose the field
+        // names. `all-exceptions.filter.multipart.spec.ts` sends that request through this
+        // configuration and through `import.module.ts`'s.
         limits: { fileSize: storage.maxBytes, files: 1, fields: 8, fieldArrayIndexLimit: 0 },
       }),
     }),
