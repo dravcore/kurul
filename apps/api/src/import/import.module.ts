@@ -40,20 +40,35 @@ import { TrelloImportService } from './trello-import.service';
         // multer would write a temp file this code would then have to delete. Same call
         // `attachment.module.ts` makes, for the same reason.
         storage: memoryStorage(),
-        // multer's default is `latin1` (`multer@2.2.0/index.js`), while a browser writes the
+        // multer's default is `latin1` (`multer@2.3.0/index.js`), while a browser writes the
         // multipart `filename` parameter as UTF-8 bytes (RFC 7578 §5.1). Measured in P3-1: under
         // the default, a non-ASCII filename is mangled. Nothing here reads the filename today,
         // but a parser configured to corrupt its own inputs is not a default worth inheriting.
         defParamCharset: 'utf8',
-        // `+ 1` because busboy fires its limit on *equality*
-        // (`busboy/lib/types/multipart.js`: `if (fileSize === fileSizeLimit)`), so passing the
-        // published ceiling would reject a file of exactly that size. Measured in P3-1; this is
-        // not slack, and deleting it moves the published number by one byte.
+        // The published ceiling as it is, with no `+ 1`. busboy fires its limit on *equality*
+        // (`busboy/lib/types/multipart.js`: `if (fileSize === fileSizeLimit)`), which is why
+        // this line used to add one byte: up to multer 2.2.0, passing the published ceiling
+        // rejected a file of exactly that size (measured in P3-1). multer 2.3.0 adds the byte
+        // itself before handing the limit to busboy, so a `+ 1` here would now accept a file one
+        // byte over it. Either drift moves the published number by one byte, and the body-limit
+        // cases in `trello-import.e2e-spec.ts` fail on both. The multer that parses this body
+        // is `@nestjs/platform-express`'s own, lifted to 2.3.0 by the root `pnpm.overrides`.
         //
         // `files: 1` and `fields: 4`: this endpoint takes one part and no text fields at all, so
         // the field allowance is headroom rather than a requirement — the ceiling that matters is
         // `fileSize`.
-        limits: { fileSize: readTrelloImportMaxBytes() + 1, files: 1, fields: 4 },
+        //
+        // `fieldArrayIndexLimit: 0` for GHSA-535w-7cp7-47q4, which multer 2.3.0 fixes only when
+        // the option is set: two fields, `items[4294967294]` and then `items[foo]`, held the
+        // event loop for 74 seconds without it (measured and explained in `attachment.module.ts`,
+        // whose route has the same exposure). Four fields are headroom, and nothing that posts
+        // here sends a field at all, so the smallest value costs nothing.
+        limits: {
+          fileSize: readTrelloImportMaxBytes(),
+          files: 1,
+          fields: 4,
+          fieldArrayIndexLimit: 0,
+        },
       }),
     }),
   ],

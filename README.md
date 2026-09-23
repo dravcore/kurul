@@ -55,7 +55,7 @@ Kurul's answer is deliberately narrow:
 - **Realtime and multi-tenancy in the core.** Socket.io board sync and workspace-scoped queries
   were designed in, not added on top.
 
-And what it is not, at `v0.4.0`: no subtasks, no time tracking, no webhooks. Personal access
+And what it is not, at `v0.4.1`: no subtasks, no time tracking, no webhooks. Personal access
 tokens ship in this release, workspace-scoped and sent as `Authorization: Bearer`, so a script
 or a CI job can drive a board; the `/v1` prefix that turns that into a stable API arrives at 1.0
 and not before ([ADR 0031](docs/decisions/0031-api-versioning.md)). Webhooks have a design
