@@ -32,7 +32,9 @@ merge sonrası silinir.
 | `hotfix/*`  | kısa ömürlü | `main`           | `main` + `develop` | Acil production fix'i                                                       |
 
 ```
-main     ──●───────────────────────●──────────────●─────●──  tags: v0.1.0, v0.2.0, v0.3.0, v0.4.0
+hotfix                                                    ●────●      hotfix/0.4.1
+                                                         /      \
+main     ──●───────────────────────●──────────────●─────●────────●──  tags: v0.1.0, v0.2.0, v0.3.0, v0.4.0, v0.4.1
             \                     /              /     /
 release      \              ●────●              /     /      release/0.2.0
               \            /                   /     /
