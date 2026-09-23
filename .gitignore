@@ -64,3 +64,6 @@ docker-compose.override.yml
 # Anchored to the repo root: unanchored it matched a directory named `audit` at any depth,
 # which silently swallowed e2e/audit/, the checked-in accessibility rig.
 /audit/
+
+# nodeterm artifacts (local only: reports, findings, roadmap data)
+.nodeterm/
