@@ -437,14 +437,16 @@ describe('Attachments (e2e)', () => {
     });
 
     it('accepts a file of exactly ATTACHMENT_MAX_BYTES — the published ceiling is inclusive', async () => {
-      // The boundary nail for K2, and the reason `attachment.module.ts` configures
-      // `storage.maxBytes + 1`. busboy raises its limit on *equality*
-      // (`busboy/lib/types/multipart.js:476`), so passing `maxBytes` straight through would
-      // refuse a file of exactly the number both layers publish — while the proxy half passes
-      // that same body (#215). That gap is a 413 nobody configured and nobody can trace, which
-      // is the failure ADR 0022:170-176 exists to prevent.
+      // The boundary nail for K2. busboy raises its limit on *equality*
+      // (`busboy/lib/types/multipart.js:476`), so a busboy limit of `maxBytes` would refuse a
+      // file of exactly the number both layers publish, while the proxy half passes that same
+      // body (#215). That gap is a 413 nobody configured and nobody can trace, which is the
+      // failure ADR 0022:170-176 exists to prevent. Under multer 2.2.0 `attachment.module.ts`
+      // closed it with `storage.maxBytes + 1`; multer 2.3.0 adds that byte itself, so the module
+      // now passes `storage.maxBytes` as it is.
       //
-      // Remove the `+ 1` from the module and this is the one test that turns red.
+      // Hand busboy the bare limit again (multer 2.2.0 without the `+ 1`) and this is the one
+      // test that turns red; add the `+ 1` back on 2.3.0 and the 413 case above does.
       const where = await seed('exact');
 
       const created = await upload(where, pngOfSize(MAX_BYTES), 'exact.png', 'image/png');
@@ -613,12 +615,13 @@ describe('Attachments (e2e)', () => {
     });
 
     it('writes a non-ASCII filename twice, and the header stays a single line', async () => {
-      // The reachable half of D8. A raw `"`, CR or LF cannot be *sent* through this path at all:
-      // superagent percent-encodes them into the multipart parameter and busboy would end the
-      // quoted string at the first quote regardless, so the strips in `displayFilename` and
-      // `contentDisposition` defend a writer that is not HTTP (an importer) and are pinned by
-      // `attachment-disposition.spec.ts`. What *is* reachable is the RFC 5987 pair, and a client
-      // that only understands `filename=` must still get a usable name.
+      // The RFC 5987 half of D8. A raw `"`, CR or LF is percent-encoded into the multipart
+      // parameter by superagent, as by a browser (`%22`, `%0D`, `%0A`), and multer 2.3.0
+      // decodes exactly those three back into `originalname`; under 2.2.0 they arrived still
+      // encoded. So the strips in `displayFilename` and `contentDisposition` defend this path as
+      // well as a writer that is not HTTP (an importer), and `attachment-disposition.spec.ts`
+      // pins them. What this test adds is the RFC 5987 pair: a client that only understands
+      // `filename=` must still get a usable name.
       const where = await seed('utf8-name');
       const created = await upload(where, PNG, 'ölçüm raporu.png', 'image/png');
 

@@ -52,14 +52,17 @@ describe('ImportModule multipart configuration', () => {
     expect(options.dest).toBeUndefined();
   });
 
-  it('accepts a file of exactly the published limit, because busboy fires on equality', async () => {
-    // `busboy/lib/types/multipart.js`: `if (fileSize === fileSizeLimit) … emit('limit')`. Passing
-    // the published ceiling would make the largest accepted file one byte smaller than the number
-    // this repository documents — the untraceable off-by-one ADR 0022's proxy row exists to
-    // prevent. Measured in P3-1.
+  it('passes the published limit through as is, because multer 2.3.0 makes it inclusive', async () => {
+    // `busboy/lib/types/multipart.js`: `if (fileSize === fileSizeLimit) … emit('limit')`, so a
+    // busboy limit of N rejects a file of exactly N bytes. Under multer 2.2.0 that made the
+    // largest accepted file one byte smaller than the number this repository documents, the
+    // untraceable off-by-one ADR 0022's proxy row exists to prevent, and this module added the
+    // byte back (measured in P3-1). multer 2.3.0 hands busboy `limits.fileSize + 1` itself
+    // (`lib/make-middleware.js`), so the old `+ 1` would now accept a file one byte over the
+    // limit. Measured again through `FileInterceptor` when 2.3.0 arrived.
     delete process.env.TRELLO_IMPORT_MAX_BYTES;
 
-    expect((await multerOptions()).limits?.fileSize).toBe(DEFAULT_TRELLO_IMPORT_MAX_BYTES + 1);
+    expect((await multerOptions()).limits?.fileSize).toBe(DEFAULT_TRELLO_IMPORT_MAX_BYTES);
   });
 
   it('resolves the limit per instantiation, not once per process', async () => {
@@ -68,14 +71,14 @@ describe('ImportModule multipart configuration', () => {
     // variable before building an app would silently exercise the default. Measured against the
     // library rather than assumed; this is why the module uses `registerAsync`.
     process.env.TRELLO_IMPORT_MAX_BYTES = '4096';
-    expect((await multerOptions()).limits?.fileSize).toBe(4097);
+    expect((await multerOptions()).limits?.fileSize).toBe(4096);
 
     process.env.TRELLO_IMPORT_MAX_BYTES = '8192';
-    expect((await multerOptions()).limits?.fileSize).toBe(8193);
+    expect((await multerOptions()).limits?.fileSize).toBe(8192);
   });
 
   it('decodes multipart parameters as UTF-8, not multer default latin1', async () => {
-    // `multer@2.2.0/index.js`: `this.defParamCharset = options.defParamCharset || 'latin1'`,
+    // `multer@2.3.0/index.js`: `this.defParamCharset = options.defParamCharset || 'latin1'`,
     // while browsers write the `filename` parameter as UTF-8 bytes (RFC 7578 §5.1). Measured in
     // P3-1 to mangle every non-ASCII filename.
     const options = (await multerOptions()) as { defParamCharset?: string };
