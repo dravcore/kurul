@@ -1,7 +1,7 @@
 /**
  * The one symbol this API imports from multer.
  *
- * multer 2.2.0 ships no types and `@types/multer` is not a dependency here. Declaring the single
+ * multer 2.3.0 ships no types and `@types/multer` is not a dependency here. Declaring the single
  * factory we call is the same call `multer-file.ts` makes about the file object: describe the
  * narrow surface actually used rather than pull a whole `@types` package in for it.
  *
