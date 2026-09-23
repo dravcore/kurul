@@ -16,7 +16,8 @@ Open-source Kanban-focused project management tool. `dravcore/kurul` — AGPL-3.
 - `Task.position` and `Column.position` are **Float** (fractional indexing) — never use Int
 - `dueDate` and `estimatedMinutes` are separate fields — do not merge them
 - `priority` is kept separate from labels
-- Multi-tenant isolation: every query is scoped by `workspaceId`, enforced at guard/interceptor level
+- Multi-tenant isolation: `WorkspaceGuard` only resolves membership; every service query must add its own `workspaceId` predicate (or `board: { workspaceId }`). Nothing does this automatically
+  (no interceptor, no Prisma extension): an unscoped query is a bug caught only by review and the workspace-isolation integration tests
 - Every `id` is UUIDv7 (`@default(uuid(7))`) — never cuid or autoincrement; pagination cursors key on `id`, never on `position`
 - `Label.color` stores a theme-resolved design-token slot name (`slot-1`…`slot-8`), never a raw hex
 - Author CSS in `apps/web/app/globals.css` inside `@layer base` unless the exception is justified
