@@ -57,7 +57,7 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         storage: memoryStorage(),
         // ## `utf8`, because multer's default corrupts every non-ASCII filename
         //
-        // `multer@2.2.0/index.js:22` is `this.defParamCharset = options.defParamCharset ||
+        // `multer@2.3.0/index.js:22` is `this.defParamCharset = options.defParamCharset ||
         // 'latin1'`, while a browser writes the multipart `filename` parameter as UTF-8 bytes
         // (RFC 7578 §5.1). Under the default those bytes are decoded one-per-character, so
         // `ölçüm raporu.png` is stored, listed and served back as `Ã¶lÃ§Ã¼m raporu.png` —
@@ -66,20 +66,41 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // wrong for every client this API has (phase plan §5 — "an unconfigured default is a
         // decision too, just one nobody made").
         defParamCharset: 'utf8',
-        // ## `maxBytes + 1`, because busboy's limit fires on equality
+        // ## `maxBytes` as it is, because multer 2.3.0 already makes the ceiling inclusive
         //
-        // Not an off-by-one and not slack: `busboy/lib/types/multipart.js:476` is
-        // `if (fileSize === fileSizeLimit) … emit('limit')`, so a file of exactly
-        // `limits.fileSize` bytes is rejected. Passing `maxBytes` therefore makes the largest
-        // accepted file `maxBytes - 1`, one byte tighter than the number K2 publishes.
+        // busboy fires its limit on equality: `busboy/lib/types/multipart.js:476` is
+        // `if (fileSize === fileSizeLimit) … emit('limit')`, so a busboy limit of N rejects a
+        // file of exactly N bytes. Up to multer 2.2.0 `limits.fileSize` reached busboy
+        // unchanged, and this line carried a `+ 1` to turn that threshold into the inclusive
+        // ceiling K2 publishes. multer 2.3.0 makes the same translation itself
+        // (`lib/make-middleware.js:83` hands busboy `limits.fileSize + 1`), so a `+ 1` here
+        // would now accept a file one byte over ATTACHMENT_MAX_BYTES.
         //
-        // That single byte is the failure ADR 0022:170-176 added the proxy line to prevent. The
-        // proxy half rejects a body that *exceeds* 26214400 and passes one that equals it
-        // (measured in #215), so an upload of exactly ATTACHMENT_MAX_BYTES would clear Caddy and
-        // die at Nest — an untraceable 413 produced by library semantics rather than by anything
-        // an operator configured. `+ 1` is the translation of busboy's threshold into the
-        // inclusive ceiling the two layers both publish; deleting it re-opens the gap.
-        limits: { fileSize: storage.maxBytes + 1, files: 1, fields: 8 },
+        // The byte matters in both directions. One byte tight is the failure ADR 0022:170-176
+        // added the proxy line to prevent: the proxy half rejects a body that *exceeds* 26214400
+        // and passes one that equals it (measured in #215), so an upload of exactly
+        // ATTACHMENT_MAX_BYTES would clear Caddy and die at Nest, an untraceable 413 produced by
+        // library semantics rather than by anything an operator configured. One byte loose
+        // makes the published number wrong the other way. The multer that parses this body is
+        // reached through `@nestjs/platform-express`, not through the import above: Nest 11.2.1
+        // pins it at 2.2.0, and the `multer@<2.3.0` entry in the root `pnpm.overrides` is what
+        // lifts it, so the tree holds one multer, 2.3.0.
+        // The size-limit block of `attachment.e2e-spec.ts` fails on a drift either way: a file
+        // of exactly the limit is a 201 there, and one byte over is a 413.
+        //
+        // ## `fieldArrayIndexLimit: 0`, because the upgrade alone does not close GHSA-535w
+        //
+        // append-field turns a field named `items[4294967294]` into a sparse array of that
+        // length, and a second field `items[foo]` on the same base converts it to an object by
+        // walking every slot. Measured through `FileInterceptor` on multer 2.3.0 with this
+        // configuration minus the option: that one two-field request held the event loop for 74
+        // seconds. multer's fix for GHSA-535w-7cp7-47q4 is this opt-in limit, not the upgrade,
+        // and with it the same request is refused in a millisecond. No client of this route
+        // sends a bracketed field name (the web app sends `kind` and `file`), so 0, the smallest
+        // value the option takes, costs nothing. The refusal is a `MulterError` code Nest
+        // 11.2.1's `transformException` does not know, so it reaches `AllExceptionsFilter`'s
+        // `instanceof Error` branch: a 500 and a Sentry report, for a request no client sends.
+        limits: { fileSize: storage.maxBytes, files: 1, fields: 8, fieldArrayIndexLimit: 0 },
       }),
     }),
   ],
