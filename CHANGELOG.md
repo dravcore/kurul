@@ -1206,107 +1206,6 @@ produced them: the same ID means different things in the 0.1.0 audit, the 0.2.0 
 the 2026-08-18 "atlas" audit. See
 [ROADMAP.md](ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit)._
 
-### Fixed
-
-- **The test suites no longer read `packages/*/dist`.** `@kurul/shared-types` and
-  `@kurul/auth-access` resolve through their `package.json` to a git-ignored build, so a fresh
-  checkout failed `pnpm test` with `Cannot find module '@kurul/shared-types'` (Jest) and
-  `Failed to resolve entry for package "@kurul/shared-types"` (Vitest), and a checkout with an
-  old build passed against last week's enums. Both Jest configs (`moduleNameMapper` plus a
-  matching `paths` entry for ts-jest, and a mapper that lets the packages' NodeNext `.js`
-  imports resolve to `.ts`) and both Vitest configs (`resolve.alias`) now point the two
-  specifiers at `src/index.ts`; `packages/auth-access`'s own suite, which imports
-  `@kurul/shared-types`, gets the same alias. A spec in each runner asserts the mapping holds,
-  and the CI test job no longer builds the packages, so it runs the way a fresh clone does.
-  The build is still needed for `pnpm typecheck`, `nest build`, `next build`, `pnpm dev` and
-  `pnpm db:seed`.
-
-- **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
-  typed.** `q` reached Postgres through Prisma's `contains`, which — confirmed empirically
-  against Postgres 18 — compiles to `ILIKE`/`LIKE` with the search string bound as a *pattern*,
-  not a literal: searching `50%` also matched `"50X done"`, and `a_b` also matched `"aXb"`. A
-  shared `escapeLikePattern` helper now escapes `%`, `_` and the backslash that escapes them
-  before the string reaches `contains`, so the search box matches only what it looks like it
-  matches. The same unescaped `contains` was also used to sweep a departing account's
-  `Verification` rows during account deletion — an email local-part is free to contain `_`, so
-  an erased `john_doe@example.com` could have deleted a stranger's live `johnXdoe@example.com`
-  verification token too; that call site is escaped the same way (audit follow-up to DB-01).
-
-- Dialog and auth submit errors are now announced to screen readers and receive focus (WCAG
-  4.1.3, audit finding UX-01). Login, register, confirm, form, delete-account,
-  delete-workspace and the Trello import dialog rendered their submit-level error as plain
-  text with no toast on this path, so assistive tech never heard it and sighted keyboard users
-  had no cue where it landed; the shared `SubmitError` component now marks it `role="alert"`
-  and moves focus to it on every mount, including a retry that fails with the exact same
-  wording.
-
-- **An attachment can no longer be stored half-file and half-link.** `AttachmentKind` was
-  introduced so that `storageKey`, `mimeType`, `size` and `url` would be nullable *because of*
-  `kind` rather than in general ([ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md)),
-  and the schema comment promised that a row carrying both a URL and a storage key — or neither —
-  was unwritable. Nothing enforced it: the four columns were plainly nullable, and the promise
-  held only as long as every writer happened to be `AttachmentService`. The Trello importer is a
-  writer that is not — it bulk-inserts attachment rows with `createMany` — which is the exact
-  case the ADR predicted. A CHECK constraint, `Attachment_kind_fields_check`, now makes the two
-  shapes the only ones the table accepts (audit finding DB-02).
-
-  **The migration validates existing rows rather than grandfathering them**, so an instance that
-  somehow holds a half-written attachment fails the upgrade with the offending constraint named
-  instead of carrying the row forward under a constraint that only applies to future writes.
-  Every row the shipped code can have written satisfies the predicate, so no action is expected
-  on upgrade.
-
-- **The curl-based self-host install could never finish, and scheduled backups silently never
-  ran.** [self-hosting.md](docs/self-hosting.md) downloads only `docker-compose.yml`,
-  `docker/Caddyfile` and `.env.example` — no source tree — but the `migrate` service was
-  `build:`-only, so `docker compose up -d` had nothing to build it from and `api`
-  (`depends_on migrate: service_completed_successfully`) could never start: the guide's "no
-  build step" promise was unfulfillable on the path it documents. A third published image,
-  `ghcr.io/dravcore/kurul-migrate`, fixes that — built from `apps/api/Dockerfile`'s `migrate`
-  stage on `linux/amd64` + `linux/arm64`, following the same per-arch build, digest merge,
-  cosign signature and SBOM pattern already applied to `kurul-api` and `kurul-web`
-  ([release-images.yml](.github/workflows/release-images.yml)). `docker-compose.yml`'s
-  `migrate` service now carries `image: ghcr.io/dravcore/kurul-migrate:${TAG:-latest}`
-  alongside its existing `build:`, the same fallback pair `api`/`web` already had.
-
-  Independently, the same download step never fetched `scripts/backup.sh` either, which the
-  `backup` service bind-mounts — so on a fresh curl-based install, scheduled backups silently
-  never ran, with nothing in the logs to say why.
-  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/tr/self-hosting.md)) now
-  downloads it alongside the compose file.
-
-  **`kurul-migrate` exists from the first release after v0.2.0 onward, not on v0.2.0 itself** —
-  the workflow that publishes it is new in this change. An operator following the curl-based
-  guide against a `v0.2.0` install still hits the original failure; `git clone` is the
-  documented workaround until the next tag ships, and the guide now says so up front instead
-  of leaving that to be discovered from a pull failure.
-
-  Audit finding OPS-01.
-- **The `backup` service now declares a healthcheck** (audit finding OPS-02). `scripts/backup.sh`'s
-  main loop runs `take_dump || true` / `take_files || true`, so a cycle that fails only logs and
-  keeps sleeping — the process never exits non-zero, and until now nothing about the container's
-  own state changed either, so a backup could silently stop being produced with `docker compose ps`
-  still reporting the service as simply "Up". RPO grew unbounded and invisibly, and the API's
-  retention sweep (`BACKUP_KEEP × BACKUP_INTERVAL` grace window, `cleanup.worker.ts`) silently
-  assumed dumps were actually landing.
-
-  Unhealthy now means: no `/backups/kurul-*.dump` modified in the last `2 × BACKUP_INTERVAL`
-  seconds (48h on the default 24h interval — 2× so one slow or skipped cycle doesn't flap the
-  status). The check reads `$BACKUP_INTERVAL` from the container's own environment, so it tracks
-  whatever an operator's `.env` sets rather than assuming the default. It uses `find -mmin`, not
-  GNU `find`'s `-newermt`: the image is `postgres:18-alpine`, whose `find` is BusyBox's and has
-  neither `-newermt` nor `-newermin` (confirmed with `docker run --rm postgres:18-alpine find
-  --help`). `start_period` (10 minutes) is sized to the first `pg_dump` completing, not to
-  `BACKUP_INTERVAL` — the first cycle starts at container boot, not after one interval elapses, so
-  tying it to a 24h default would hide a genuinely broken first cycle for most of a day.
-
-  `docs/self-hosting.md` (and its `docs/tr/` mirror) no longer says `backup` declares no
-  healthcheck, and now has a "watch backup freshness" bullet next to the existing
-  `/api/health/ready` monitoring guidance — that endpoint never touches the backup sidecar, so it
-  stays green through a backup outage. `scripts/bootstrap.mjs`'s comment on which dev-loop
-  containers declare healthchecks is updated to match (`docker-compose.dev.yml` has no `backup`
-  service of its own, so this doesn't change what that script waits on).
-
 ### Added
 
 - **Email notifications** ([#255](https://github.com/dravcore/kurul/discussions/255)). An
@@ -1546,6 +1445,124 @@ the 2026-08-18 "atlas" audit. See
   Links from `docs/`, both READMEs and the ADRs that pointed into the archive are rewritten or
   turned into plain text; the released entries below keep their old paths as text only.
 
+### Fixed
+
+- **The test suites no longer read `packages/*/dist`.** `@kurul/shared-types` and
+  `@kurul/auth-access` resolve through their `package.json` to a git-ignored build, so a fresh
+  checkout failed `pnpm test` with `Cannot find module '@kurul/shared-types'` (Jest) and
+  `Failed to resolve entry for package "@kurul/shared-types"` (Vitest), and a checkout with an
+  old build passed against last week's enums. Both Jest configs (`moduleNameMapper` plus a
+  matching `paths` entry for ts-jest, and a mapper that lets the packages' NodeNext `.js`
+  imports resolve to `.ts`) and both Vitest configs (`resolve.alias`) now point the two
+  specifiers at `src/index.ts`; `packages/auth-access`'s own suite, which imports
+  `@kurul/shared-types`, gets the same alias. A spec in each runner asserts the mapping holds,
+  and the CI test job no longer builds the packages, so it runs the way a fresh clone does.
+  The build is still needed for `pnpm typecheck`, `nest build`, `next build`, `pnpm dev` and
+  `pnpm db:seed`.
+
+- **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
+  typed.** `q` reached Postgres through Prisma's `contains`, which — confirmed empirically
+  against Postgres 18 — compiles to `ILIKE`/`LIKE` with the search string bound as a *pattern*,
+  not a literal: searching `50%` also matched `"50X done"`, and `a_b` also matched `"aXb"`. A
+  shared `escapeLikePattern` helper now escapes `%`, `_` and the backslash that escapes them
+  before the string reaches `contains`, so the search box matches only what it looks like it
+  matches. The same unescaped `contains` was also used to sweep a departing account's
+  `Verification` rows during account deletion — an email local-part is free to contain `_`, so
+  an erased `john_doe@example.com` could have deleted a stranger's live `johnXdoe@example.com`
+  verification token too; that call site is escaped the same way (audit follow-up to DB-01).
+
+- Dialog and auth submit errors are now announced to screen readers and receive focus (WCAG
+  4.1.3, audit finding UX-01). Login, register, confirm, form, delete-account,
+  delete-workspace and the Trello import dialog rendered their submit-level error as plain
+  text with no toast on this path, so assistive tech never heard it and sighted keyboard users
+  had no cue where it landed; the shared `SubmitError` component now marks it `role="alert"`
+  and moves focus to it on every mount, including a retry that fails with the exact same
+  wording.
+
+- **An attachment can no longer be stored half-file and half-link.** `AttachmentKind` was
+  introduced so that `storageKey`, `mimeType`, `size` and `url` would be nullable *because of*
+  `kind` rather than in general ([ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md)),
+  and the schema comment promised that a row carrying both a URL and a storage key — or neither —
+  was unwritable. Nothing enforced it: the four columns were plainly nullable, and the promise
+  held only as long as every writer happened to be `AttachmentService`. The Trello importer is a
+  writer that is not — it bulk-inserts attachment rows with `createMany` — which is the exact
+  case the ADR predicted. A CHECK constraint, `Attachment_kind_fields_check`, now makes the two
+  shapes the only ones the table accepts (audit finding DB-02).
+
+  **The migration validates existing rows rather than grandfathering them**, so an instance that
+  somehow holds a half-written attachment fails the upgrade with the offending constraint named
+  instead of carrying the row forward under a constraint that only applies to future writes.
+  Every row the shipped code can have written satisfies the predicate, so no action is expected
+  on upgrade.
+
+- **The curl-based self-host install could never finish, and scheduled backups silently never
+  ran.** [self-hosting.md](docs/self-hosting.md) downloads only `docker-compose.yml`,
+  `docker/Caddyfile` and `.env.example` — no source tree — but the `migrate` service was
+  `build:`-only, so `docker compose up -d` had nothing to build it from and `api`
+  (`depends_on migrate: service_completed_successfully`) could never start: the guide's "no
+  build step" promise was unfulfillable on the path it documents. A third published image,
+  `ghcr.io/dravcore/kurul-migrate`, fixes that — built from `apps/api/Dockerfile`'s `migrate`
+  stage on `linux/amd64` + `linux/arm64`, following the same per-arch build, digest merge,
+  cosign signature and SBOM pattern already applied to `kurul-api` and `kurul-web`
+  ([release-images.yml](.github/workflows/release-images.yml)). `docker-compose.yml`'s
+  `migrate` service now carries `image: ghcr.io/dravcore/kurul-migrate:${TAG:-latest}`
+  alongside its existing `build:`, the same fallback pair `api`/`web` already had.
+
+  Independently, the same download step never fetched `scripts/backup.sh` either, which the
+  `backup` service bind-mounts — so on a fresh curl-based install, scheduled backups silently
+  never ran, with nothing in the logs to say why.
+  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/tr/self-hosting.md)) now
+  downloads it alongside the compose file.
+
+  **`kurul-migrate` exists from the first release after v0.2.0 onward, not on v0.2.0 itself** —
+  the workflow that publishes it is new in this change. An operator following the curl-based
+  guide against a `v0.2.0` install still hits the original failure; `git clone` is the
+  documented workaround until the next tag ships, and the guide now says so up front instead
+  of leaving that to be discovered from a pull failure.
+
+  Audit finding OPS-01.
+- **The `backup` service now declares a healthcheck** (audit finding OPS-02). `scripts/backup.sh`'s
+  main loop runs `take_dump || true` / `take_files || true`, so a cycle that fails only logs and
+  keeps sleeping — the process never exits non-zero, and until now nothing about the container's
+  own state changed either, so a backup could silently stop being produced with `docker compose ps`
+  still reporting the service as simply "Up". RPO grew unbounded and invisibly, and the API's
+  retention sweep (`BACKUP_KEEP × BACKUP_INTERVAL` grace window, `cleanup.worker.ts`) silently
+  assumed dumps were actually landing.
+
+  Unhealthy now means: no `/backups/kurul-*.dump` modified in the last `2 × BACKUP_INTERVAL`
+  seconds (48h on the default 24h interval — 2× so one slow or skipped cycle doesn't flap the
+  status). The check reads `$BACKUP_INTERVAL` from the container's own environment, so it tracks
+  whatever an operator's `.env` sets rather than assuming the default. It uses `find -mmin`, not
+  GNU `find`'s `-newermt`: the image is `postgres:18-alpine`, whose `find` is BusyBox's and has
+  neither `-newermt` nor `-newermin` (confirmed with `docker run --rm postgres:18-alpine find
+  --help`). `start_period` (10 minutes) is sized to the first `pg_dump` completing, not to
+  `BACKUP_INTERVAL` — the first cycle starts at container boot, not after one interval elapses, so
+  tying it to a 24h default would hide a genuinely broken first cycle for most of a day.
+
+  `docs/self-hosting.md` (and its `docs/tr/` mirror) no longer says `backup` declares no
+  healthcheck, and now has a "watch backup freshness" bullet next to the existing
+  `/api/health/ready` monitoring guidance — that endpoint never touches the backup sidecar, so it
+  stays green through a backup outage. `scripts/bootstrap.mjs`'s comment on which dev-loop
+  containers declare healthchecks is updated to match (`docker-compose.dev.yml` has no `backup`
+  service of its own, so this doesn't change what that script waits on).
+
+- **`docker-compose.dev.yml` and `docker-compose.yml` shared the same implicit Compose project name** — the checkout's directory, usually `kurul`, since neither file declared its own
+  — and therefore the same container and volume names for every service both define:
+  `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came from that:
+  `docker compose -f docker-compose.dev.yml down -v` (the documented way to reset a local
+  database, docs/development.md#database-workflow) dropped the full stack's Postgres/Redis
+  volumes too if the full stack had ever been started from the same directory, and bringing the
+  full stack up afterward silently recreated the dev loop's `postgres` container from
+  `docker-compose.yml`'s definition, which publishes no host port — `localhost:5432` simply
+  stopped answering, with nothing anywhere naming why (OPS-04, 2026-08-18 audit).
+  `docker-compose.dev.yml` now declares its own project (`name: kurul-dev`), so its containers
+  and volumes (`kurul-dev_postgres_data`, …) are namespaced apart from the full stack's `kurul_*`
+  ones and the two can run side by side with neither able to touch the other's data. Existing
+  dev-loop containers/volumes under the old shared name are simply orphaned by this, not
+  migrated — the dev database has always been throwaway by design; recreate with
+  `pnpm bootstrap`. `scripts/bootstrap.mjs` needed no change: it already invokes compose with
+  only `-f`, never `-p`, so it picks up the new project name automatically.
+
 ### Security
 
 - **Every pull request now builds the images this project ships and scans them for CVEs.**
@@ -1610,23 +1627,6 @@ the 2026-08-18 "atlas" audit. See
   and migration time, and never touches request-borne input — the thing that was broken was a
   CI gate, not a deployment. The override should be dropped once Prisma ships a release that
   depends on `deepmerge-ts >= 8`.
-
-- **`docker-compose.dev.yml` and `docker-compose.yml` shared the same implicit Compose project name** — the checkout's directory, usually `kurul`, since neither file declared its own
-  — and therefore the same container and volume names for every service both define:
-  `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came from that:
-  `docker compose -f docker-compose.dev.yml down -v` (the documented way to reset a local
-  database, docs/development.md#database-workflow) dropped the full stack's Postgres/Redis
-  volumes too if the full stack had ever been started from the same directory, and bringing the
-  full stack up afterward silently recreated the dev loop's `postgres` container from
-  `docker-compose.yml`'s definition, which publishes no host port — `localhost:5432` simply
-  stopped answering, with nothing anywhere naming why (OPS-04, 2026-08-18 audit).
-  `docker-compose.dev.yml` now declares its own project (`name: kurul-dev`), so its containers
-  and volumes (`kurul-dev_postgres_data`, …) are namespaced apart from the full stack's `kurul_*`
-  ones and the two can run side by side with neither able to touch the other's data. Existing
-  dev-loop containers/volumes under the old shared name are simply orphaned by this, not
-  migrated — the dev database has always been throwaway by design; recreate with
-  `pnpm bootstrap`. `scripts/bootstrap.mjs` needed no change: it already invokes compose with
-  only `-f`, never `-p`, so it picks up the new project name automatically.
 
 - **Every service in `docker-compose.yml` now carries a `mem_limit`** (`postgres`/`api`/`web`/
   `migrate` 512m, `backup` 256m, `redis`/`proxy` 128m) — `docs/self-hosting.md` has promised "2
