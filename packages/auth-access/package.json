@@ -21,11 +21,11 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "better-auth": "1.7.1"
+    "better-auth": "1.7.5"
   },
   "devDependencies": {
     "@kurul/shared-types": "workspace:*",
-    "better-auth": "1.7.1",
+    "better-auth": "1.7.5",
     "typescript": "^5.8.2",
     "vitest": "^4.1.11"
   }
