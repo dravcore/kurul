@@ -86,7 +86,20 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // 2.2.0, and the `multer@<2.3.0` entry in the root `pnpm.overrides` is what lifts it.
         // The size-limit block of `attachment.e2e-spec.ts` fails on a drift either way: a file
         // of exactly the limit is a 201 there, and one byte over is a 413.
-        limits: { fileSize: storage.maxBytes, files: 1, fields: 8 },
+        //
+        // ## `fieldArrayIndexLimit: 0`, because the upgrade alone does not close GHSA-535w
+        //
+        // append-field turns a field named `items[4294967294]` into a sparse array of that
+        // length, and a second field `items[foo]` on the same base converts it to an object by
+        // walking every slot. Measured through `FileInterceptor` on multer 2.3.0 with this
+        // configuration minus the option: that one two-field request held the event loop for 74
+        // seconds. multer's fix for GHSA-535w-7cp7-47q4 is this opt-in limit, not the upgrade,
+        // and with it the same request is refused in a millisecond. No client of this route
+        // sends a bracketed field name (the web app sends `kind` and `file`), so 0, the smallest
+        // value the option takes, costs nothing. The refusal is a `MulterError` code Nest
+        // 11.2.1's `transformException` does not know, so it reaches `AllExceptionsFilter`'s
+        // `instanceof Error` branch: a 500 and a Sentry report, for a request no client sends.
+        limits: { fileSize: storage.maxBytes, files: 1, fields: 8, fieldArrayIndexLimit: 0 },
       }),
     }),
   ],

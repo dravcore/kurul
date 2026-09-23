@@ -57,7 +57,18 @@ import { TrelloImportService } from './trello-import.service';
         // `files: 1` and `fields: 4`: this endpoint takes one part and no text fields at all, so
         // the field allowance is headroom rather than a requirement — the ceiling that matters is
         // `fileSize`.
-        limits: { fileSize: readTrelloImportMaxBytes(), files: 1, fields: 4 },
+        //
+        // `fieldArrayIndexLimit: 0` for GHSA-535w-7cp7-47q4, which multer 2.3.0 fixes only when
+        // the option is set: two fields, `items[4294967294]` and then `items[foo]`, held the
+        // event loop for 74 seconds without it (measured and explained in `attachment.module.ts`,
+        // whose route has the same exposure). Four fields are headroom, and nothing that posts
+        // here sends a field at all, so the smallest value costs nothing.
+        limits: {
+          fileSize: readTrelloImportMaxBytes(),
+          files: 1,
+          fields: 4,
+          fieldArrayIndexLimit: 0,
+        },
       }),
     }),
   ],

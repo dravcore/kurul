@@ -90,6 +90,15 @@ describe('ImportModule multipart configuration', () => {
     expect((await multerOptions()).limits?.files).toBe(1);
   });
 
+  it('caps array indexes in field names, which multer 2.3.0 leaves uncapped by default', async () => {
+    // GHSA-535w-7cp7-47q4: `items[4294967294]` and then `items[foo]` walk a sparse array of that
+    // length on the event loop, and multer closes it only when this option is set. Nest 11.2.1's
+    // `MulterOptions` does not declare the option yet, hence the widened read.
+    const limits = (await multerOptions()).limits as { fieldArrayIndexLimit?: number } | undefined;
+
+    expect(limits?.fieldArrayIndexLimit).toBe(0);
+  });
+
   it('does not depend on file storage at all', () => {
     // An import writes LINK rows and stores no bytes, so it has to work on an instance with no
     // STORAGE_PATH — where `StorageService.write` answers 503. Importing StorageModule here would
