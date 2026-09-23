@@ -100,7 +100,8 @@ answers 400 instead of crashing starts passing for the wrong reason.
 ## Real exports
 
 The `v0.3.0` gate asked for at least two anonymised real exports importing end to end
-(`ROADMAP.md`, Hardening track), and it closed on 2026-08-22: `real/` holds
+(`ROADMAP.md`, now the Import from Trello / Jira row under
+[Beyond MVP](../../../../../ROADMAP.md#beyond-mvp)), and it closed on 2026-08-22: `real/` holds
 `starter-guide-board.json` (Trello's own default "Starter Guide" board) and
 `eleven-list-board.json` (an eleven-list board exported the same day), and both import cleanly
 through `trello-import-real.e2e-spec.ts`.

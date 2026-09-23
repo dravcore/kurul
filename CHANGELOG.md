@@ -1288,8 +1288,8 @@ require. Nothing to migrate and no new setting.
   Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
   the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
   repository admin is a repository ruleset, described in
-  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
-  in `ROADMAP.md`.
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the
+  [Launch checklist](ROADMAP.md#launch-checklist).
 
 ## [0.3.0] - 2026-08-22
 
@@ -1297,107 +1297,6 @@ _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wav
 produced them: the same ID means different things in the 0.1.0 audit, the 0.2.0 audit and
 the 2026-08-18 "atlas" audit. See
 [ROADMAP.md](ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit)._
-
-### Fixed
-
-- **The test suites no longer read `packages/*/dist`.** `@kurul/shared-types` and
-  `@kurul/auth-access` resolve through their `package.json` to a git-ignored build, so a fresh
-  checkout failed `pnpm test` with `Cannot find module '@kurul/shared-types'` (Jest) and
-  `Failed to resolve entry for package "@kurul/shared-types"` (Vitest), and a checkout with an
-  old build passed against last week's enums. Both Jest configs (`moduleNameMapper` plus a
-  matching `paths` entry for ts-jest, and a mapper that lets the packages' NodeNext `.js`
-  imports resolve to `.ts`) and both Vitest configs (`resolve.alias`) now point the two
-  specifiers at `src/index.ts`; `packages/auth-access`'s own suite, which imports
-  `@kurul/shared-types`, gets the same alias. A spec in each runner asserts the mapping holds,
-  and the CI test job no longer builds the packages, so it runs the way a fresh clone does.
-  The build is still needed for `pnpm typecheck`, `nest build`, `next build`, `pnpm dev` and
-  `pnpm db:seed`.
-
-- **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
-  typed.** `q` reached Postgres through Prisma's `contains`, which — confirmed empirically
-  against Postgres 18 — compiles to `ILIKE`/`LIKE` with the search string bound as a *pattern*,
-  not a literal: searching `50%` also matched `"50X done"`, and `a_b` also matched `"aXb"`. A
-  shared `escapeLikePattern` helper now escapes `%`, `_` and the backslash that escapes them
-  before the string reaches `contains`, so the search box matches only what it looks like it
-  matches. The same unescaped `contains` was also used to sweep a departing account's
-  `Verification` rows during account deletion — an email local-part is free to contain `_`, so
-  an erased `john_doe@example.com` could have deleted a stranger's live `johnXdoe@example.com`
-  verification token too; that call site is escaped the same way (audit follow-up to DB-01).
-
-- Dialog and auth submit errors are now announced to screen readers and receive focus (WCAG
-  4.1.3, audit finding UX-01). Login, register, confirm, form, delete-account,
-  delete-workspace and the Trello import dialog rendered their submit-level error as plain
-  text with no toast on this path, so assistive tech never heard it and sighted keyboard users
-  had no cue where it landed; the shared `SubmitError` component now marks it `role="alert"`
-  and moves focus to it on every mount, including a retry that fails with the exact same
-  wording.
-
-- **An attachment can no longer be stored half-file and half-link.** `AttachmentKind` was
-  introduced so that `storageKey`, `mimeType`, `size` and `url` would be nullable *because of*
-  `kind` rather than in general ([ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md)),
-  and the schema comment promised that a row carrying both a URL and a storage key — or neither —
-  was unwritable. Nothing enforced it: the four columns were plainly nullable, and the promise
-  held only as long as every writer happened to be `AttachmentService`. The Trello importer is a
-  writer that is not — it bulk-inserts attachment rows with `createMany` — which is the exact
-  case the ADR predicted. A CHECK constraint, `Attachment_kind_fields_check`, now makes the two
-  shapes the only ones the table accepts (audit finding DB-02).
-
-  **The migration validates existing rows rather than grandfathering them**, so an instance that
-  somehow holds a half-written attachment fails the upgrade with the offending constraint named
-  instead of carrying the row forward under a constraint that only applies to future writes.
-  Every row the shipped code can have written satisfies the predicate, so no action is expected
-  on upgrade.
-
-- **The curl-based self-host install could never finish, and scheduled backups silently never
-  ran.** [self-hosting.md](docs/self-hosting.md) downloads only `docker-compose.yml`,
-  `docker/Caddyfile` and `.env.example` — no source tree — but the `migrate` service was
-  `build:`-only, so `docker compose up -d` had nothing to build it from and `api`
-  (`depends_on migrate: service_completed_successfully`) could never start: the guide's "no
-  build step" promise was unfulfillable on the path it documents. A third published image,
-  `ghcr.io/dravcore/kurul-migrate`, fixes that — built from `apps/api/Dockerfile`'s `migrate`
-  stage on `linux/amd64` + `linux/arm64`, following the same per-arch build, digest merge,
-  cosign signature and SBOM pattern already applied to `kurul-api` and `kurul-web`
-  ([release-images.yml](.github/workflows/release-images.yml)). `docker-compose.yml`'s
-  `migrate` service now carries `image: ghcr.io/dravcore/kurul-migrate:${TAG:-latest}`
-  alongside its existing `build:`, the same fallback pair `api`/`web` already had.
-
-  Independently, the same download step never fetched `scripts/backup.sh` either, which the
-  `backup` service bind-mounts — so on a fresh curl-based install, scheduled backups silently
-  never ran, with nothing in the logs to say why.
-  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/tr/self-hosting.md)) now
-  downloads it alongside the compose file.
-
-  **`kurul-migrate` exists from the first release after v0.2.0 onward, not on v0.2.0 itself** —
-  the workflow that publishes it is new in this change. An operator following the curl-based
-  guide against a `v0.2.0` install still hits the original failure; `git clone` is the
-  documented workaround until the next tag ships, and the guide now says so up front instead
-  of leaving that to be discovered from a pull failure.
-
-  Audit finding OPS-01.
-- **The `backup` service now declares a healthcheck** (audit finding OPS-02). `scripts/backup.sh`'s
-  main loop runs `take_dump || true` / `take_files || true`, so a cycle that fails only logs and
-  keeps sleeping — the process never exits non-zero, and until now nothing about the container's
-  own state changed either, so a backup could silently stop being produced with `docker compose ps`
-  still reporting the service as simply "Up". RPO grew unbounded and invisibly, and the API's
-  retention sweep (`BACKUP_KEEP × BACKUP_INTERVAL` grace window, `cleanup.worker.ts`) silently
-  assumed dumps were actually landing.
-
-  Unhealthy now means: no `/backups/kurul-*.dump` modified in the last `2 × BACKUP_INTERVAL`
-  seconds (48h on the default 24h interval — 2× so one slow or skipped cycle doesn't flap the
-  status). The check reads `$BACKUP_INTERVAL` from the container's own environment, so it tracks
-  whatever an operator's `.env` sets rather than assuming the default. It uses `find -mmin`, not
-  GNU `find`'s `-newermt`: the image is `postgres:18-alpine`, whose `find` is BusyBox's and has
-  neither `-newermt` nor `-newermin` (confirmed with `docker run --rm postgres:18-alpine find
-  --help`). `start_period` (10 minutes) is sized to the first `pg_dump` completing, not to
-  `BACKUP_INTERVAL` — the first cycle starts at container boot, not after one interval elapses, so
-  tying it to a 24h default would hide a genuinely broken first cycle for most of a day.
-
-  `docs/self-hosting.md` (and its `docs/tr/` mirror) no longer says `backup` declares no
-  healthcheck, and now has a "watch backup freshness" bullet next to the existing
-  `/api/health/ready` monitoring guidance — that endpoint never touches the backup sidecar, so it
-  stays green through a backup outage. `scripts/bootstrap.mjs`'s comment on which dev-loop
-  containers declare healthchecks is updated to match (`docker-compose.dev.yml` has no `backup`
-  service of its own, so this doesn't change what that script waits on).
 
 ### Added
 
@@ -1638,6 +1537,124 @@ the 2026-08-18 "atlas" audit. See
   Links from `docs/`, both READMEs and the ADRs that pointed into the archive are rewritten or
   turned into plain text; the released entries below keep their old paths as text only.
 
+### Fixed
+
+- **The test suites no longer read `packages/*/dist`.** `@kurul/shared-types` and
+  `@kurul/auth-access` resolve through their `package.json` to a git-ignored build, so a fresh
+  checkout failed `pnpm test` with `Cannot find module '@kurul/shared-types'` (Jest) and
+  `Failed to resolve entry for package "@kurul/shared-types"` (Vitest), and a checkout with an
+  old build passed against last week's enums. Both Jest configs (`moduleNameMapper` plus a
+  matching `paths` entry for ts-jest, and a mapper that lets the packages' NodeNext `.js`
+  imports resolve to `.ts`) and both Vitest configs (`resolve.alias`) now point the two
+  specifiers at `src/index.ts`; `packages/auth-access`'s own suite, which imports
+  `@kurul/shared-types`, gets the same alias. A spec in each runner asserts the mapping holds,
+  and the CI test job no longer builds the packages, so it runs the way a fresh clone does.
+  The build is still needed for `pnpm typecheck`, `nest build`, `next build`, `pnpm dev` and
+  `pnpm db:seed`.
+
+- **The task search box treated `%` and `_` as SQL wildcards instead of the characters a user
+  typed.** `q` reached Postgres through Prisma's `contains`, which — confirmed empirically
+  against Postgres 18 — compiles to `ILIKE`/`LIKE` with the search string bound as a *pattern*,
+  not a literal: searching `50%` also matched `"50X done"`, and `a_b` also matched `"aXb"`. A
+  shared `escapeLikePattern` helper now escapes `%`, `_` and the backslash that escapes them
+  before the string reaches `contains`, so the search box matches only what it looks like it
+  matches. The same unescaped `contains` was also used to sweep a departing account's
+  `Verification` rows during account deletion — an email local-part is free to contain `_`, so
+  an erased `john_doe@example.com` could have deleted a stranger's live `johnXdoe@example.com`
+  verification token too; that call site is escaped the same way (audit follow-up to DB-01).
+
+- Dialog and auth submit errors are now announced to screen readers and receive focus (WCAG
+  4.1.3, audit finding UX-01). Login, register, confirm, form, delete-account,
+  delete-workspace and the Trello import dialog rendered their submit-level error as plain
+  text with no toast on this path, so assistive tech never heard it and sighted keyboard users
+  had no cue where it landed; the shared `SubmitError` component now marks it `role="alert"`
+  and moves focus to it on every mount, including a retry that fails with the exact same
+  wording.
+
+- **An attachment can no longer be stored half-file and half-link.** `AttachmentKind` was
+  introduced so that `storageKey`, `mimeType`, `size` and `url` would be nullable *because of*
+  `kind` rather than in general ([ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md)),
+  and the schema comment promised that a row carrying both a URL and a storage key — or neither —
+  was unwritable. Nothing enforced it: the four columns were plainly nullable, and the promise
+  held only as long as every writer happened to be `AttachmentService`. The Trello importer is a
+  writer that is not — it bulk-inserts attachment rows with `createMany` — which is the exact
+  case the ADR predicted. A CHECK constraint, `Attachment_kind_fields_check`, now makes the two
+  shapes the only ones the table accepts (audit finding DB-02).
+
+  **The migration validates existing rows rather than grandfathering them**, so an instance that
+  somehow holds a half-written attachment fails the upgrade with the offending constraint named
+  instead of carrying the row forward under a constraint that only applies to future writes.
+  Every row the shipped code can have written satisfies the predicate, so no action is expected
+  on upgrade.
+
+- **The curl-based self-host install could never finish, and scheduled backups silently never
+  ran.** [self-hosting.md](docs/self-hosting.md) downloads only `docker-compose.yml`,
+  `docker/Caddyfile` and `.env.example` — no source tree — but the `migrate` service was
+  `build:`-only, so `docker compose up -d` had nothing to build it from and `api`
+  (`depends_on migrate: service_completed_successfully`) could never start: the guide's "no
+  build step" promise was unfulfillable on the path it documents. A third published image,
+  `ghcr.io/dravcore/kurul-migrate`, fixes that — built from `apps/api/Dockerfile`'s `migrate`
+  stage on `linux/amd64` + `linux/arm64`, following the same per-arch build, digest merge,
+  cosign signature and SBOM pattern already applied to `kurul-api` and `kurul-web`
+  ([release-images.yml](.github/workflows/release-images.yml)). `docker-compose.yml`'s
+  `migrate` service now carries `image: ghcr.io/dravcore/kurul-migrate:${TAG:-latest}`
+  alongside its existing `build:`, the same fallback pair `api`/`web` already had.
+
+  Independently, the same download step never fetched `scripts/backup.sh` either, which the
+  `backup` service bind-mounts — so on a fresh curl-based install, scheduled backups silently
+  never ran, with nothing in the logs to say why.
+  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/tr/self-hosting.md)) now
+  downloads it alongside the compose file.
+
+  **`kurul-migrate` exists from the first release after v0.2.0 onward, not on v0.2.0 itself** —
+  the workflow that publishes it is new in this change. An operator following the curl-based
+  guide against a `v0.2.0` install still hits the original failure; `git clone` is the
+  documented workaround until the next tag ships, and the guide now says so up front instead
+  of leaving that to be discovered from a pull failure.
+
+  Audit finding OPS-01.
+- **The `backup` service now declares a healthcheck** (audit finding OPS-02). `scripts/backup.sh`'s
+  main loop runs `take_dump || true` / `take_files || true`, so a cycle that fails only logs and
+  keeps sleeping — the process never exits non-zero, and until now nothing about the container's
+  own state changed either, so a backup could silently stop being produced with `docker compose ps`
+  still reporting the service as simply "Up". RPO grew unbounded and invisibly, and the API's
+  retention sweep (`BACKUP_KEEP × BACKUP_INTERVAL` grace window, `cleanup.worker.ts`) silently
+  assumed dumps were actually landing.
+
+  Unhealthy now means: no `/backups/kurul-*.dump` modified in the last `2 × BACKUP_INTERVAL`
+  seconds (48h on the default 24h interval — 2× so one slow or skipped cycle doesn't flap the
+  status). The check reads `$BACKUP_INTERVAL` from the container's own environment, so it tracks
+  whatever an operator's `.env` sets rather than assuming the default. It uses `find -mmin`, not
+  GNU `find`'s `-newermt`: the image is `postgres:18-alpine`, whose `find` is BusyBox's and has
+  neither `-newermt` nor `-newermin` (confirmed with `docker run --rm postgres:18-alpine find
+  --help`). `start_period` (10 minutes) is sized to the first `pg_dump` completing, not to
+  `BACKUP_INTERVAL` — the first cycle starts at container boot, not after one interval elapses, so
+  tying it to a 24h default would hide a genuinely broken first cycle for most of a day.
+
+  `docs/self-hosting.md` (and its `docs/tr/` mirror) no longer says `backup` declares no
+  healthcheck, and now has a "watch backup freshness" bullet next to the existing
+  `/api/health/ready` monitoring guidance — that endpoint never touches the backup sidecar, so it
+  stays green through a backup outage. `scripts/bootstrap.mjs`'s comment on which dev-loop
+  containers declare healthchecks is updated to match (`docker-compose.dev.yml` has no `backup`
+  service of its own, so this doesn't change what that script waits on).
+
+- **`docker-compose.dev.yml` and `docker-compose.yml` shared the same implicit Compose project name** — the checkout's directory, usually `kurul`, since neither file declared its own
+  — and therefore the same container and volume names for every service both define:
+  `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came from that:
+  `docker compose -f docker-compose.dev.yml down -v` (the documented way to reset a local
+  database, docs/development.md#database-workflow) dropped the full stack's Postgres/Redis
+  volumes too if the full stack had ever been started from the same directory, and bringing the
+  full stack up afterward silently recreated the dev loop's `postgres` container from
+  `docker-compose.yml`'s definition, which publishes no host port — `localhost:5432` simply
+  stopped answering, with nothing anywhere naming why (OPS-04, 2026-08-18 audit).
+  `docker-compose.dev.yml` now declares its own project (`name: kurul-dev`), so its containers
+  and volumes (`kurul-dev_postgres_data`, …) are namespaced apart from the full stack's `kurul_*`
+  ones and the two can run side by side with neither able to touch the other's data. Existing
+  dev-loop containers/volumes under the old shared name are simply orphaned by this, not
+  migrated — the dev database has always been throwaway by design; recreate with
+  `pnpm bootstrap`. `scripts/bootstrap.mjs` needed no change: it already invokes compose with
+  only `-f`, never `-p`, so it picks up the new project name automatically.
+
 ### Security
 
 - **Every pull request now builds the images this project ships and scans them for CVEs.**
@@ -1675,8 +1692,8 @@ the 2026-08-18 "atlas" audit. See
   gets a new `docker` ecosystem tracking the `docker-compose.dev.yml` pin (it also covers
   `docker-compose.yml`, which shares the same directory); the e2e workflow's own `services:`
   image sits outside what that ecosystem reads, so it stays a manual bump, with a comment at
-  the call site saying so. PR-time image build + Trivy scan for `api`/`web` is a separate,
-  still-open part of the same roadmap row.
+  the call site saying so. PR-time image build + Trivy scan for `api`/`web` shipped above
+  in this same release, closing the roadmap row.
 
 - **Pinned `deepmerge-ts` to `^8.0.1` through a pnpm override**, closing
   [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) (high: stack
@@ -1702,23 +1719,6 @@ the 2026-08-18 "atlas" audit. See
   and migration time, and never touches request-borne input — the thing that was broken was a
   CI gate, not a deployment. The override should be dropped once Prisma ships a release that
   depends on `deepmerge-ts >= 8`.
-
-- **`docker-compose.dev.yml` and `docker-compose.yml` shared the same implicit Compose project name** — the checkout's directory, usually `kurul`, since neither file declared its own
-  — and therefore the same container and volume names for every service both define:
-  `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came from that:
-  `docker compose -f docker-compose.dev.yml down -v` (the documented way to reset a local
-  database, docs/development.md#database-workflow) dropped the full stack's Postgres/Redis
-  volumes too if the full stack had ever been started from the same directory, and bringing the
-  full stack up afterward silently recreated the dev loop's `postgres` container from
-  `docker-compose.yml`'s definition, which publishes no host port — `localhost:5432` simply
-  stopped answering, with nothing anywhere naming why (OPS-04, 2026-08-18 audit).
-  `docker-compose.dev.yml` now declares its own project (`name: kurul-dev`), so its containers
-  and volumes (`kurul-dev_postgres_data`, …) are namespaced apart from the full stack's `kurul_*`
-  ones and the two can run side by side with neither able to touch the other's data. Existing
-  dev-loop containers/volumes under the old shared name are simply orphaned by this, not
-  migrated — the dev database has always been throwaway by design; recreate with
-  `pnpm bootstrap`. `scripts/bootstrap.mjs` needed no change: it already invokes compose with
-  only `-f`, never `-p`, so it picks up the new project name automatically.
 
 - **Every service in `docker-compose.yml` now carries a `mem_limit`** (`postgres`/`api`/`web`/
   `migrate` 512m, `backup` 256m, `redis`/`proxy` 128m) — `docs/self-hosting.md` has promised "2
@@ -1815,6 +1815,178 @@ the 2026-08-18 "atlas" audit. See
   not become the new ones**. `docker compose pull` against `kurultay-api` will keep serving
   the last image published under that name, silently and indefinitely, which is exactly what a
   rename cannot fix for you.
+
+- **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
+  Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
+  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
+  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
+  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
+  in `docs/development.md`, because they are far enough apart that quoting one alone would be
+  choosing a flattering number.
+
+  Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
+  package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
+  package itself marked `"optional": true`, which pnpm's `auto-install-peers` had resolved
+  anyway. `better-auth` declares those on `next`, `react`, `react-dom`, `svelte`, `vue`,
+  `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`;
+  `@prisma/client` declares them on `prisma` and `typescript`. Following those edges shipped
+  `@next/swc-linux-arm64-{gnu,musl}` (169 MB), `@prisma/studio-core`, `@electric-sql/pglite`,
+  `@prisma/engines`, `sharp`'s libvips builds, Playwright, `vite`, `rollup`, `esbuild` and the
+  TypeScript compiler into an image whose only job is to run `node dist/main.js`.
+  `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
+  `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
+  deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
+  those entries are off the primary resolution path, so this is not a judgement about which code
+  "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
+
+  The residual risk, named in the script's header rather than left for someone to discover: a
+  package that `require`s something it never declared used to resolve through pnpm's flat
+  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
+  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
+  suite, and a boot with the three opt-in paths that load code no default boot touches:
+  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
+  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
+  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
+
+  `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
+  image was the entire assembled workspace — every dev dependency of every package, the
+  sources, and pnpm — kept alive to run one command. It now starts from the same clean
+  `node:24-alpine` the API does and carries the Prisma CLI, `prisma.config.ts`, the schema and
+  the migrations. It also drops root: the old stage ran as root only because it inherited no
+  `USER` from `build`, and `prisma migrate deploy` never needed one. Both images run as
+  `USER node`, as before for `api` and newly so for `migrate`.
+
+  Nothing about the compose contract moved: `docker compose up -d` still brings the stack up
+  with `migrate` at `Exited (0)` and `api` `(healthy)`, `/health/ready` answers 200 through the
+  proxy, and the web image is untouched — no build-time API URL was reintroduced.
+- **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
+  `docs/git-strategy.md` had promised that since the branch table was written, and no staging
+  environment has ever existed — no host, no workflow, no secret in this repository points at
+  one (audit finding OPS-08). A standing promise nothing enforces is worse than no promise,
+  because it is quoted as though it were a safety net. The table now says `develop` must
+  **start**, which is verifiable, and the release process gained the verification as part of
+  step 4: `docker compose up -d --build`, `docker compose ps -a`, `curl` the readiness endpoint,
+  `docker compose down -v`. It is deliberately a release-time step rather than a CI job — a full
+  compose boot on every pull request costs more than it catches — and it runs the same stack a
+  self-hoster runs, `SITE_URL` at its `http://localhost` default, so what is checked is the real
+  deployment shape and not a staging-only approximation. Step numbering is unchanged; the boot
+  and the release PR share step 4.
+- **`docs/self-hosting.md` now covers the host, not just the stack.** The guide arrived with
+  automatic HTTPS but said nothing about what the machine around it should allow: it now states
+  the inbound firewall rule (SSH, 80, 443 and nothing else), why the rest of the stack is
+  already private without one (`proxy` is the only service in `docker-compose.yml` with a
+  `ports:` entry — everything else is on Docker's internal network, checkable with
+  `docker compose ps`), and the trap that makes a firewall alone insufficient on Linux: Docker
+  publishes ports through its own iptables rules, which are consulted before ufw's, so a port
+  published in an override is internet-facing despite a `ufw deny` covering it. Verifying the
+  deployment also no longer stops at "the page loads" — step 4 checks the thing HTTPS was for,
+  by reading the session cookie back. `SITE_URL=https://…` yields
+  `__Secure-better-auth.session_token=…; HttpOnly; Secure; SameSite=Lax`; the same request under
+  `SITE_URL=http://…` yields `better-auth.session_token=…; HttpOnly; SameSite=Lax`, no prefix
+  and no `Secure`, with the session token crossing the network in clear text. Both measured on a
+  running stack. Better Auth derives both properties from the scheme of the URL it is configured
+  with, which makes the scheme in `SITE_URL` the single switch behind them — now stated where an
+  operator will read it, along with what the wrong answer looks like.
+- **The nightly retention sweep now covers a fifth table.** `UsagePing` — the deduplicated
+  "somebody opened a board / the dashboard" rows the activation funnel above needed — is swept
+  under the existing `ACTIVITY_RETENTION_DAYS` rather than growing a window of its own: it is
+  the same class of row (instance history naming a user), and two settings on one class of data
+  can only ever disagree with each other. `0` still means "keep forever" for both. The job's
+  nightly JSON log line gains a `usagePings` count alongside the four it already carried; it is
+  still counts only, with nothing from the rows themselves.
+- **`api` and `web` no longer publish host ports in `docker-compose.yml`.** Both are reached
+  through the new `proxy` service on port 80/443, so a Docker install is now at
+  `http://localhost`, not `http://localhost:3000`. This closes a real gap rather than just
+  tidying: with no route around the proxy, the API's `TRUST_PROXY` can be fixed at `1` (it is),
+  which restores the per-client rate-limit buckets and access-log IPs that would otherwise have
+  collapsed onto the proxy's own container address. `docker-compose.dev.yml` and the `pnpm dev`
+  loop are unchanged — they still run the two apps on `:3000`/`:4000` as separate origins.
+- **The `web` image bakes `NEXT_PUBLIC_API_URL=/api`** instead of `http://localhost:4000`, and
+  the variable was removed from `docker-compose.yml`'s build `args:` so a local
+  `docker compose build web` produces the same bundle as the release image rather than baking
+  whatever the dev loop left in `.env`. Next.js still inlines `NEXT_PUBLIC_*` at build time —
+  that cannot change — but the value being inlined is now correct on every domain. A deployment
+  that wants the API on its own hostname can still build with
+  `--build-arg NEXT_PUBLIC_API_URL=https://api.example.com` and accept a domain-specific image.
+- The web app's CSP `connect-src` collapses to `'self'` for a same-origin API instead of naming
+  an origin and a derived `ws(s)://` one. `'self'` covers the same-origin WebSocket upgrade
+  (CSP Level 3), confirmed in a browser against the real stack rather than taken from the
+  spec — had it not, Socket.io would have quietly fallen back to its polling transport.
+
+  **Upgrading an existing Docker install:** set `SITE_URL` in `.env` (`http://localhost` keeps
+  today's behaviour, on the standard port), then `docker compose pull && docker compose up -d`.
+  `WEB_URL` and `BETTER_AUTH_URL` in `.env` no longer affect the compose stack — they belong to
+  the dev loop now — so a deployment that set them must move that value to `SITE_URL`. If port
+  80 is taken on your host, override `proxy`'s `ports:` rather than re-publishing `web`'s.
+
+- **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
+  batch as the reader scrolls toward the end of the current one, and cards are marked
+  `content-visibility: auto` so the mounted ones nobody is looking at cost no paint. Nothing
+  about loading changed: every task page still drains into state, the column header still
+  reports the column's true total, and the board still paints on the first page. What changed
+  is how many of those rows exist as DOM at once — which is the number the cost of *dragging*
+  scales with, because every mounted card is a dnd-kit sortable that re-runs on every pointer
+  move. Measured on a seeded 1 000-task board (`SEED_LARGE_BOARD_TASKS=1000`, five columns,
+  the largest holding 333), production build, drag driven at ~120 pointer moves per second for
+  four seconds: the main thread went from **99.9% busy with 28 long tasks totalling 3.8 s** to
+  **34.1% busy with none**, per processed pointer move from **84 ms to 2.6 ms**, DOM nodes from
+  **18 421 to 3 854**, and heap after a drag from **117 MB to 19 MB**. Time to the board's first
+  paint was already good and is unchanged (~130–165 ms, first page then stream). Dragging,
+  keyboard reordering and drops all behave as before, including onto and out of columns whose
+  tail is not mounted. `content-visibility` alone was measured too and is not a substitute: it
+  halved the frame time and left the main thread saturated (audit finding FE-03,
+  [#125](https://github.com/dravcore/kurul/issues/125)).
+- CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
+  instead of relying on multiple job names in branch protection. The gate runs only when all
+  upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
+  if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
+  renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
+  [#145](https://github.com/dravcore/kurul/issues/145).
+- **BREAKING:** `docker-compose.yml` and `docker-compose.dev.yml` no longer bake a fixed
+  `kurul`/`kurul` Postgres password (or a passwordless Redis by omission of any choice)
+  into the compose files themselves — every container on the same Docker network could
+  previously connect to the database with a password identical across every Kurul install,
+  with no separate secret to guess. `POSTGRES_PASSWORD` is now a required `.env` value with no
+  default, using the same fail-loud pattern as `BETTER_AUTH_SECRET`: `docker compose config`/
+  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurul`
+  default so an otherwise-unmodified `.env` still works once the password is filled in, and
+  `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
+  as before, so this half is not a breaking change on its own. See
+  [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
+
+  **Migration for existing installs:** add `POSTGRES_PASSWORD=<your-password>` to `.env`
+  before the next `docker compose up` — without it, compose now fails before creating a single
+  container. **Picking a value here does not, by itself, change anything about an already
+  initialized database:** the official Postgres image applies `POSTGRES_PASSWORD` only during
+  `initdb`, i.e. only the very first time the `postgres_data` volume is created, so an existing
+  volume keeps the role's original password no matter what `.env` now says. Two ways to bring
+  them back in sync:
+  - Set `POSTGRES_PASSWORD` in `.env` to whatever the running role's password **already is**
+    (`kurul`, if this is the first time upgrading past this change) — the value only needs
+    to be present and correct, not different from today.
+  - Or actually rotate the role's password to a new value, on the running instance, before
+    updating `.env` to match:
+
+    ```bash
+    docker compose exec -T postgres psql -U kurul -d postgres \
+      -c "ALTER USER kurul WITH PASSWORD 'the-new-password';"
+    ```
+
+    then set `POSTGRES_PASSWORD=the-new-password` in `.env` and restart the stack. Doing this
+    out of order — restarting with a `.env` password that does not match the volume's actual
+    role password — makes `migrate`/`api` fail to authenticate against a Postgres container
+    that otherwise reports healthy.
+- Docker Compose now survives crashes and host reboots: every long-running service carries
+  `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
+  deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
+  means DB and Redis actually answer, `web` gains a root-page healthcheck, and `web` now waits
+  on `api` being *healthy* rather than merely started.
+- Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
+  project-skeleton archived, TR design status synced.
+- Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
+  `ROADMAP.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
+  `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
+  `docs/archive/specs/` (CHANGELOG links updated).
 
 ### Added
 
@@ -2434,180 +2606,6 @@ the 2026-08-18 "atlas" audit. See
   supported single-instance configuration and does not make the instance unready. `GET /health`
   stays exactly as it was — liveness, dependency-free, so a dependency blip never gets a
   healthy API restarted.
-
-### Changed
-
-- **The two API images lost 2.8 GB between them, without dropping a dependency the app uses.**
-  Summing `docker history` on `linux/arm64`: the `api` runtime image went from 955 MB to
-  407 MB, and the one-shot `migrate` image from 2663 MB to 418 MB (audit finding OPS-07). As
-  unpacked bytes on disk, the same two images went from 1.22 GB to 516 MB and from 3.37 GB to
-  538 MB; compressed, from 266 MB to 108 MB and from 705 MB to 120 MB. All three readings are
-  in `docs/development.md`, because they are far enough apart that quoting one alone would be
-  choosing a flattering number.
-
-  Most of the API image was never reachable code. `pnpm deploy --prod` prunes the deployed
-  package's own `devDependencies` but keeps _optional peer dependencies_ — peers the publishing
-  package itself marked `"optional": true`, which pnpm's `auto-install-peers` had resolved
-  anyway. `better-auth` declares those on `next`, `react`, `react-dom`, `svelte`, `vue`,
-  `solid-js`, `drizzle-orm`, `mongodb`, `mysql2`, `better-sqlite3` and `vitest`;
-  `@prisma/client` declares them on `prisma` and `typescript`. Following those edges shipped
-  `@next/swc-linux-arm64-{gnu,musl}` (169 MB), `@prisma/studio-core`, `@electric-sql/pglite`,
-  `@prisma/engines`, `sharp`'s libvips builds, Playwright, `vite`, `rollup`, `esbuild` and the
-  TypeScript compiler into an image whose only job is to run `node dist/main.js`.
-  `scripts/prune-deployed-modules.mjs` now removes them: it walks `dependencies`,
-  `optionalDependencies` and non-optional `peerDependencies` from the deploy's top level and
-  deletes every virtual-store entry the closure does not contain. In pnpm's isolated layout
-  those entries are off the primary resolution path, so this is not a judgement about which code
-  "probably" runs — 269 of 493 store entries went, and 212 MB of `node_modules` remained.
-
-  The residual risk, named in the script's header rather than left for someone to discover: a
-  package that `require`s something it never declared used to resolve through pnpm's flat
-  `.pnpm/node_modules` hoist, and no longer will. A manifest-only walk cannot see that, and it
-  fails at runtime rather than at build. The mitigation is empirical — the healthcheck, the e2e
-  suite, and a boot with the three opt-in paths that load code no default boot touches:
-  `SENTRY_DSN` set (SDK initialises with 44 integrations, `flush()` returns), `SMTP_HOST` set
-  (a real invitation arrives in Mailpit over SMTP), and `REDIS_URL` set (BullMQ schedulers and
-  the Socket.io Redis adapter both register). All three were exercised against the pruned image.
-
-  `migrate` was the bigger number and the simpler fix: the stage was `FROM build`, so the
-  image was the entire assembled workspace — every dev dependency of every package, the
-  sources, and pnpm — kept alive to run one command. It now starts from the same clean
-  `node:24-alpine` the API does and carries the Prisma CLI, `prisma.config.ts`, the schema and
-  the migrations. It also drops root: the old stage ran as root only because it inherited no
-  `USER` from `build`, and `prisma migrate deploy` never needed one. Both images run as
-  `USER node`, as before for `api` and newly so for `migrate`.
-
-  Nothing about the compose contract moved: `docker compose up -d` still brings the stack up
-  with `migrate` at `Exited (0)` and `api` `(healthy)`, `/health/ready` answers 200 through the
-  proxy, and the web image is untouched — no build-time API URL was reintroduced.
-- **"`develop` is always deployable to staging" is gone, replaced by a claim something checks.**
-  `docs/git-strategy.md` had promised that since the branch table was written, and no staging
-  environment has ever existed — no host, no workflow, no secret in this repository points at
-  one (audit finding OPS-08). A standing promise nothing enforces is worse than no promise,
-  because it is quoted as though it were a safety net. The table now says `develop` must
-  **start**, which is verifiable, and the release process gained the verification as part of
-  step 4: `docker compose up -d --build`, `docker compose ps -a`, `curl` the readiness endpoint,
-  `docker compose down -v`. It is deliberately a release-time step rather than a CI job — a full
-  compose boot on every pull request costs more than it catches — and it runs the same stack a
-  self-hoster runs, `SITE_URL` at its `http://localhost` default, so what is checked is the real
-  deployment shape and not a staging-only approximation. Step numbering is unchanged; the boot
-  and the release PR share step 4.
-- **`docs/self-hosting.md` now covers the host, not just the stack.** The guide arrived with
-  automatic HTTPS but said nothing about what the machine around it should allow: it now states
-  the inbound firewall rule (SSH, 80, 443 and nothing else), why the rest of the stack is
-  already private without one (`proxy` is the only service in `docker-compose.yml` with a
-  `ports:` entry — everything else is on Docker's internal network, checkable with
-  `docker compose ps`), and the trap that makes a firewall alone insufficient on Linux: Docker
-  publishes ports through its own iptables rules, which are consulted before ufw's, so a port
-  published in an override is internet-facing despite a `ufw deny` covering it. Verifying the
-  deployment also no longer stops at "the page loads" — step 4 checks the thing HTTPS was for,
-  by reading the session cookie back. `SITE_URL=https://…` yields
-  `__Secure-better-auth.session_token=…; HttpOnly; Secure; SameSite=Lax`; the same request under
-  `SITE_URL=http://…` yields `better-auth.session_token=…; HttpOnly; SameSite=Lax`, no prefix
-  and no `Secure`, with the session token crossing the network in clear text. Both measured on a
-  running stack. Better Auth derives both properties from the scheme of the URL it is configured
-  with, which makes the scheme in `SITE_URL` the single switch behind them — now stated where an
-  operator will read it, along with what the wrong answer looks like.
-- **The nightly retention sweep now covers a fifth table.** `UsagePing` — the deduplicated
-  "somebody opened a board / the dashboard" rows the activation funnel above needed — is swept
-  under the existing `ACTIVITY_RETENTION_DAYS` rather than growing a window of its own: it is
-  the same class of row (instance history naming a user), and two settings on one class of data
-  can only ever disagree with each other. `0` still means "keep forever" for both. The job's
-  nightly JSON log line gains a `usagePings` count alongside the four it already carried; it is
-  still counts only, with nothing from the rows themselves.
-- **`api` and `web` no longer publish host ports in `docker-compose.yml`.** Both are reached
-  through the new `proxy` service on port 80/443, so a Docker install is now at
-  `http://localhost`, not `http://localhost:3000`. This closes a real gap rather than just
-  tidying: with no route around the proxy, the API's `TRUST_PROXY` can be fixed at `1` (it is),
-  which restores the per-client rate-limit buckets and access-log IPs that would otherwise have
-  collapsed onto the proxy's own container address. `docker-compose.dev.yml` and the `pnpm dev`
-  loop are unchanged — they still run the two apps on `:3000`/`:4000` as separate origins.
-- **The `web` image bakes `NEXT_PUBLIC_API_URL=/api`** instead of `http://localhost:4000`, and
-  the variable was removed from `docker-compose.yml`'s build `args:` so a local
-  `docker compose build web` produces the same bundle as the release image rather than baking
-  whatever the dev loop left in `.env`. Next.js still inlines `NEXT_PUBLIC_*` at build time —
-  that cannot change — but the value being inlined is now correct on every domain. A deployment
-  that wants the API on its own hostname can still build with
-  `--build-arg NEXT_PUBLIC_API_URL=https://api.example.com` and accept a domain-specific image.
-- The web app's CSP `connect-src` collapses to `'self'` for a same-origin API instead of naming
-  an origin and a derived `ws(s)://` one. `'self'` covers the same-origin WebSocket upgrade
-  (CSP Level 3), confirmed in a browser against the real stack rather than taken from the
-  spec — had it not, Socket.io would have quietly fallen back to its polling transport.
-
-  **Upgrading an existing Docker install:** set `SITE_URL` in `.env` (`http://localhost` keeps
-  today's behaviour, on the standard port), then `docker compose pull && docker compose up -d`.
-  `WEB_URL` and `BETTER_AUTH_URL` in `.env` no longer affect the compose stack — they belong to
-  the dev loop now — so a deployment that set them must move that value to `SITE_URL`. If port
-  80 is taken on your host, override `proxy`'s `ports:` rather than re-publishing `web`'s.
-
-- **A board column now mounts 40 cards at a time instead of all of them**, revealing the next
-  batch as the reader scrolls toward the end of the current one, and cards are marked
-  `content-visibility: auto` so the mounted ones nobody is looking at cost no paint. Nothing
-  about loading changed: every task page still drains into state, the column header still
-  reports the column's true total, and the board still paints on the first page. What changed
-  is how many of those rows exist as DOM at once — which is the number the cost of *dragging*
-  scales with, because every mounted card is a dnd-kit sortable that re-runs on every pointer
-  move. Measured on a seeded 1 000-task board (`SEED_LARGE_BOARD_TASKS=1000`, five columns,
-  the largest holding 333), production build, drag driven at ~120 pointer moves per second for
-  four seconds: the main thread went from **99.9% busy with 28 long tasks totalling 3.8 s** to
-  **34.1% busy with none**, per processed pointer move from **84 ms to 2.6 ms**, DOM nodes from
-  **18 421 to 3 854**, and heap after a drag from **117 MB to 19 MB**. Time to the board's first
-  paint was already good and is unchanged (~130–165 ms, first page then stream). Dragging,
-  keyboard reordering and drops all behave as before, including onto and out of columns whose
-  tail is not mounted. `content-visibility` alone was measured too and is not a substitute: it
-  halved the frame time and left the main thread saturated (audit finding FE-03,
-  [#125](https://github.com/dravcore/kurul/issues/125)).
-- CI gate job: `.github/workflows/ci.yml` now defines a single required status check, `ci-ok`,
-  instead of relying on multiple job names in branch protection. The gate runs only when all
-  upstream jobs (lint, test, build) have completed, and fails if any is not successful — even
-  if skipped or cancelled via concurrency — preventing PRs from silently passing when a job is
-  renamed or a workflow is cancelled. See [docs/testing.md](docs/testing.md#ci) and
-  [#145](https://github.com/dravcore/kurul/issues/145).
-- **BREAKING:** `docker-compose.yml` and `docker-compose.dev.yml` no longer bake a fixed
-  `kurul`/`kurul` Postgres password (or a passwordless Redis by omission of any choice)
-  into the compose files themselves — every container on the same Docker network could
-  previously connect to the database with a password identical across every Kurul install,
-  with no separate secret to guess. `POSTGRES_PASSWORD` is now a required `.env` value with no
-  default, using the same fail-loud pattern as `BETTER_AUTH_SECRET`: `docker compose config`/
-  `up` refuses to start until it is set. `POSTGRES_USER`/`POSTGRES_DB` keep the `kurul`
-  default so an otherwise-unmodified `.env` still works once the password is filled in, and
-  `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
-  as before, so this half is not a breaking change on its own. See
-  [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
-
-  **Migration for existing installs:** add `POSTGRES_PASSWORD=<your-password>` to `.env`
-  before the next `docker compose up` — without it, compose now fails before creating a single
-  container. **Picking a value here does not, by itself, change anything about an already
-  initialized database:** the official Postgres image applies `POSTGRES_PASSWORD` only during
-  `initdb`, i.e. only the very first time the `postgres_data` volume is created, so an existing
-  volume keeps the role's original password no matter what `.env` now says. Two ways to bring
-  them back in sync:
-  - Set `POSTGRES_PASSWORD` in `.env` to whatever the running role's password **already is**
-    (`kurul`, if this is the first time upgrading past this change) — the value only needs
-    to be present and correct, not different from today.
-  - Or actually rotate the role's password to a new value, on the running instance, before
-    updating `.env` to match:
-
-    ```bash
-    docker compose exec -T postgres psql -U kurul -d postgres \
-      -c "ALTER USER kurul WITH PASSWORD 'the-new-password';"
-    ```
-
-    then set `POSTGRES_PASSWORD=the-new-password` in `.env` and restart the stack. Doing this
-    out of order — restarting with a `.env` password that does not match the volume's actual
-    role password — makes `migrate`/`api` fail to authenticate against a Postgres container
-    that otherwise reports healthy.
-- Docker Compose now survives crashes and host reboots: every long-running service carries
-  `restart: unless-stopped` (in `docker-compose.dev.yml` too; the one-shot `migrate` job is
-  deliberately excluded), `api` gains a healthcheck against `GET /health/ready` so "healthy"
-  means DB and Redis actually answer, `web` gains a root-page healthcheck, and `web` now waits
-  on `api` being *healthy* rather than merely started.
-- Docs consistency pass: Node ≥24, i18n status, squash policy, archive links,
-  project-skeleton archived, TR design status synced.
-- Documentation map sharpened for post-MVP: `docs/README.md` is a five-minute reading guide;
-  `ROADMAP.md` is status + Beyond MVP only; Phase 0–9 checklists moved to
-  `docs/archive/roadmap-mvp-phases.md`; shipped phase design specs moved to
-  `docs/archive/specs/` (CHANGELOG links updated).
 
 ### Removed
 
