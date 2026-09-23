@@ -9,7 +9,7 @@ announcement wave is gated on, and growing the API surface toward a 1.0 compatib
 Work runs on **two parallel tracks**, Hardening and New Features, so stability debt and user
 value never queue behind each other.
 
-**Last updated:** 2026-08-27. This file supersedes the former `docs/roadmap.md`, deleted in
+**Last updated:** 2026-09-23. This file supersedes the former `docs/roadmap.md`, deleted in
 `6d1b075` (git history keeps it), and absorbs the open items of the 2026-08-13 local audit
 dashboard (now deleted). Task-level work lives in
 [GitHub Issues](https://github.com/dravcore/kurul/issues); release mechanics in
@@ -26,6 +26,9 @@ the [Hardening track](#hardening-track). That leaves the announcement wave as th
 it waits on one thing, a deployed demo host. Every dependency it has is enumerated once, in the
 [Launch checklist](#launch-checklist), and the rows that used to carry a quarter of that list
 each now link there.
+
+**Re-checked 2026-09-23:** both items below are still open and still the blockers, and both
+still wait on operator time and a host, the second through the first.
 
 | #   | Item                                                                    | Blocked on            |
 | --- | ----------------------------------------------------------------------- | --------------------- |
@@ -189,7 +192,7 @@ atlas findings, not these.)
 
 | ID      | Item                                         | Trigger                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DB-06   | Full soft-delete layer (L effort)            | First real "deleted the wrong board" incident, or ≥10 active team workspaces: until then the backup/restore path is the compensation (why off-host copies sit in Phase 2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| DB-06   | Full soft-delete layer (L effort)            | First real "deleted the wrong board" incident, or ≥10 active team workspaces: until then the backup/restore path is the compensation (why off-host copies sit in Phase 2 of the [launch plan](#phases))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | DB-10   | Status CHECK constraint                      | Next Better Auth organization-plugin major: added as a one-line constraint in that migration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | OPS-11  | Zero-downtime deploy                         | A paying customer or an SLA commitment. Unchanged by the shutdown work of 2026-08-26 (`stop_grace_period` on `api`, Caddy `lb_try_duration`, teardown moved to `onApplicationShutdown`): those are the S-effort partials that make one replica restart cleanly, not this item, which is still a second replica and a rollout                                                                                                                                                                                                                                                                                                                                                                                    |
 | PM-09   | Public API tokens + webhooks                 | Token half shipped 2026-08-23 as the first API 1.0 slice; the webhook half is covered by the API 1.0 remainder above, and launch feedback still sets its pace                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -228,8 +231,9 @@ history before that date has them.
 
 ## Beyond MVP
 
-Not scheduled unless marked `[→]` (promoted onto the tracks above). Listed so the
-architecture stays compatible with them, not as commitments.
+Not scheduled unless marked `[→]` (promoted onto the tracks above). `[-]` marks every other
+row: nothing on it is scheduled, and where part of it already shipped, its Note says so and
+names what is left. Listed so the architecture stays compatible with them, not as commitments.
 
 Every row links to a discussion under
 [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas), where it can be
@@ -262,8 +266,8 @@ thing that moves one off this list, and this is where that accumulates.
 saying so is the point** — the three rows below are the only API surface 1.0 is expected to
 grow, and anything that arrives instead of them should have to argue with this heading first.
 Two of the three appear in [Beyond MVP](#beyond-mvp) above as unscheduled items; this section is
-where they acquire a shape. Declared sequencing (see Phase 2): **PAT → `/v1` → webhooks**,
-decided in [ADR 0031](docs/decisions/0031-api-versioning.md).
+where they acquire a shape. Declared sequencing (see Phase 2 of the [launch plan](#phases)):
+**PAT → `/v1` → webhooks**, decided in [ADR 0031](docs/decisions/0031-api-versioning.md).
 
 What exists today, and is why this can be scoped at all: the API is described by a generated
 OpenAPI document, committed at [`apps/api/openapi.json`](apps/api/openapi.json) and served at
