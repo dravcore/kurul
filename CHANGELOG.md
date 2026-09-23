@@ -1196,8 +1196,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
   the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
   repository admin is a repository ruleset, described in
-  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the operator checklist
-  in `ROADMAP.md`.
+  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the
+  [Launch checklist](ROADMAP.md#launch-checklist).
 
 ## [0.3.0] - 2026-08-22
 
@@ -1583,8 +1583,8 @@ the 2026-08-18 "atlas" audit. See
   gets a new `docker` ecosystem tracking the `docker-compose.dev.yml` pin (it also covers
   `docker-compose.yml`, which shares the same directory); the e2e workflow's own `services:`
   image sits outside what that ecosystem reads, so it stays a manual bump, with a comment at
-  the call site saying so. PR-time image build + Trivy scan for `api`/`web` is a separate,
-  still-open part of the same roadmap row.
+  the call site saying so. PR-time image build + Trivy scan for `api`/`web` shipped above
+  in this same release, closing the roadmap row.
 
 - **Pinned `deepmerge-ts` to `^8.0.1` through a pnpm override**, closing
   [GHSA-ggr8-5vv4-36mx](https://github.com/advisories/GHSA-ggr8-5vv4-36mx) (high: stack
