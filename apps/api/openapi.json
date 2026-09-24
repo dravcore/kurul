@@ -13846,7 +13846,7 @@
             "type": "string"
           },
           "status": {
-            "enum": ["accepted", "pending", "canceled", "rejected"],
+            "enum": ["accepted", "pending", "rejected", "canceled"],
             "type": "string"
           },
           "expiresAt": {
@@ -14768,12 +14768,12 @@
             "type": "string",
             "description": "Why it did not make it across.\n\n`defaulted` is in this list without being a skip: an imported column takes the default\ncategory and an unknown Trello colour falls back to `slot-1`. Both changed something the\nuser will see, and the question after an import is \"why does my board look different\".",
             "enum": [
+              "defaulted",
               "outOfScope",
               "archived",
               "unmappable",
               "unsupportedScheme",
-              "malformed",
-              "defaulted"
+              "malformed"
             ]
           },
           "count": {

@@ -155,7 +155,7 @@ async function importOptions(): Promise<MulterOptions> {
 
 /**
  * What a multer refusal becomes once it has been through the real stack: busboy parsing a real
- * multipart body, multer 2.3.0 refusing it, Nest's `transformException` passing it on, and
+ * multipart body, multer 2.4.0 refusing it, Nest's `transformException` passing it on, and
  * `AllExceptionsFilter` answering. `all-exceptions.filter.spec.ts` pins the mapping on errors it
  * builds itself; this is the proof that what multer throws for a real request has the shape the
  * mapping expects.
@@ -244,6 +244,29 @@ describe.each<[string, () => Promise<MulterOptions>]>([
     });
     expect(handler).not.toHaveBeenCalled();
     // `reportFailure` logs and reports together, so no log line means no Sentry event either.
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  /**
+   * multer 2.4.0 words `LIMIT_UNEXPECTED_FILE` as `Unexpected file field`, which Nest 11.2.1's
+   * message-keyed `transformException` no longer recognises, so a file part under a name the
+   * route does not take now reaches `mapMulterError` as the `MulterError` itself. Still a 400 in
+   * the envelope with the part name after it, as Nest wrote it before, and still unreported.
+   */
+  it('answers a file part under another name with 400, after multer 2.4.0 reworded it', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/upload')
+      .attach('photo', Buffer.alloc(16, 1), 'x.png')
+      .expect(400);
+
+    expect(response.body).toEqual({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Unexpected file field - photo',
+      path: '/upload',
+      timestamp: expect.any(String),
+    });
+    expect(handler).not.toHaveBeenCalled();
     expect(logError).not.toHaveBeenCalled();
   });
 

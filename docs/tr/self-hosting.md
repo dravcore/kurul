@@ -803,6 +803,12 @@ adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonr
 Bir release'in bu sayfanın indirttiği dosyalarda neyi değiştirdiği ya da `pull`'dan önce
 sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca onları gösterir.
 
+- **Sonraki release ([Unreleased](../../CHANGELOG.md#unreleased)):** Better Auth 1.7.5,
+  `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor: 0.4.0'ın eklediği ve
+  Better Auth'un artık yazmadığı `Account.issuer` sütunundan `NOT NULL` kısıtını ve benzersiz
+  indeksi kaldırıyor. Çalıştırılacak bir şey yok, onu 2. adımdaki yedek karşılıyor. Sonrasında
+  v0.4.1'e geri dönmek şema değişikliği gerektirmez, ama yükseltmeden sonra açılan bir hesap
+  v0.4.1'de oturum açamaz.
 - **0.4.0 ([CHANGELOG](../../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1,
   `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor; çalıştırılacak bir şey
   yok, ama onu karşılayan 2. adımdaki yedek. `BACKUP_REMOTE` ve host dışı kopya, 3. adımdaki
