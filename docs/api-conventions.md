@@ -484,10 +484,11 @@ are refused by a full one.
 (`items[1]`: the limit that closes
 [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)) never reaches the
 handler. The envelope's `message` is multer's own sentence with the part name after it;
-[Errors](#errors) says why the wording is multer's. A `Content-Type` the multipart parser cannot
-read, such as `multipart/mixed`, is a `400` too. An upload the client abandons partway is never
-reported, and gets a `400` only if something can still be written to it, which by the time the
-parser notices is normally not the case.
+[Errors](#errors) says why the wording is multer's. A part name longer than 64 characters is
+refused on its own, as `Field name too long`, and never repeated. A `Content-Type` the multipart
+parser cannot read, such as `multipart/mixed`, is a `400` too. An upload the client abandons
+partway is never reported, and gets a `400` only if something can still be written to it, which
+by the time the parser notices is normally not the case.
 
 **Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
 media type (never the one the client declared at upload), `Content-Length`, and
@@ -649,8 +650,12 @@ the framework's built-in exceptions and hand-written ones look identical):
   wording _is_ the library's, on purpose: it is what Nest already returns for the codes it
   translates, so a refusal reads the same whichever layer caught it. That is multer's sentence,
   then the part name when there is one (`Field name array index too large - items[4294967294]`).
-  `STREAM_DESTROYED`, which multer's disk storage raises when an upload's own stream has failed,
-  is the one code that stays a `500`.
+  The part name is the client's own input and is repeated whole only up to 64 characters: both
+  multipart routes refuse a longer one before anything names it, and one that reaches the filter
+  some other way is cut to its first 64 characters followed by `[+N more]`. The one refusal that
+  can still carry a longer name is Nest's own `Field value too long - <name>`, for a text value
+  over 1 MiB. `STREAM_DESTROYED`, which multer's disk storage raises when an upload's own stream
+  has failed, is the one code that stays a `500`.
 - A multipart upload whose client leaves before the body has arrived in full is not a server
   failure and is never reported. It is answered **`400`** in this envelope, as the JSON parsers
   answer the same abort, when anything can still be written; by the time multer reports it the

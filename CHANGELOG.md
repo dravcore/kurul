@@ -40,6 +40,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   happened to leave first is still reported. The two `Content-Type` refusals are a `400` worded as
   Nest words the busboy errors it translates, `Multipart: Unsupported content type` and
   `Multipart: Malformed content type`, without the header.
+- **A multipart part name is no longer repeated back at any length.** busboy's multipart parser
+  puts no limit on a part's name (the `fieldNameSize` default of 100 is its urlencoded parser's),
+  only on the 16 KiB of the header block around it, and the refusals that name their part
+  repeated all of it. Measured through `FileInterceptor`: a 16,340-character field name ending in
+  `[1]` came back as a 16,484-byte error envelope, a 1 KiB file part under the wrong name as
+  `Unexpected field - <name>`, and on the attachment upload a 16 KiB text field the DTO does not
+  know was accepted by multer and repeated twice by `ValidationPipe`, a 32,899-byte envelope. Both
+  multipart routes now set `limits.fieldNameSize` to `64`, which multer enforces itself: a longer
+  name is `Field name too long`, a refusal that names no part. `AllExceptionsFilter` repeats at
+  most 64 characters of a part name, then `[+N more]`, so a name that reaches it another way
+  cannot pad the envelope either; up to 64 the message is exactly Nest's. One echo is left, and
+  it is Nest's: multer checks a text value's size before its name's length, so a value over 1 MiB
+  still comes back as `Field value too long - <name>`, bounded by the 16 KiB header block.
 
 ### Security
 

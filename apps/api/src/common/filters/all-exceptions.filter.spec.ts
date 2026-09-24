@@ -489,6 +489,61 @@ describe('AllExceptionsFilter', () => {
       expect(answer(new MulterError(code, field))).toEqual(answer(translated));
     });
 
+    /**
+     * The part name is the client's own, and busboy's multipart parser bounds it only by the
+     * 16 KiB of a part's header block. Both routes refuse a name over 64 characters before multer
+     * would name it (`limits.fieldNameSize`); this is the filter's own bound, for a name that gets
+     * here anyway.
+     */
+    describe('the part name', () => {
+      const sentence = 'Field name array index too large';
+
+      it('is repeated whole up to 64 characters, as Nest repeats it', () => {
+        const name = `${'a'.repeat(61)}[1]`;
+        expect(name).toHaveLength(64);
+
+        expect(answer(new MulterError('LIMIT_FIELD_ARRAY_INDEX', name))).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `${sentence} - ${name}`,
+        });
+        // The parity above, at the boundary: a code Nest translates reads the same at 64.
+        expect(answer(new MulterError('LIMIT_UNEXPECTED_FILE', name))).toEqual(
+          answer(transformException(new MulterError('LIMIT_UNEXPECTED_FILE', name))),
+        );
+      });
+
+      it('is cut after 64 characters past that, followed by how many more there were', () => {
+        const name = `${'a'.repeat(62)}[1]`;
+
+        expect(answer(new MulterError('LIMIT_FIELD_ARRAY_INDEX', name))).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `${sentence} - ${name.slice(0, 64)}[+1 more]`,
+        });
+      });
+
+      it('keeps the envelope small however long busboy let the name get', () => {
+        // 16,340 characters, the longest name a 16 KiB part-header block holds (measured through
+        // `FileInterceptor`), was a 16,484-byte envelope before the cap.
+        const name = `${'a'.repeat(16_337)}[1]`;
+
+        expect(answer(new MulterError('LIMIT_FIELD_ARRAY_INDEX', name))).toEqual(
+          expect.objectContaining({ message: `${sentence} - ${'a'.repeat(64)}[+16276 more]` }),
+        );
+      });
+
+      it('never ends on half of a surrogate pair', () => {
+        // U+1F600 is two UTF-16 code units, the 64th and 65th here. Cutting between them would
+        // leave a lone `\ud83d` in the JSON; the cut steps back one instead.
+        const name = `${'a'.repeat(63)}\u{1F600}b`;
+
+        expect(answer(new MulterError('INVALID_FIELD_NAME', name))).toEqual(
+          expect.objectContaining({ message: `Invalid field name - ${'a'.repeat(63)}[+3 more]` }),
+        );
+      });
+    });
+
     it('leaves STREAM_DESTROYED to the 500 path, which logs and reports it', () => {
       // Raised by multer's disk storage when the file stream is gone before it opens its output
       // file: the upload's own plumbing failing, not a refusal of anything the client sent.

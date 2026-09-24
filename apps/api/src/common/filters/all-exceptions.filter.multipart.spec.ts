@@ -242,6 +242,53 @@ describe.each<[string, () => Promise<MulterOptions>]>([
     expect(logError).not.toHaveBeenCalled();
   });
 
+  /**
+   * busboy's multipart parser bounds a part's name only by the 16 KiB of its header block, and a
+   * refusal that names its part used to repeat all of it: a 16,340-character name made a
+   * 16,484-byte envelope. `limits.fieldNameSize: 64` refuses a longer name first, without naming
+   * it, and up to 64 the name is repeated whole, as Nest repeats it.
+   */
+  it('repeats a part name of 64 characters whole', async () => {
+    const name = `${'a'.repeat(61)}[1]`;
+
+    const response = await request(app.getHttpServer())
+      .post('/upload')
+      .field(name, 'a')
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      statusCode: 400,
+      message: `Field name array index too large - ${name}`,
+    });
+  });
+
+  it.each<[string, (upload: request.Test) => request.Test]>([
+    // Refused for its length before its array index is looked at.
+    ['a field one character longer', (upload) => upload.field(`${'a'.repeat(62)}[1]`, 'a')],
+    // Accepted until now, and on the attachment upload repeated twice by `ValidationPipe`.
+    [
+      'a 1 KiB field the route does not take',
+      (upload) => upload.field('a'.repeat(1024), 'a').attach('file', Buffer.alloc(16, 1), 'x.png'),
+    ],
+    // `Unexpected field - <name>` until now, worded by Nest before the filter runs.
+    [
+      'a 1 KiB file part',
+      (upload) => upload.attach('a'.repeat(1024), Buffer.alloc(16, 1), 'x.png'),
+    ],
+  ])('refuses %s as a name too long, without repeating it', async (_part, send) => {
+    const response = await send(request(app.getHttpServer()).post('/upload')).expect(400);
+
+    expect(response.body).toEqual({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Field name too long',
+      path: '/upload',
+      timestamp: expect.any(String),
+    });
+    expect(handler).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
   // The limit that was already mapped, still mapped: Nest turns `LIMIT_FILE_SIZE` into its own
   // `PayloadTooLargeException` before the filter sees it, and nothing here may change that.
   it('still answers an over-limit file with 413', async () => {
