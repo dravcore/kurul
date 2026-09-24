@@ -132,6 +132,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `express`, directly and through the `body-parser` it depends on, into `apps/api`'s tree under
   `@nestjs/platform-express`. Express asks for `qs@^6.14.0` and body-parser for `qs@^6.15.2`;
   every range already admits 6.16.0, so this is a lockfile change and nothing more.
+- **A JSON body holding more values than any endpoint takes is refused before validation.** The
+  global `ValidationPipe` hands every body to class-transformer before class-validator sees it,
+  and class-transformer 0.5.1 de-duplicates an object's keys in time quadratic in their number,
+  so what a body cost followed its shape, which nothing bounded, rather than its size, which
+  `REQUEST_BODY_MAX_BYTES` did. Measured through the stack `configureApp` installs: 80,000 short
+  keys in an 868,891-byte body took 3 seconds to refuse, during which the process served nothing
+  else, and 131,071 keys filling the 1 MiB default took 8. A value nested 10,000 deep, 20 KB, and
+  349,511 empty `dispositions` in an account deletion body were each a `500`, logged and reported
+  to error tracking, the second after 3.3 seconds. Every such route needs a session or a token,
+  which open sign-up, the default, gives anyone, and the default rate limit lets one address send
+  100 of these requests a minute to each route. A JSON body may now hold at most 1,000 values,
+  every member and every array element at any depth, the number of fields the form-encoded parser
+  has always allowed a form body; over that, the answer is the same `413`
+  (`Request body is too large`), and nothing is validated. All four bodies above are refused in
+  under 100 ms. The largest body any endpoint takes, an account deletion with the most workspace
+  dispositions it accepts, holds 802 values.
 
 ## [0.4.1] - 2026-09-23
 

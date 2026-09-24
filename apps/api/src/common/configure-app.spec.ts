@@ -848,6 +848,108 @@ describe('configureApp validation of a key the DTO does not declare', () => {
 });
 
 /**
+ * A JSON body holds at most 1,000 values (`json-value-limit.ts`). `REQUEST_BODY_MAX_BYTES` bounds
+ * a body's size and nothing bounded its shape, and `ValidationPipe` pays for the shape: measured
+ * through this same stack, 80,000 short keys took 3 seconds to refuse, the process doing nothing
+ * else meanwhile, and a value nested 10,000 deep was a `500`. The urlencoded parser has always
+ * refused a form body over 1,000 fields with the same `413`.
+ */
+describe('configureApp JSON body value ceiling', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logError: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TitleProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    titleHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+    logError.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /** A JSON object of `count` keys the DTO does not declare, and nothing else. */
+  function keys(count: number): string {
+    return JSON.stringify(
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`k${i}`, 1])),
+    );
+  }
+
+  it('refuses 80,000 keys with the 413 an oversized body gets, before validating them', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(keys(80_000))
+      .expect(413);
+
+    expect(response.body).toMatchObject({
+      statusCode: 413,
+      error: 'Payload Too Large',
+      message: 'Request body is too large',
+      path: '/probe/title',
+    });
+    expect(titleHandler).not.toHaveBeenCalled();
+    // A client's doing, like every 413: not logged, so not reported either.
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('lets 1,000 values through to validation and refuses 1,001', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(keys(1000))
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(keys(1001))
+      .expect(413);
+  });
+
+  it('answers a value nested 10,000 deep with the same 413, where it was a 500', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(`{"title":"x","deep":${'['.repeat(10_000)}${']'.repeat(10_000)}}`)
+      .expect(413);
+
+    expect(response.body.message).toBe('Request body is too large');
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('leaves a form body to the parameter limit of its own parser', async () => {
+    // 600 fields nested one level down are 1,200 values as this ceiling counts them, and within
+    // the 1,000 fields the urlencoded parser allows, so validation is what refuses them.
+    const form = Array.from({ length: 600 }, (_, i) => `k${i}[a]=1`).join('&');
+
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(`${form}&title=x`)
+      .expect(400);
+
+    expect(response.body).toMatchObject({ message: 'Validation failed', detailsOmitted: 500 });
+  });
+});
+
+/**
  * The envelope's `path` is the request path (`docs/api-conventions.md#errors`), and it used to be
  * the whole request URL. Asserted through the whole stack `configureApp` installs because two
  * layers wrote the URL: `AllExceptionsFilter` in `path`, and Nest's own not-found handler in

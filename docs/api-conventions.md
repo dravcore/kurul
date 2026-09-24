@@ -406,6 +406,14 @@ Rules:
 the API will read.** Over it, the answer is `413` in the error envelope above — a client error,
 and one that is deliberately **not** reported to error tracking, exactly like a `404` or a `403`.
 
+**A JSON body also holds at most 1,000 values**, counting every member of every object and every
+element of every array at any depth, however few bytes they take. Over that, the answer is the
+same `413`, before anything validates the body: validation walks every key, and one object with
+tens of thousands of them held the whole process for seconds (80,000 short keys in 868,891 bytes
+took 3 seconds). 1,000 is the number of fields the form-encoded parser has always allowed a form
+body, refused the same way, and the largest body any endpoint takes holds 802 values: an account
+deletion with the most workspace dispositions it accepts, 200.
+
 This is the size of a _parsed body_ and it is unrelated to `ATTACHMENT_MAX_BYTES`: an upload is
 `multipart/form-data`, which this limit never sees — multer reads those, with its own ceiling
 (see [File uploads and downloads](#file-uploads-and-downloads)).

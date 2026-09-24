@@ -414,6 +414,14 @@ Kurallar:
 form-encoded body'dir.** Bunun üstünde cevap, yukarıdaki hata zarfı içinde `413`'tür — bir client
 hatasıdır ve tıpkı bir `404` ya da `403` gibi hata takibine **bilinçli olarak** bildirilmez.
 
+**Bir JSON body ayrıca en fazla 1.000 değer taşır**; her derinlikteki her objenin her üyesi ve her
+array'in her elemanı sayılır, kaç bayt tuttukları fark etmez. Bunun üstünde cevap, body'yi hiçbir
+şey doğrulamadan önce, yine aynı `413`'tür: doğrulama her anahtarı dolaşır ve on binlerce anahtarlı
+tek bir obje bütün süreci saniyelerce meşgul ediyordu (868.891 bayttaki 80.000 kısa anahtar 3
+saniye sürüyordu). 1.000, form-encoded parser'ın bir form body'ye her zaman izin verdiği ve
+aşıldığında aynı şekilde reddettiği alan sayısıdır; herhangi bir ucun aldığı en büyük body ise 802
+değer taşır: kabul ettiği en fazla workspace kararıyla, 200 kararla, bir hesap silme.
+
 Bu, _parse edilmiş bir body'nin_ boyutudur ve `ATTACHMENT_MAX_BYTES` ile ilgisi yoktur: bir
 yükleme `multipart/form-data`'dır ve bu limit onu hiç görmez — onları multer okur, kendi
 tavanıyla (bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)).
