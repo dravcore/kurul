@@ -84,8 +84,8 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // library semantics rather than by anything an operator configured. One byte loose
         // makes the published number wrong the other way. The multer that parses this body is
         // reached through `@nestjs/platform-express`, not through the import above: Nest 11.2.1
-        // pins it at 2.2.0, and the `multer@<2.3.0` entry in the root `pnpm.overrides` is what
-        // lifts it, so the tree holds one multer, 2.3.0.
+        // pins it at 2.2.0, and the `multer@<2.4.0` entry in the root `pnpm.overrides` is what
+        // lifts it, so the tree holds one multer, 2.4.0.
         // The size-limit block of `attachment.e2e-spec.ts` fails on a drift either way: a file
         // of exactly the limit is a 201 there, and one byte over is a 413.
         //

@@ -572,19 +572,19 @@ describe('AllExceptionsFilter', () => {
     }
 
     // Each code with the part name multer attaches to it, or none where multer attaches none
-    // (`lib/make-middleware.js`, `index.js`). The first two are the ones Nest 11.2.1 passes on;
-    // Nest translates the other eight before this filter runs, and they are here so a rewording
-    // like multer 2.4.0's, which Nest's message-keyed switch stops recognising, still lands on a
-    // 400 instead of on the 500 fallback.
+    // (`lib/make-middleware.js`, `index.js`). The first three are the ones Nest 11.2.1 passes on:
+    // the two multer 2.3.0 added, and `LIMIT_UNEXPECTED_FILE`, which multer 2.4.0 rewords past
+    // Nest's message-keyed switch. Nest translates the other seven before this filter runs, and
+    // they are here so the next rewording lands on a 400 as well, instead of on the 500 fallback.
     it.each<[string, string | undefined]>([
       ['LIMIT_FIELD_ARRAY_INDEX', 'items[4294967294]'],
       ['INVALID_FIELD_NAME', 'items[]'],
+      ['LIMIT_UNEXPECTED_FILE', 'photo'],
       ['LIMIT_PART_COUNT', undefined],
       ['LIMIT_FILE_COUNT', undefined],
       ['LIMIT_FIELD_KEY', undefined],
       ['LIMIT_FIELD_VALUE', 'kind'],
       ['LIMIT_FIELD_COUNT', undefined],
-      ['LIMIT_UNEXPECTED_FILE', 'photo'],
       ['MISSING_FIELD_NAME', undefined],
       ['LIMIT_FIELD_NESTING', 'a[b][c]'],
     ])('answers %s with 400, in the envelope and unreported', (code, field) => {
@@ -622,7 +622,6 @@ describe('AllExceptionsFilter', () => {
       ['LIMIT_FIELD_KEY', undefined],
       ['LIMIT_FIELD_VALUE', 'kind'],
       ['LIMIT_FIELD_COUNT', undefined],
-      ['LIMIT_UNEXPECTED_FILE', 'photo'],
       ['MISSING_FIELD_NAME', undefined],
       ['LIMIT_FIELD_NESTING', 'a[b][c]'],
     ])('words %s exactly as Nest does when Nest translates it', (code, field) => {
@@ -630,6 +629,21 @@ describe('AllExceptionsFilter', () => {
       expect(translated).toBeInstanceOf(HttpException);
 
       expect(answer(new MulterError(code, field))).toEqual(answer(translated));
+    });
+
+    it('answers LIMIT_UNEXPECTED_FILE itself, since Nest no longer recognises its wording', () => {
+      // multer 2.4.0 words it `Unexpected file field` and Nest 11.2.1's switch still looks for
+      // `Unexpected field`, so the MulterError reaches this filter untranslated. A Nest that
+      // matches the new wording fails the first line: move the code back into the list above.
+      const refusal = new MulterError('LIMIT_UNEXPECTED_FILE', 'photo');
+      expect(transformException(refusal)).toBe(refusal);
+
+      expect(answer(refusal)).toEqual({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `${refusal.message} - photo`,
+      });
+      expect(logError).not.toHaveBeenCalled();
     });
 
     /**
@@ -651,8 +665,8 @@ describe('AllExceptionsFilter', () => {
           message: `${sentence} - ${name}`,
         });
         // The parity above, at the boundary: a code Nest translates reads the same at 64.
-        expect(answer(new MulterError('LIMIT_UNEXPECTED_FILE', name))).toEqual(
-          answer(transformException(new MulterError('LIMIT_UNEXPECTED_FILE', name))),
+        expect(answer(new MulterError('LIMIT_FIELD_VALUE', name))).toEqual(
+          answer(transformException(new MulterError('LIMIT_FIELD_VALUE', name))),
         );
       });
 

@@ -300,9 +300,11 @@ const MULTER_CLIENT_ERROR_STATUSES: ReadonlyMap<string, HttpStatus> = new Map([
  * `LIMIT_UNEXPECTED_FILE` from `Unexpected field` to `Unexpected file field`, which is how Nest
  * 12.0.3, pinning 2.4.0, answered a misnamed file part with a 500 (nestjs/nest#17769). From 2.4.0
  * on, multer's own JSDoc says to check `err.code` rather than the message. So the table holds all
- * eleven codes that refuse the request, not only the two Nest missed: the nine it translates first
- * cost nothing here, and the next rewording lands on this branch as a `400` instead of on the
- * fallback as a `500`. `LIMIT_FILE_SIZE` keeps the `413` Nest gives it, so the status of an
+ * eleven codes that refuse the request, not only the ones Nest misses. With 2.4.0 installed, Nest
+ * 11.2.1 translates eight and passes `LIMIT_UNEXPECTED_FILE` on with the two 2.3.0 added: a
+ * misnamed file part is answered here, `Unexpected file field - <name>`, a `400` as before. The
+ * eight Nest still translates first cost nothing here, and the next rewording lands on this branch
+ * as a `400` instead of on the fallback as a `500`. `LIMIT_FILE_SIZE` keeps the `413` Nest gives it, so the status of an
  * oversized file never depends on which layer caught it. The match never reads the message, so the
  * string collision ADR 0022 records for `transformException` (a storage error that happens to read
  * `File too large`) cannot happen here.
@@ -321,7 +323,7 @@ const MULTER_CLIENT_ERROR_STATUSES: ReadonlyMap<string, HttpStatus> = new Map([
  *
  * `name === 'MulterError'` and a string `code` are what multer's constructor sets. The error comes
  * from the multer `@nestjs/platform-express` resolves, not the one `apps/api` declares: they are
- * one copy today only because the root `pnpm.overrides` entry lifts Nest's pin to the same 2.3.0,
+ * one copy today only because the root `pnpm.overrides` entry lifts Nest's pin to the same 2.4.0,
  * and an `instanceof` against a second copy would fail silently and bring the 500 back. multer
  * also ships no types, `attachment/multer.d.ts` declares `memoryStorage` alone on purpose, and
  * importing the class at runtime would make the filter every failure passes through depend on an
@@ -370,15 +372,17 @@ function mapMulterError(exception: unknown): { statusCode: number; message: stri
 }
 
 /**
- * multer's sentence for every code `MULTER_CLIENT_ERROR_STATUSES` answers `400`, as multer 2.3.0
+ * multer's sentence for every code `MULTER_CLIENT_ERROR_STATUSES` answers `400`, as multer 2.4.0
  * words it (`lib/multer-error.js`).
  *
  * The sentences rather than the codes, because what they pick out is a message Nest has already
- * written. `transformException` turns eight of these codes into a `BadRequestException` of its own,
- * reading `<sentence> - <part name>` whenever multer named a part, and hands this filter nothing
- * else: the `MulterError`, its `code` and its `field` are gone by then. The two codes Nest 11.2.1
- * leaves alone are here as well, because nestjs/nest#17857 words them the same way once a release
- * carries it. A closed list, for the reason `MULTER_CLIENT_ERROR_STATUSES` is one:
+ * written. `transformException` turns seven of these codes into a `BadRequestException` of its
+ * own, reading `<sentence> - <part name>` whenever multer named a part, and hands this filter
+ * nothing else: the `MulterError`, its `code` and its `field` are gone by then. The three codes
+ * Nest 11.2.1 leaves alone are here as well: the two multer 2.3.0 added, which nestjs/nest#17857
+ * words the same way once a release carries it, and `LIMIT_UNEXPECTED_FILE`, whose 2.4.0 wording
+ * its message-keyed switch no longer matches and a Nest that does match it words the same way. A
+ * closed list, for the reason `MULTER_CLIENT_ERROR_STATUSES` is one:
  * `all-exceptions.filter.spec.ts` holds it against the installed multer's table and the installed
  * Nest's translation, so a rewording on either side fails there instead of passing a name through.
  */
@@ -388,7 +392,7 @@ const MULTER_REFUSAL_SENTENCES: readonly string[] = [
   'Field name too long',
   'Field value too long',
   'Too many fields',
-  'Unexpected field',
+  'Unexpected file field',
   'Field name missing',
   'Field name nesting too deep',
   'Field name array index too large',
@@ -444,7 +448,7 @@ function boundedNotFound(message: string, request: Request, path: string): strin
 
 /**
  * The sentences multer raises as a plain `Error` when the request stream fails under it, rather
- * than because of anything in the body (`lib/make-middleware.js`, multer 2.3.0): on the request's
+ * than because of anything in the body (`lib/make-middleware.js`, multer 2.4.0): on the request's
  * `aborted` event, on a `close` that comes before the body ended, and on an `error` event that
  * carries no error of its own. A closed list, for the reason `MULTER_CLIENT_ERROR_STATUSES` is
  * one; `all-exceptions.filter.spec.ts` reads the sentences out of the installed source.
