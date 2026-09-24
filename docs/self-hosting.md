@@ -783,6 +783,11 @@ a step you take deliberately, with the backup from step 2 in hand, not something
 What a release changes in the files this page has you fetch, or expects of you before `pull`.
 The full entries live in `CHANGELOG.md`; this list only points at them.
 
+- **Next release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.5 ships a
+  migration the `migrate` service applies on the first `up`: it drops the `NOT NULL` and the
+  unique index from the `Account.issuer` column 0.4.0 added, which Better Auth no longer
+  writes. Nothing to run, and the backup in step 2 covers it. Rolling back to v0.4.1 afterwards
+  needs no schema change, but an account created after the upgrade cannot sign in on v0.4.1.
 - **0.4.0 ([CHANGELOG](../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1 ships a
   migration the `migrate` service applies on the first `up`; nothing to run, but the backup in
   step 2 is what covers it. `BACKUP_REMOTE` and the off-host copy need the `scripts/backup.sh`

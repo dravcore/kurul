@@ -136,13 +136,16 @@ model Account {
   id     String @id @default(uuid(7))
   userId String
 
-  /// Which authority vouched for `accountId`, required by Better Auth since 1.7.
+  /// Which authority vouched for `accountId`, as Better Auth 1.7.0 to 1.7.2 wrote it. Nothing
+  /// writes it now.
   ///
-  /// Identity is keyed on the pair, not on `accountId` alone: two providers can hand out the
-  /// same subject string, and before this column one of them could be made to collide with the
-  /// other. Providers with no issuer of their own get a synthetic one, and Kurul has only
-  /// email/password, so every row here reads `local:credential`.
-  issuer                String
+  /// Better Auth 1.7.3 went back to keying an account on `(providerId, accountId)`, as 1.6 did,
+  /// and stopped writing this column, so `NOT NULL` here refused every sign-up. Migration
+  /// `20260924090000_account_issuer_nullable` relaxed it and dropped the `(issuer, accountId)`
+  /// unique index. Rows from before it keep the `local:credential` the 0.4.0 backfill or a 0.4.x
+  /// sign-up wrote, which is what a rollback to 0.4.1 reads: its Better Auth still looks the
+  /// credential account up by issuer. Dropping the column is a later, separate step.
+  issuer                String?
   accountId             String
   providerId            String
   accessToken           String?
@@ -157,7 +160,6 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([issuer, accountId])
   @@index([userId])
 }
 
