@@ -50,9 +50,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   multipart routes now set `limits.fieldNameSize` to `64`, which multer enforces itself: a longer
   name is `Field name too long`, a refusal that names no part. `AllExceptionsFilter` repeats at
   most 64 characters of a part name, then `[+N more]`, so a name that reaches it another way
-  cannot pad the envelope either; up to 64 the message is exactly Nest's. One echo is left, and
-  it is Nest's: multer checks a text value's size before its name's length, so a value over 1 MiB
-  still comes back as `Field value too long - <name>`, bounded by the 16 KiB header block.
+  cannot pad the envelope either; up to 64 the message is exactly Nest's. That includes the one
+  refusal multer raises before it checks a name's length, `Field value too long - <name>`, which
+  Nest words itself: the next entry cuts its name the same way.
 - **The part name in `Field value too long` is cut after 64 characters too, and a multipart text
   value gets the room its route needs rather than 1 MiB.** multer checks a text value's size
   before its name's length, so a value over the limit under a long name is refused with the name
@@ -78,11 +78,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cuts a name after 64 characters with the same `[+N more]` the multipart refusals use: `field`
   as one path, so a nested one still reads from its declared start (`items[0].` and then the
   key), and the name in `message` on its own. The 20 KiB key is now a 433-byte envelope. The query
-  key is cut in `details` as well and still comes back once in `path`, which repeats the request's
-  URL for every error, as it always has, within the 16 KiB Node allows a request's head. A name of
-  64 characters or fewer, which is every name a DTO declares, comes back exactly as before, and
-  `details` keeps its shape. One function, `common/echoed-name.ts`, cuts both kinds of name, and
-  `AllExceptionsFilter` shares it.
+  key is cut in `details` as well, and `path` no longer carries the query string at all: see the
+  entry on `path` below. A name of 64 characters or fewer, which is every name a DTO declares,
+  comes back exactly as before, and `details` keeps its shape. One function,
+  `common/echoed-name.ts`, cuts both kinds of name, and `AllExceptionsFilter` shares it.
 - **A request whose client leaves before the response finishes is in the access log.** The line
   was written on the response's `finish` event, which a response whose connection is gone never
   emits, so a JSON body or an upload abandoned mid-body, a client that gave up while its handler
