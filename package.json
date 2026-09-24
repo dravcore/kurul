@@ -52,7 +52,7 @@
     "knip": "6.32.2",
     "lint-staged": "^17.3.0",
     "prettier": "^3.5.3",
-    "prisma": "^7.0.0",
+    "prisma": "^7.10.0",
     "tsx": "^4.23.12",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.67.0"
