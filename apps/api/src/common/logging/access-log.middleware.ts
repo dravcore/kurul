@@ -4,8 +4,9 @@ import { stdoutWriter, type LogWriter } from './json-log';
 import { getRequestId } from './request-id';
 
 /**
- * One line per finished HTTP request, emitted as JSON so a collector can index the fields
- * instead of regex-ing a human-readable format.
+ * One line per HTTP request, emitted as JSON so a collector can index the fields instead of
+ * regex-ing a human-readable format. It is written when the response finishes or, for a request
+ * whose connection closed first, when it closed.
  *
  * The field list is deliberately closed. Request bodies, query strings, headers and cookies
  * never appear: this API carries session cookies, invitation tokens and task content, none of
@@ -20,7 +21,10 @@ export interface AccessLogLine {
   requestId?: string;
   method: string;
   path: string;
-  status: number;
+  /** The status the client was sent, or `null` when its connection closed before one went out. */
+  status: number | null;
+  /** Present, and always `true`, when the connection closed before the response finished. */
+  aborted?: true;
   durationMs: number;
   userId?: string;
   ip: string;
@@ -92,26 +96,54 @@ function redactSecretSegments(path: string): string {
  * the router — so sign-in traffic and 404s, the two things an access log is most often opened
  * for, would be missing. Registered ahead of that mount in `configureApp`.
  *
- * The line is emitted on `finish` — after the response is fully written — so `status` and
- * `durationMs` are the real ones, and `userId` picks up the user that `SessionAuthGuard`
+ * The line is written once the response has finished, after it is fully written, so `status`
+ * and `durationMs` are the real ones, and `userId` picks up the user that `SessionAuthGuard`
  * attached during the request, which has not happened yet when the middleware itself runs.
+ *
+ * ## A request whose connection closed first gets its line too
+ *
+ * A response whose connection is gone never emits `finish`, so a request that ended that way
+ * used to leave no line at all: a JSON body or an upload the client abandoned mid-body, a client
+ * that gave up while its handler was still running, a download cut short (each measured through
+ * `configureApp`, with a raw socket that stopped partway). `AllExceptionsFilter` logs only what
+ * it reports and reports no disconnect, so those requests were in no log anywhere. The line is
+ * now also written on `close`, marked `aborted: true`, with the same fields.
+ *
+ * `status` is what the client was sent, so a download cut short still reads `200`, and `null` when
+ * the connection closed before any status went out. `res.statusCode` is not that: until the
+ * headers are sent it is Node's default `200`, or whatever Nest set ahead of the handler (`201`
+ * on an upload whose client left, measured), and logging it would record an answer nobody got. A
+ * line with a status takes its level from it, as every other line does; one without is `warn`,
+ * the level of the `400` this API answers a client that leaves mid-body with wherever it still
+ * can (the JSON parsers' abort, `mapMultipartFailure` for an upload).
+ *
+ * Node emits `close` after `finish` on every response that did finish, so the line is written by
+ * whichever of the two comes first and skipped by the other: one line per request, never two.
  */
 export function createAccessLogMiddleware(write: LogWriter = stdoutWriter) {
   return function accessLog(req: Request, res: Response, next: NextFunction): void {
     const startedAt = process.hrtime.bigint();
+    let written = false;
 
-    res.once('finish', () => {
+    const writeLine = (finished: boolean): void => {
+      if (written) {
+        return;
+      }
+      written = true;
+
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
       const requestId = getRequestId(req);
       const userId = (req as AuthedRequest).user?.id;
+      const status = finished || res.headersSent ? res.statusCode : null;
 
       const line: AccessLogLine = {
         ts: new Date().toISOString(),
-        level: levelFor(res.statusCode),
+        level: status === null ? 'warn' : levelFor(status),
         ...(requestId !== undefined ? { requestId } : {}),
         method: req.method,
         path: pathOf(req),
-        status: res.statusCode,
+        status,
+        ...(finished ? {} : { aborted: true as const }),
         durationMs: Math.round(durationMs * 1000) / 1000,
         ...(userId !== undefined ? { userId } : {}),
         // Express's own trust-proxy-aware resolution (`common/trust-proxy.ts` configures
@@ -122,7 +154,10 @@ export function createAccessLogMiddleware(write: LogWriter = stdoutWriter) {
       };
 
       write(JSON.stringify(line));
-    });
+    };
+
+    res.once('finish', () => writeLine(true));
+    res.once('close', () => writeLine(false));
 
     next();
   };

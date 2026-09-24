@@ -1463,10 +1463,13 @@ from the exact failure.
 
 Both apps log to stdout; Docker collects it. `docker compose logs -f api` reads it back.
 
-The API writes one JSON object per finished request — `ts`, `level`, `requestId`, `method`,
-`path`, `status`, `durationMs`, `userId`. That field list is closed on purpose: request
-bodies, query strings, headers and cookies are never logged, because this API carries session
-cookies, invitation tokens and task content.
+The API writes one JSON object per request, with `ts`, `level`, `requestId`, `method`, `path`,
+`status`, `durationMs`, `userId` and `ip`, when its response finishes. A request whose connection
+closes first, such as a client that leaves mid-upload, still gets its line, written when the
+connection closes, with `aborted: true` and a `status` of `null` if no status had gone out
+([api-conventions.md](api-conventions.md#request-correlation) describes each field). That field
+list is closed on purpose: request bodies, query strings, headers and cookies are never logged,
+because this API carries session cookies, invitation tokens and task content.
 
 Every service in both compose files caps its logs at **3 files × 10 MB** (`x-logging` at the
 top of `docker-compose.yml`). Docker's `json-file` default is _unbounded_, and a full disk is

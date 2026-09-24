@@ -425,12 +425,12 @@ const BUSBOY_CONTENT_TYPE_REFUSALS: readonly string[] = [
  *
  * It is answered the way the same abort under the JSON parsers already is: `raw-body` reports that
  * one as an `http-errors` `400`, which `mapHttpClientError` answers with the reason phrase and
- * never reports. Nothing is logged either, which is the convention rather than an omission:
- * nothing in this API logs a client that disconnected. The filter logs only what it reports, and
- * the access log writes its line on `finish`, which a response whose connection is gone never
- * emits (measured for both parsers: no line at all). In practice nothing is written back either,
- * because by the time the error arrives Node has closed the connection; `catch` checks for that
- * before writing.
+ * never reports. Nor is it logged here, since the filter logs only what it reports. The request
+ * is not lost for that: the access log writes its line when the connection closes, marked
+ * `aborted: true` with no status, under both parsers (`access-log.middleware.ts`; before that it
+ * wrote only on `finish`, which a response whose connection is gone never emits, and an abort left
+ * no line at all). In practice nothing is written back either, because by the time the error
+ * arrives Node has closed the connection; `catch` checks for that before writing.
  *
  * ### The sentence says what failed; the request says it was the client
  *

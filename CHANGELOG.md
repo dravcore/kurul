@@ -83,6 +83,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   64 characters or fewer, which is every name a DTO declares, comes back exactly as before, and
   `details` keeps its shape. One function, `common/echoed-name.ts`, cuts both kinds of name, and
   `AllExceptionsFilter` shares it.
+- **A request whose client leaves before the response finishes is in the access log.** The line
+  was written on the response's `finish` event, which a response whose connection is gone never
+  emits, so a JSON body or an upload abandoned mid-body, a client that gave up while its handler
+  was still running, and a download cut short left no line at all (measured through the stack
+  `configureApp` installs, with a raw socket that stopped partway). `AllExceptionsFilter` logs no
+  disconnect either, so those requests were in no log anywhere. The line is now also written when
+  the connection closes, with the same fields and `"aborted": true`. `status` is the one the
+  client was sent, so a download cut short still reads `200`, or `null` when none went out:
+  `res.statusCode` is no evidence before then, and read `201` on an abandoned upload because Nest
+  sets a route's status ahead of its handler. A line without a status is `warn`, like the `400`
+  the API gives a client that stops sending mid-body. A response that finishes emits `close` too,
+  and still writes one line; lines for such requests are exactly as they were.
 
 ### Security
 

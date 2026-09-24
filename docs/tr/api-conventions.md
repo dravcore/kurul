@@ -698,7 +698,7 @@ Aynı id üç yerde birden görünür, ki asıl mesele budur: client'ın aldığ
 header'ı, hata zarfının `requestId` alanı ve o request'e ait sunucu log satırları. Bir
 hatayı bildiren kullanıcı tek bir id verir ve bu id tam olarak tek bir request'i seçer.
 
-Biten her request ayrıca stdout'a tek satırlık bir JSON erişim logu yazar:
+Her request ayrıca stdout'a tek satırlık bir JSON erişim logu yazar:
 
 ```jsonc
 {
@@ -719,6 +719,13 @@ asla loglanmaz: query kullanıcının verdiği filtreleri ve arama terimlerini, 
 session cookie'lerini ve davet token'larını taşır. `ip`, ham bir header değil Express'in kendi
 `req.ip`'sidir — yapılandırılmamışsa bu her zaman TCP peer'ıdır, yani yapılandırılmamış bir
 reverse proxy arkasında her istek için proxy'nin adresidir. Aşağıda `TRUST_PROXY`'ye bakın.
+
+Satır, response tamamlandığında yazılır. Bağlantısı ondan önce kapanan bir request, ki istek
+ortasında ayrılan bir client böyle görünür, satırını bağlantı kapandığında alır; `status`'ün
+ardında `"aborted": true` bulunur. `status`'ü client'a gönderilmiş olandır, yani yarıda kesilen
+bir indirme yine `200` okur; bağlantı hiçbir status gönderilmeden kapandıysa `null`'dır. Status'ü
+olmayan bir satır `warn`'dır: API'nin gövdenin ortasında göndermeyi bırakan bir client'a verdiği
+`400`'ün seviyesi. Her iki durumda da bir request'in tek bir satırı olur, asla iki değil.
 
 ## Kimlik doğrulama
 

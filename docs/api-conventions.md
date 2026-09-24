@@ -684,7 +684,7 @@ The same id appears in three places, which is the point: the `X-Request-Id` head
 received, the `requestId` field of the error envelope, and the server's log lines for that
 request. A user reporting a failure quotes one id, and it selects exactly one request.
 
-Each finished request also writes a single-line JSON access log to stdout:
+Every request also writes a single-line JSON access log to stdout:
 
 ```jsonc
 {
@@ -705,6 +705,13 @@ logged: the query carries user-supplied filters and search terms, and the header
 session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw header —
 unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
 proxy's address for every request. See `TRUST_PROXY` below.
+
+The line is written when the response finishes. A request whose connection closes first, which is
+what a client that leaves mid-request looks like, gets its line when the connection closes, with
+`"aborted": true` after `status`. Its `status` is the one the client was sent, so a download cut
+short still reads `200`, or `null` when the connection closed before any status went out; a line
+with no status is `warn`, the level of the `400` the API gives a client that stops sending
+mid-body. Either way a request has one line, never two.
 
 ## Authentication
 
