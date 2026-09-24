@@ -494,7 +494,10 @@ adla gelen bir dosya parçası, rotanın aldığından fazla metin alanı ya da 
 indeksi taşıyan bir alan adı (`items[1]`:
 [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)'ü kapatan limit)
 handler'a hiç ulaşmaz. Zarfın `message`'ı multer'ın kendi cümlesi ve ardından parça adıdır;
-metnin neden multer'ın olduğunu [Hatalar](#hatalar) anlatır.
+metnin neden multer'ın olduğunu [Hatalar](#hatalar) anlatır. Multipart ayrıştırıcının
+okuyamadığı bir `Content-Type`, örneğin `multipart/mixed`, de `400`'dür. İstemcinin yarıda
+bıraktığı bir yükleme asla raporlanmaz ve ancak ona hâlâ bir şey yazılabiliyorsa `400` alır;
+ayrıştırıcı bunu fark ettiğinde genellikle yazılabilecek bir şey kalmamıştır.
 
 **İndirme.** `GET .../attachments/:attachmentId/content` byte'ları **sniff edilmiş** medya tipiyle
 (asla istemcinin yüklemede beyan ettiğiyle değil), `Content-Length` ve `Content-Disposition` ile
@@ -659,6 +662,14 @@ isimleriyle):
   cümlesi, varsa ardından parça adıdır (`Field name array index too large - items[4294967294]`).
   multer'ın disk depolamasının, bir yüklemenin kendi akışı bozulduğunda fırlattığı
   `STREAM_DESTROYED`, `500` olarak kalan tek koddur.
+- İstemcisi gövdenin tamamı gelmeden ayrılan bir multipart yükleme sunucu hatası değildir ve
+  asla raporlanmaz. Hâlâ bir şey yazılabiliyorsa, JSON parser'larının aynı kesintiye verdiği gibi bu
+  zarf içinde **`400`** ile cevaplanır; multer bunu bildirdiğinde bağlantı genellikle çoktan
+  kapanmıştır ve o zaman hiçbir şey yazılmaz. Multipart ayrıştırıcının okuyamadığı bir
+  `Content-Type` de **`400`**'dür; metin, Nest'in çevirdiği ayrıştırıcı hatalarına verdiği
+  biçimdedir ve header'ı geri okumaz: `multipart/form-data` dışındaki bir `multipart/*` tipi için
+  `Multipart: Unsupported content type`, ayrıştıramadığı bir tip için
+  `Multipart: Malformed content type`.
 
 ### Request korelasyonu
 

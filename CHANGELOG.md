@@ -24,6 +24,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   disk storage raises and the memory storage Kurul uses never does, stays a `500`, as it does in
   Nest's own fix for the same gap ([nestjs/nest#17857](https://github.com/nestjs/nest/pull/17857)),
   which no Nest release carries yet.
+- **An upload the client abandons is not a `500` filed in Sentry, and neither is a `Content-Type`
+  the multipart parser cannot read.** multer aborts an upload whose client stops sending with a
+  plain `Error('Request aborted')`, not a coded `MulterError`, and hands on whatever busboy's
+  constructor throws for a `Content-Type` it cannot parse; `@nestjs/platform-express` translates
+  neither, so both reached the catch-all in `AllExceptionsFilter`. A closed tab or a dropped
+  connection partway through an upload was an error-level log line and a Sentry event, and
+  `multipart/mixed; boundary=x`, or a boundary with spaces around its `=`, was a `500` whose
+  message outside production read the request's own `Content-Type` back. An abandoned upload is
+  now answered as the JSON parsers already answered the same abort: a `400` in the standard
+  envelope, not logged and not reported. In practice nothing is written at all, because the
+  filter no longer writes to a connection that is gone, and in every abort measured through
+  `FileInterceptor` the connection was gone by the time multer gave up. The match is multer's own
+  sentence on a request whose body never arrived in full, so a server failure whose client
+  happened to leave first is still reported. The two `Content-Type` refusals are a `400` worded as
+  Nest words the busboy errors it translates, `Multipart: Unsupported content type` and
+  `Multipart: Malformed content type`, without the header.
 
 ### Security
 

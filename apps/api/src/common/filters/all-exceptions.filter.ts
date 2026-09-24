@@ -316,6 +316,134 @@ function mapMulterError(exception: unknown): { statusCode: number; message: stri
   };
 }
 
+/**
+ * The sentences multer raises as a plain `Error` when the request stream fails under it, rather
+ * than because of anything in the body (`lib/make-middleware.js`, multer 2.3.0): on the request's
+ * `aborted` event, on a `close` that comes before the body ended, and on an `error` event that
+ * carries no error of its own. A closed list, for the reason `MULTER_CLIENT_ERROR_STATUSES` is
+ * one; `all-exceptions.filter.spec.ts` reads the sentences out of the installed source.
+ */
+const MULTER_REQUEST_STREAM_FAILURES: ReadonlySet<string> = new Set([
+  'Request aborted',
+  'Request closed',
+  'Request error',
+]);
+
+/**
+ * The refusals busboy's entry point throws when it cannot pick a parser for the request's
+ * `Content-Type` (`busboy/lib/index.js`, busboy 1.6.0). `Unsupported content type` goes on with
+ * `: ` and the whole header, which is why a sentence is matched as a prefix too.
+ */
+const BUSBOY_CONTENT_TYPE_REFUSALS: readonly string[] = [
+  'Missing Content-Type',
+  'Malformed content type',
+  'Unsupported content type',
+];
+
+/**
+ * Maps the plain `Error`s multer passes on about a multipart request onto `400`, in the two cases
+ * where what failed is the request and not the server.
+ *
+ * Besides its `MulterError`s (`mapMulterError`), multer hands `next` plain `Error`s of two
+ * origins, and Nest's `transformException` translates neither, in 11.2.1 or on Nest's `master` at
+ * the time of writing. Both reached the `instanceof Error` fallback below, a `500` and a Sentry
+ * report. Measured through `FileInterceptor` with each route's own multer options.
+ *
+ * ## The client left mid-upload
+ *
+ * multer listens on the request itself and aborts the upload with one of
+ * `MULTER_REQUEST_STREAM_FAILURES`. A client that stops sending halfway reaches this filter as
+ * `Request aborted` every time, measured against a raw socket that closed, reset or half-closed
+ * the connection, with a `Content-Length` body and with a chunked one: Node emits `aborted` before
+ * the `close`, and before the `ECONNRESET` error it destroys the request with, both of which
+ * multer ignores by then. The one path that hands on something else, an `error` event carrying
+ * that `ECONNRESET` itself, needs the connection to drop after the body arrived in full but before
+ * multer was done with it. 300 connections closed or reset straight after a complete body never
+ * produced it (the handler answered first every time); should it happen, it reaches the fallback
+ * and is reported, which is where a case nobody has measured belongs.
+ *
+ * It is answered the way the same abort under the JSON parsers already is: `raw-body` reports that
+ * one as an `http-errors` `400`, which `mapHttpClientError` answers with the reason phrase and
+ * never reports. Nothing is logged either, which is the convention rather than an omission:
+ * nothing in this API logs a client that disconnected. The filter logs only what it reports, and
+ * the access log writes its line on `finish`, which a response whose connection is gone never
+ * emits (measured for both parsers: no line at all). In practice nothing is written back either,
+ * because by the time the error arrives Node has closed the connection; `catch` checks for that
+ * before writing.
+ *
+ * ### The sentence says what failed; the request says it was the client
+ *
+ * A sentence counts only on a request whose stream was destroyed before it arrived in full
+ * (`message.complete`, which is what Node documents for telling a message the connection cut
+ * short). Without that, the same words from anywhere else would be silenced: Express's
+ * `res.sendFile` raises a plain `Error('Request aborted')` for a download whose client left, on a
+ * request that had arrived long before, and `Request error` is wording any code could use.
+ *
+ * The request's state is not enough on its own, though, and that is why the sentence is matched
+ * at all. On a multipart route the guards run while the body is still arriving, and a client
+ * giving up on a slow request is exactly what a failing database produces. Measured: a guard that
+ * throws `database unreachable` after its client disconnected reaches this filter with the
+ * request destroyed and incomplete, the state an abort leaves, and that failure must be reported.
+ * A rewording in multer lands on the fallback, reported, and fails the completeness check in the
+ * spec, the same trade `mapMulterError` makes with its codes.
+ *
+ * ## busboy could not pick a parser for the `Content-Type`
+ *
+ * multer builds its busboy inside a `try` and passes whatever the constructor throws straight to
+ * `next`. multer's `type-is` check lets through any `multipart/*` type, busboy parses only
+ * `multipart/form-data`, and the two parse the header by different rules, so two of the three
+ * `BUSBOY_CONTENT_TYPE_REFUSALS` are reachable from any client. `multipart/mixed; boundary=x` is
+ * `Unsupported content type: multipart/mixed; boundary=x`, and a header with spaces around the
+ * `=` of its boundary, which `type-is` reads and busboy does not, is `Malformed content type`.
+ * Both were a `500`, reported, and outside production the first read the request's own
+ * `Content-Type` back as its message. `Missing Content-Type` cannot happen behind `type-is`,
+ * which admits no request without the header, and is here so the list is busboy's whole
+ * vocabulary rather than the part measured.
+ *
+ * They are answered the way Nest words the busboy errors it does translate
+ * (`Multipart: Boundary not found`, `Multipart: Unexpected end of form`): the sentence after
+ * `Multipart: `, without the header busboy appends to it. The client sent that header and gains
+ * nothing from reading it back, and it is as long as the client made it.
+ */
+function mapMultipartFailure(
+  exception: unknown,
+  request: Request,
+): { statusCode: number; message: string } | null {
+  // A bare `new Error(...)`, which is all multer and busboy construct for these. A subclass
+  // carrying the same words is another library's failure: undici's `RequestAbortedError` reads
+  // `Request aborted` and means a request this server made to somebody else was cut off.
+  if (!(exception instanceof Error) || Object.getPrototypeOf(exception) !== Error.prototype) {
+    return null;
+  }
+
+  const { message } = exception;
+  if (MULTER_REQUEST_STREAM_FAILURES.has(message)) {
+    return request.destroyed && !request.complete
+      ? { statusCode: HttpStatus.BAD_REQUEST, message: reasonPhrase(HttpStatus.BAD_REQUEST) }
+      : null;
+  }
+
+  const refusal = BUSBOY_CONTENT_TYPE_REFUSALS.find(
+    (sentence) => message === sentence || message.startsWith(`${sentence}: `),
+  );
+  return refusal === undefined
+    ? null
+    : { statusCode: HttpStatus.BAD_REQUEST, message: `Multipart: ${refusal}` };
+}
+
+/**
+ * True once the connection the request arrived on is gone, after which nothing written to the
+ * response can reach the client: a destroyed `net.Socket` transfers no further data.
+ *
+ * The request's socket rather than anything on the response. When the JSON parsers report an
+ * abort, this filter runs inside the socket's own `close` handling, before Node has marked the
+ * response destroyed (measured: `response.destroyed` still `false`, the socket already
+ * destroyed), and an `IncomingMessage` keeps its socket where a response lets go of it.
+ */
+function connectionClosed(request: Request): boolean {
+  return request.socket?.destroyed === true;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -342,9 +470,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
    * The split falls out of the control flow for free: this method is called only on
    * `statusCode >= 500` and on the branches that could not resolve a client status, so
    * reporting rides along with logging and the two can never drift apart. The
-   * `mapHttpClientError` and `mapMulterError` branches are the two places where that had to be
-   * arranged rather than inherited: both sit ahead of the `instanceof Error` fallback precisely so
-   * a body parser's `413` (issue #214) or a multer refusal's `400` never reaches a call site here.
+   * `mapHttpClientError`, `mapMulterError` and `mapMultipartFailure` branches are the places where
+   * that had to be arranged rather than inherited: all three sit ahead of the `instanceof Error`
+   * fallback precisely so a body parser's `413` (issue #214), a multer refusal's `400` or a client
+   * that left mid-upload never reaches a call site here.
    */
   private reportFailure(
     error: unknown,
@@ -386,6 +515,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const httpClientError = mapHttpClientError(exception);
     const multerError = mapMulterError(exception);
+    const multipartFailure = mapMultipartFailure(exception, request);
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -453,6 +583,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode = multerError.statusCode;
       error = reasonPhrase(statusCode);
       message = multerError.message;
+    } else if (multipartFailure !== null) {
+      // The same again for the plain `Error`s multer passes on: an upload the client abandoned,
+      // or a `Content-Type` busboy cannot parse. See `mapMultipartFailure`.
+      statusCode = multipartFailure.statusCode;
+      error = reasonPhrase(statusCode);
+      message = multipartFailure.message;
     } else if (exception instanceof Error) {
       this.reportFailure(
         exception,
@@ -479,6 +615,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (!isProductionEnv()) {
         message = described;
       }
+    }
+
+    // Nobody is left to read an envelope once the connection is gone, and writing one anyway only
+    // looks like an answer: Node drops a write to a destroyed response without an error, so
+    // `response.json` returns as if it had sent it (measured with a client that left mid-upload).
+    // Checked after every branch above, so a failure is logged and reported whether or not its
+    // client stayed to hear about it.
+    if (connectionClosed(request)) {
+      return;
     }
 
     const problem: ProblemDetails = {

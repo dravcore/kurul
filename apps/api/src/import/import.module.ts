@@ -63,6 +63,11 @@ import { TrelloImportService } from './trello-import.service';
         // event loop for 74 seconds without it (measured and explained in `attachment.module.ts`,
         // whose route has the same exposure). Four fields are headroom, and nothing that posts
         // here sends a field at all, so the smallest value costs nothing.
+        //
+        // What a refusal becomes is `AllExceptionsFilter`'s to decide, the same for both routes,
+        // and `attachment.module.ts` walks through it: a `400` in the error envelope (`413` for
+        // the file's size), and a `400` too for the two plain errors multer passes on, a client
+        // that left mid-upload and a `Content-Type` busboy cannot parse. None is reported.
         limits: {
           fileSize: readTrelloImportMaxBytes(),
           files: 1,

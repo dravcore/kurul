@@ -484,7 +484,10 @@ are refused by a full one.
 (`items[1]`: the limit that closes
 [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)) never reaches the
 handler. The envelope's `message` is multer's own sentence with the part name after it;
-[Errors](#errors) says why the wording is multer's.
+[Errors](#errors) says why the wording is multer's. A `Content-Type` the multipart parser cannot
+read, such as `multipart/mixed`, is a `400` too. An upload the client abandons partway is never
+reported, and gets a `400` only if something can still be written to it, which by the time the
+parser notices is normally not the case.
 
 **Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
 media type (never the one the client declared at upload), `Content-Length`, and
@@ -648,6 +651,14 @@ the framework's built-in exceptions and hand-written ones look identical):
   then the part name when there is one (`Field name array index too large - items[4294967294]`).
   `STREAM_DESTROYED`, which multer's disk storage raises when an upload's own stream has failed,
   is the one code that stays a `500`.
+- A multipart upload whose client leaves before the body has arrived in full is not a server
+  failure and is never reported. It is answered **`400`** in this envelope, as the JSON parsers
+  answer the same abort, when anything can still be written; by the time multer reports it the
+  connection is normally gone, and then nothing is written at all. A `Content-Type` the
+  multipart parser cannot read is a **`400`** as well, worded the way Nest words the parser
+  errors it translates and without the header read back: `Multipart: Unsupported content type`
+  for a `multipart/*` type other than `multipart/form-data`, `Multipart: Malformed content type`
+  for one it cannot parse.
 
 ### Request correlation
 

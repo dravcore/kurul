@@ -103,6 +103,17 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // large - items[4294967294]`, and no Sentry report, since the client chose the field
         // names. `all-exceptions.filter.multipart.spec.ts` sends that request through this
         // configuration and through `import.module.ts`'s.
+        //
+        // ## What multer hands on besides the refusals these limits make
+        //
+        // Two plain `Error`s, which no option here decides and Nest translates neither of. A
+        // client that drops the connection mid-upload arrives as `Request aborted`, from multer's
+        // own listener on the request, and a `Content-Type` busboy cannot parse (`multipart/mixed`,
+        // or spaces around the `=` of the boundary) as whatever busboy's constructor threw. Both
+        // were a 500 and a Sentry report. `AllExceptionsFilter` answers both `400`, reports
+        // neither (`mapMultipartFailure`), and writes nothing to a connection that is already
+        // gone; every abort measured through this configuration had lost its connection by the
+        // time multer gave up. The same spec sends both through each route's options.
         limits: { fileSize: storage.maxBytes, files: 1, fields: 8, fieldArrayIndexLimit: 0 },
       }),
     }),
