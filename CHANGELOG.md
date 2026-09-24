@@ -7,6 +7,60 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Better Auth 1.7.5, and a migration that lets it create accounts again.** 1.7.3 went back on
+  the account identity 1.7.0 introduced: an account is keyed on `(providerId, accountId)` again,
+  as in 1.6, and nothing writes the `Account.issuer` column 0.4.0 added for 1.7.1, `NOT NULL`
+  and with a unique `(issuer, accountId)` index. Left that way, the column refuses every row
+  Better Auth inserts: on Dependabot's pull requests for 1.7.4 and 1.7.5
+  ([#367](https://github.com/dravcore/kurul/pull/367),
+  [#377](https://github.com/dravcore/kurul/pull/377)) 28 of the 34 integration suites failed,
+  each sign-up a `500` on Prisma's `Argument issuer is missing`, and the seed and the demo reset
+  fail the same way. Migration `20260924090000_account_issuer_nullable` drops the index and the
+  `NOT NULL`, the two statements Better Auth's 1.7 upgrade guide gives for Postgres, and
+  `pnpm db:migrate` applies it like any other. The column stays, with the `local:credential`
+  every existing account holds: a rollback to 0.4.1, whose Better Auth still signs in by issuer,
+  needs no schema change, though an account created after the upgrade cannot sign in on it.
+  Dropping the column is left to a later release.
+
+  1.7.3 also validates the database schema at startup and refuses auth requests while it
+  disagrees, but through a Prisma 7 client it sees column names only, so it passed the column
+  that broke every sign-up. `auth-schema.spec.ts` holds `schema.prisma` to the same rule with the
+  `?` and the `@default` in view, and fails on the old schema.
+
+- **Prisma 7.10.0**: `prisma`, `@prisma/client`, `@prisma/adapter-pg` and
+  `@prisma/client-runtime-utils` from 7.9.1, together, because the generated client, its runtime
+  and the CLI that generates it have to match. The release's fixes that reach Kurul's code are in
+  interactive transactions, which the API opens in 26 places: `$disconnect()`, which the shutdown
+  path calls on every client, now also cleans up a transaction whose start is still in progress
+  at the driver, and a cleanup that fails after a timeout or a terminated backend no longer
+  becomes an unhandled rejection. The `PrismaClientValidationError` that failed the attachment
+  integration suite on #367 was not Prisma's: it is the `issuer` column in the entry above.
+  7.10.0 still pins the CLI's `mysql2` at 3.15.3 and `@prisma/config`'s `deepmerge-ts` at 7.1.5,
+  so both overrides stay; without either, `pnpm audit --audit-level high` fails again, on
+  GHSA-3f6p-5ww8-9rcr or GHSA-ggr8-5vv4-36mx.
+
+- **Next.js 16.3.6 and React 19.3.0**, with `@types/react` and `@types/react-dom` 19.3.0. Next
+  16.3.4 turned AVIF image optimisation back on, which 16.3.3 had switched off to answer
+  GHSA-2xp9-vwfh-vxw4 in 0.4.1, and now requires `sharp` 0.35.4, the version 0.4.1 already took
+  for its libheif fix. React 19.3 adds `<ViewTransition>` and refs on `<Fragment>`, and renders
+  concurrent transitions independently rather than as one. Nothing in `apps/web` needed a change
+  and its unit suite passes as it did; the browser suite, which runs nightly and on pull requests
+  to `main`, is where a change in timing would show.
+
+- **The rest of Dependabot's production and development groups**
+  ([#377](https://github.com/dravcore/kurul/pull/377),
+  [#375](https://github.com/dravcore/kurul/pull/375)), at the versions they propose, which the
+  seven-day cooldown in `dependabot.yml` had already aged: `@nestjs/throttler` 6.6.0,
+  `@sentry/node` and `@sentry/nextjs` 10.75.0, `bullmq` 6.3.6, `file-type` 22.1.0 (which now
+  recognises ISO 9660 images; as an attachment one is still a `415`), `lucide-react` 1.46.0,
+  `next-intl` 4.14.5 and `tailwind-merge` 3.7.0, and among the development tools eslint 10.10.0,
+  typescript-eslint 8.70.0, jest 30.5.1, Playwright 1.63.0, prettier 3.9.7 and knip 6.36.0.
+  Nothing needed a change for them: `pnpm lint` and `pnpm knip` find nothing new, and prettier
+  3.9.7 moves no file. typescript-eslint 8.70.0 still peers on TypeScript below 6.1, so
+  [ADR 0030](docs/decisions/0030-typescript-7-hold.md)'s hold on TypeScript 7 stands.
+
 ### Fixed
 
 - **A field name multer refuses is a `400`, not a `500` filed in Sentry.** 0.4.1 set multer's
@@ -131,6 +185,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `express`, directly and through the `body-parser` it depends on, into `apps/api`'s tree under
   `@nestjs/platform-express`. Express asks for `qs@^6.14.0` and body-parser for `qs@^6.15.2`;
   every range already admits 6.16.0, so this is a lockfile change and nothing more.
+- **next 16.3.3 → 16.3.6**: remote code execution through the Node.js `ImageResponse` of
+  `next/og` when an application renders attacker-controlled values into its SVG
+  ([GHSA-vcvr-r3jv-pc5j](https://github.com/vercel/next.js/security/advisories/GHSA-vcvr-r3jv-pc5j),
+  critical, `>=16.2.0 <16.3.6`). #377 proposes 16.3.5, because 16.3.6 was still inside the
+  seven-day cooldown when Dependabot ran, and `dependabot.yml` has a release an advisory holds
+  bumped by hand. Kurul renders no `ImageResponse`; as with 0.4.1's image advisories, that was
+  not a reason to stay behind.
+- **multer 2.3.0 → 2.4.0**, with the override that keeps it the only multer in the tree moved to
+  `multer@<2.4.0`. 2.4.0 removes the files an upload aborted at the wrong moment could leave in
+  disk storage
+  ([GHSA-3pph-fpjx-jg34](https://github.com/expressjs/multer/security/advisories/GHSA-3pph-fpjx-jg34),
+  rated medium), which the memory storage both multipart routes use never writes. It also
+  rewords `LIMIT_UNEXPECTED_FILE` from `Unexpected field` to `Unexpected file field`, which the
+  message-keyed translation in `@nestjs/platform-express` 11.2.1 no longer recognises, so that
+  refusal now reaches `AllExceptionsFilter` as the `MulterError` itself and is answered by its
+  code, like the codes in the first entry under Fixed: a file part under a name the route does
+  not take is still a `400`, now reading `Unexpected file field - <name>`. The multipart spec
+  sends one through both routes, and the inclusive `fileSize` ceiling, `fieldArrayIndexLimit`,
+  `fieldNameSize` and `fieldSize` were checked again on 2.4.0.
 - **A JSON body holding more values than any endpoint takes is refused before validation.** The
   global `ValidationPipe` hands every body to class-transformer before class-validator sees it,
   and class-transformer 0.5.1 de-duplicates an object's keys in time quadratic in their number,
