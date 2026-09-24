@@ -64,7 +64,11 @@ export class ErrorEnvelopeSchema {
   /** Per-field problems. Present on validation failures (`400`, `422`) and nowhere else. */
   details?: ValidationDetailSchema[];
 
-  /** The request path that failed, query string included. */
+  /**
+   * The path of the request that failed, without its query string, which can carry a token from a
+   * link. Longer than 256 characters, it is cut to its first 256 followed by `[+N more]`; no route
+   * this API serves is that long.
+   */
   path!: string;
 
   /** ISO 8601 UTC instant the envelope was written. */

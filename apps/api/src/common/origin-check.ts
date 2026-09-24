@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { echoedPath } from './echoed-name';
 import { getRequestId } from './logging/request-id';
 
 /**
@@ -207,7 +208,7 @@ export function claimedOrigin(req: Request): string | null {
  * bound to the Nest router, so an error thrown from here would reach Express's default HTML
  * error handler instead. The envelope below is therefore assembled by hand to match the one
  * `docs/api-conventions.md` specifies, field for field, including the correlation id
- * `requestIdMiddleware` attached upstream.
+ * `requestIdMiddleware` attached upstream and the `path` the filter writes (`echoedPath`).
  */
 export function createOriginCheckMiddleware(
   allowedOrigins: readonly string[],
@@ -235,7 +236,7 @@ export function createOriginCheckMiddleware(
       // operator with a misconfigured WEB_URL, finds the value in the access log line for
       // the same request id rather than in a body a browser hands to a hostile page.
       message: 'Cross-origin state-changing request rejected',
-      path: req.path,
+      path: echoedPath(req.url),
       timestamp: new Date().toISOString(),
       ...(requestId !== undefined ? { requestId } : {}),
     });

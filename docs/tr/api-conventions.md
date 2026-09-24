@@ -643,7 +643,7 @@ isimleriyle):
 | `error`      | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`) |
 | `message`    | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                       |
 | `details`    | array  | hayır   | Alan bazlı validation problemleri; yalnızca `400`/`422`'de mevcut                |
-| `path`       | string | evet    | Request path'i                                                                   |
+| `path`       | string | evet    | Request path'i, query string olmadan                                             |
 | `timestamp`  | string | evet    | ISO 8601 UTC                                                                     |
 | `requestId`  | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                 |
 
@@ -652,6 +652,13 @@ isimleriyle):
 - `message`, production'da asla ham bir exception string'i değildir, stack trace'ler
   döndürülmez, loglanır.
 - Client'lar `message` metnine değil, `statusCode` ve `error`'a göre dallanır.
+- `path`, isteğin gönderildiği yoldur ve ondan sonrasını içermez: ne query string ne fragment.
+  Bir query bir linkten gelen token'ı taşıyabilir ve client onu zaten bilir. Nest'in var olmayan
+  bir rota için verdiği kendi `404`'ü de aynı yolu anar: tüm URL'yi değil, `Cannot GET /nope`.
+  API'nin sunduğu en uzun rotanın (üç id'si yazılmış hâliyle 153 karakter) çok üstündeki 256
+  karakteri aşan bir yol, ilk 256 karakterine kesilir ve ardından `[+N more]` gelir, bir adın
+  kesildiği gibi (sonraki madde). Erişim logu da yolu yazar, bu kesme olmadan
+  ([Request korelasyonu](#request-korelasyonu)); ikisini `requestId` birleştirir.
 - Client'ın seçtiği bir ad `details` içinde yalnızca 64 karaktere kadar olduğu gibi yazılır.
   DTO'nun tanımlamadığı bir anahtar adıyla reddedilir, hem `field`'da hem yeniden `message`'da
   (`property <ad> should not exist`); 64 karakteri aşan her biri ilk 64 karakterine kesilir ve

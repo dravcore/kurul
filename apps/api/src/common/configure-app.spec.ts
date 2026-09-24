@@ -828,6 +828,93 @@ describe('configureApp validation of a key the DTO does not declare', () => {
 });
 
 /**
+ * The envelope's `path` is the request path (`docs/api-conventions.md#errors`), and it used to be
+ * the whole request URL. Asserted through the whole stack `configureApp` installs because two
+ * layers wrote the URL: `AllExceptionsFilter` in `path`, and Nest's own not-found handler in
+ * `message`, which only a real router produces.
+ */
+describe('configureApp error envelope path', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logLines: string[];
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TitleProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    titleHandler.mockClear();
+    logLines = [];
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      logLines.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /** The access-log line for the request just made, parsed. */
+  function accessLog(): AccessLogLine {
+    const lines = logLines.filter((line) => line.startsWith('{'));
+    expect(lines).toHaveLength(1);
+    return JSON.parse(lines[0] ?? '{}') as AccessLogLine;
+  }
+
+  it('leaves a 16,000-character query out of a 404, which named it twice', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/nope?${'q'.repeat(16_000)}`)
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      statusCode: 404,
+      error: 'Not Found',
+      message: 'Cannot GET /nope',
+      path: '/nope',
+    });
+    // 32,174 bytes before, measured through this same stack: the query in `path` and again in
+    // Nest's `Cannot GET <url>`.
+    expect(Buffer.byteLength(response.text)).toBeLessThan(512);
+    // The access log has always written the path alone; the two now agree, and the id joins them.
+    expect(accessLog()).toMatchObject({ path: '/nope', requestId: response.body.requestId });
+    expect(response.headers['x-request-id']).toBe(response.body.requestId);
+  });
+
+  it('never reads a token in the query back, on a route that exists', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/title?token=s3cr3t')
+      .send({})
+      .expect(400);
+
+    expect(response.body).toMatchObject({ message: 'Validation failed', path: '/probe/title' });
+    expect(response.text).not.toContain('s3cr3t');
+    expect(titleHandler).not.toHaveBeenCalled();
+  });
+
+  it('cuts a path longer than any route after 256 characters', async () => {
+    const echoed = `/nope/${'p'.repeat(250)}[+15750 more]`;
+
+    const response = await request(app.getHttpServer())
+      .get(`/nope/${'p'.repeat(16_000)}`)
+      .expect(404);
+
+    expect(response.body).toMatchObject({ message: `Cannot GET ${echoed}`, path: echoed });
+    expect(Buffer.byteLength(response.text)).toBeLessThan(1024);
+  });
+});
+
+/**
  * The access log's line for a request whose connection closed before its response finished.
  *
  * `finish` never fires on such a response, and until the middleware listened for `close` as well

@@ -9,7 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma';
-import { echoedName } from '../echoed-name';
+import { echoedName, echoedPath } from '../echoed-name';
 import { isProductionEnv } from '../env';
 import { getRequestId } from '../logging/request-id';
 import { captureServerError, type ServerErrorContext } from '../observability/sentry';
@@ -23,6 +23,7 @@ interface ProblemDetails {
   details?: ValidationDetail[];
   /** Present only on a plan-limit refusal (ADR 0032): which ceiling, and the two numbers. */
   planLimit?: PlanLimitDetail;
+  /** The request path, without its query string, as `echoedPath` gives it. */
   path: string;
   timestamp: string;
   requestId?: string;
@@ -378,6 +379,28 @@ function boundedMulterRefusal(message: string): string {
 }
 
 /**
+ * Nest's sentence for a request no route matched, with the path in it as the envelope's `path`
+ * has it, and any other message as it was.
+ *
+ * `RoutesResolver.registerNotFoundHandler` (`@nestjs/core` 11.2.1) answers such a request with a
+ * `NotFoundException` reading `Cannot <method> <url>`, the URL being `request.originalUrl`: the
+ * whole request target, query string included, as long as Node lets a request's head be.
+ * `echoedPath` takes the query out of `path`, and without this the same query would still come
+ * back one field up. Measured through the stack `configureApp` installs, a 16,000-character query
+ * key on a route that does not exist was a 16,017-character message, and a `?token=` came back in
+ * it.
+ *
+ * Only that exact sentence, rebuilt from this request, counts. A handler's own `404` that happens
+ * to name a URL is somebody else's wording and stays as written.
+ */
+function boundedNotFound(message: string, request: Request, path: string): string {
+  const url = typeof request.originalUrl === 'string' ? request.originalUrl : request.url;
+  return message === `Cannot ${request.method} ${url}`
+    ? `Cannot ${request.method} ${path}`
+    : message;
+}
+
+/**
  * The sentences multer raises as a plain `Error` when the request stream fails under it, rather
  * than because of anything in the body (`lib/make-middleware.js`, multer 2.3.0): on the request's
  * `aborted` event, on a `close` that comes before the body ended, and on an `error` event that
@@ -560,12 +583,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const requestId = getRequestId(request);
+    // The path the envelope repeats and the report carries, one value for both: the request
+    // target without its query string, cut after 256 characters. See `echoedPath`.
+    const path = echoedPath(typeof request.url === 'string' ? request.url : '');
     // Built once and shared by every `reportFailure` branch below. `statusCode` is filled in
     // per branch because only the `HttpException` path knows a code other than 500.
     const failureContext: ServerErrorContext = {
       ...(requestId !== undefined ? { requestId } : {}),
       ...(typeof request.method === 'string' ? { method: request.method } : {}),
-      ...(typeof request.url === 'string' ? { path: request.url } : {}),
+      ...(typeof request.url === 'string' ? { path } : {}),
     };
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -605,6 +631,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // `boundedMulterRefusal`.
       if (statusCode === HttpStatus.BAD_REQUEST) {
         message = boundedMulterRefusal(message);
+      }
+
+      // Nest's answer to a request no route matched, which repeats the whole request URL. See
+      // `boundedNotFound`.
+      if (statusCode === HttpStatus.NOT_FOUND) {
+        message = boundedNotFound(message, request, path);
       }
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -699,7 +731,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
       ...(details ? { details } : {}),
       ...(planLimit ? { planLimit } : {}),
-      path: request.url,
+      path,
       timestamp: new Date().toISOString(),
       // Present on every response the running app produces (`requestIdMiddleware` runs
       // ahead of the router), which is what makes a reported failure traceable: the same id

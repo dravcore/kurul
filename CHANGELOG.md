@@ -95,6 +95,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sets a route's status ahead of its handler. A line without a status is `warn`, like the `400`
   the API gives a client that stops sending mid-body. A response that finishes emits `close` too,
   and still writes one line; lines for such requests are exactly as they were.
+- **The error envelope's `path` is the request path, without the query string.**
+  `docs/api-conventions.md` defines `path` as the request path, but `AllExceptionsFilter` and the
+  Better Auth mount wrote the whole request URL there, and Nest's own answer to a route that does
+  not exist, `Cannot GET <url>`, repeated the URL again in `message`. A query string can carry a
+  token from a link and is as long as Node lets a request's head be: measured through the stack
+  `configureApp` installs, a 16,000-character query key on a route that does not exist came back
+  twice in a 32,174-byte envelope, and a `?token=` came back in both fields. `path` now stops at
+  the first `?` or `#`, where Express stops when it routes, and the filter writes Nest's not-found
+  sentence with the same path, `Cannot GET /nope`: the same request is a 172-byte envelope. Past
+  256 characters, well beyond the 153 of the longest route with its three ids filled in, a path is
+  cut to its first 256 followed by `[+N more]`, so a 16,000-character path is a 700-byte envelope
+  where it was 32,174. The origin check's `403` writes `path` the same way, and a `500` reported
+  to error tracking carries the same path the client read. The access log, which has always
+  dropped the query, is unchanged, and `requestId` still joins its line to the envelope.
 
 ### Security
 

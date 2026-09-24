@@ -631,7 +631,7 @@ the framework's built-in exceptions and hand-written ones look identical):
 | `error`      | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
 | `message`    | string | yes      | Human-readable, single sentence, safe to log                        |
 | `details`    | array  | no       | Per-field validation problems; present only for `400`/`422`         |
-| `path`       | string | yes      | Request path                                                        |
+| `path`       | string | yes      | Request path, without the query string                              |
 | `timestamp`  | string | yes      | ISO 8601 UTC                                                        |
 | `requestId`  | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
 
@@ -640,6 +640,13 @@ the framework's built-in exceptions and hand-written ones look identical):
 - `message` is never a raw exception string in production, and stack traces are logged, not
   returned.
 - Clients branch on `statusCode` and `error`, never on `message` text.
+- `path` is the path the request was sent to and nothing after it: no query string and no
+  fragment. A query can carry a token from a link, and the client already has it. Nest's own
+  `404` for a route that does not exist names the same path, `Cannot GET /nope` and not the whole
+  URL. Past 256 characters, well beyond the longest route the API serves (153 with its three ids
+  filled in), a path is cut to its first 256 followed by `[+N more]`, as a name is (next item).
+  The access log writes the path as well, without that cut (see
+  [Request correlation](#request-correlation)), and the `requestId` joins the two.
 - A name the client chose is repeated in `details` whole only up to 64 characters. A key the DTO
   does not declare is refused by name, in `field` and again in `message`
   (`property <name> should not exist`), and past 64 characters each is cut to its first 64

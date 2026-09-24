@@ -8,6 +8,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
 import { transformException } from '@nestjs/platform-express/multer/multer/multer.utils';
@@ -192,6 +193,61 @@ describe('AllExceptionsFilter', () => {
       filter.catch(new HttpException('boom', status), host);
 
       expect(body(response).error).toBe(phrase);
+    });
+  });
+
+  /**
+   * `path` is the request path (`docs/api-conventions.md#errors`), and the envelope used to carry
+   * the whole request URL there: a query string as long as Node lets a request's head be, and any
+   * token a link put in it. The request-level case, with Nest's real not-found handler, is in
+   * `configure-app.spec.ts`.
+   */
+  describe('path', () => {
+    it('repeats the request path without its query string', () => {
+      const { host, response } = createHost('/workspaces/w_1/tasks?token=s3cr3t&q=salary');
+
+      filter.catch(new HttpException('Nope', HttpStatus.FORBIDDEN), host);
+
+      expect(body(response).path).toBe('/workspaces/w_1/tasks');
+      expect(JSON.stringify(body(response))).not.toContain('s3cr3t');
+    });
+
+    it('writes the same path into Nest’s own sentence for a route that does not exist', () => {
+      const url = '/nope?token=s3cr3t';
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET', originalUrl: url });
+
+      // What `RoutesResolver.registerNotFoundHandler` throws, word for word.
+      filter.catch(new NotFoundException(`Cannot GET ${url}`), host);
+
+      expect(body(response)).toMatchObject({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'Cannot GET /nope',
+        path: '/nope',
+      });
+      expect(JSON.stringify(body(response))).not.toContain('s3cr3t');
+    });
+
+    it('cuts a path past 256 characters, in `path` and in that sentence alike', () => {
+      const url = `/nope/${'p'.repeat(16_000)}`;
+      const echoed = `/nope/${'p'.repeat(250)}[+15750 more]`;
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET', originalUrl: url });
+
+      filter.catch(new NotFoundException(`Cannot GET ${url}`), host);
+
+      expect(body(response)).toMatchObject({ message: `Cannot GET ${echoed}`, path: echoed });
+    });
+
+    it('leaves a handler’s own 404 as written, even one that names a URL', () => {
+      const url = '/workspaces/w_1/tasks?view=board';
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET', originalUrl: url });
+
+      filter.catch(new NotFoundException(`Cannot find ${url}`), host);
+
+      expect(body(response)).toMatchObject({
+        message: `Cannot find ${url}`,
+        path: '/workspaces/w_1/tasks',
+      });
     });
   });
 
@@ -1282,6 +1338,18 @@ describe('AllExceptionsFilter', () => {
       filter.catch(error, createHost().host);
 
       expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('reports the path it repeats, cut the same way', async () => {
+      const { scope } = await enableFakeSentry();
+      const url = `/workspaces/${'w'.repeat(16_000)}?token=s3cr3t`;
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET' });
+
+      filter.catch(new Error('database unreachable'), host);
+
+      const { path } = body(response);
+      expect(path).toBe(`/workspaces/${'w'.repeat(244)}[+15756 more]`);
+      expect(scope.setContext).toHaveBeenCalledWith('request', { method: 'GET', path });
     });
 
     it('wraps a non-Error throw so Sentry has something to group by', async () => {
