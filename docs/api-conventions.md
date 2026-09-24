@@ -480,15 +480,15 @@ like the per-file one. LINK attachments store no bytes: they neither count again
 are refused by a full one.
 
 **A multipart body multer refuses is `400`.** A second file, a file part under any name but
-`file`, more text fields than the route takes, or a field name carrying an array index above `0`
-(`items[1]`: the limit that closes
+`file`, more text fields than the route takes, a text value of 8 KiB or more, or a field name
+carrying an array index above `0` (`items[1]`: the limit that closes
 [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)) never reaches the
 handler. The envelope's `message` is multer's own sentence with the part name after it;
 [Errors](#errors) says why the wording is multer's. A part name longer than 64 characters is
-refused on its own, as `Field name too long`, and never repeated. A `Content-Type` the multipart
-parser cannot read, such as `multipart/mixed`, is a `400` too. An upload the client abandons
-partway is never reported, and gets a `400` only if something can still be written to it, which
-by the time the parser notices is normally not the case.
+refused on its own, as `Field name too long`, and no refusal repeats more than 64 characters of a
+name. A `Content-Type` the multipart parser cannot read, such as `multipart/mixed`, is a `400`
+too. An upload the client abandons partway is never reported, and gets a `400` only if something
+can still be written to it, which by the time the parser notices is normally not the case.
 
 **Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
 media type (never the one the client declared at upload), `Content-Length`, and
@@ -640,6 +640,12 @@ the framework's built-in exceptions and hand-written ones look identical):
 - `message` is never a raw exception string in production, and stack traces are logged, not
   returned.
 - Clients branch on `statusCode` and `error`, never on `message` text.
+- A name the client chose is repeated in `details` whole only up to 64 characters. A key the DTO
+  does not declare is refused by name, in `field` and again in `message`
+  (`property <name> should not exist`), and past 64 characters each is cut to its first 64
+  followed by `[+N more]`: a nested `field` is cut as one path, so it still reads from its
+  declared start (`items[0].` and then the key). Every name a DTO declares is shorter than that
+  and is repeated exactly. A multipart part name gets the same bound, below.
 - A failure thrown by a library whose error vocabulary _is_ HTTP status codes — `http-errors`,
   which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
   with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx
@@ -651,11 +657,12 @@ the framework's built-in exceptions and hand-written ones look identical):
   translates, so a refusal reads the same whichever layer caught it. That is multer's sentence,
   then the part name when there is one (`Field name array index too large - items[4294967294]`).
   The part name is the client's own input and is repeated whole only up to 64 characters: both
-  multipart routes refuse a longer one before anything names it, and one that reaches the filter
-  some other way is cut to its first 64 characters followed by `[+N more]`. The one refusal that
-  can still carry a longer name is Nest's own `Field value too long - <name>`, for a text value
-  over 1 MiB. `STREAM_DESTROYED`, which multer's disk storage raises when an upload's own stream
-  has failed, is the one code that stays a `500`.
+  multipart routes refuse a longer one before anything names it, and one that is named anyway is
+  cut to its first 64 characters followed by `[+N more]`, whichever layer worded the refusal. That
+  includes Nest's own `Field value too long - <name>`, which multer raises before it looks at the
+  name's length, for a text value of the route's limit or more (8 KiB on the attachment upload,
+  1 KiB on the Trello import, which reads none). `STREAM_DESTROYED`, which multer's disk storage
+  raises when an upload's own stream has failed, is the one code that stays a `500`.
 - A multipart upload whose client leaves before the body has arrived in full is not a server
   failure and is never reported. It is answered **`400`** in this envelope, as the JSON parsers
   answer the same abort, when anything can still be written; by the time multer reports it the
@@ -677,7 +684,7 @@ The same id appears in three places, which is the point: the `X-Request-Id` head
 received, the `requestId` field of the error envelope, and the server's log lines for that
 request. A user reporting a failure quotes one id, and it selects exactly one request.
 
-Each finished request also writes a single-line JSON access log to stdout:
+Every request also writes a single-line JSON access log to stdout:
 
 ```jsonc
 {
@@ -698,6 +705,13 @@ logged: the query carries user-supplied filters and search terms, and the header
 session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw header —
 unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
 proxy's address for every request. See `TRUST_PROXY` below.
+
+The line is written when the response finishes. A request whose connection closes first, which is
+what a client that leaves mid-request looks like, gets its line when the connection closes, with
+`"aborted": true` after `status`. Its `status` is the one the client was sent, so a download cut
+short still reads `200`, or `null` when the connection closed before any status went out; a line
+with no status is `warn`, the level of the `400` the API gives a client that stops sending
+mid-body. Either way a request has one line, never two.
 
 ## Authentication
 

@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { ArgumentsHost, HttpException, HttpStatus, Logger, ValidationPipe } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import { transformException } from '@nestjs/platform-express/multer/multer/multer.utils';
 import { MulterError } from 'multer';
 import { IsInt, IsNotEmpty, Min, ValidateNested } from 'class-validator';
@@ -542,6 +550,38 @@ describe('AllExceptionsFilter', () => {
           expect.objectContaining({ message: `Invalid field name - ${'a'.repeat(63)}[+3 more]` }),
         );
       });
+
+      it('is cut the same way in a refusal Nest worded itself', () => {
+        // multer checks a text value's size before its name's length, so a value over
+        // `limits.fieldSize` is `LIMIT_FIELD_VALUE` naming its part, and Nest 11.2.1 translates
+        // that code before this filter runs. A 16,340-character name came back whole, in a
+        // 16,472-byte envelope (measured through `FileInterceptor`).
+        const name = 'a'.repeat(16_340);
+
+        expect(answer(transformException(new MulterError('LIMIT_FIELD_VALUE', name)))).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `Field value too long - ${'a'.repeat(64)}[+16276 more]`,
+        });
+      });
+
+      // The cut keys on one of multer's sentences followed by the ` - ` Nest writes after it, on
+      // the status Nest gives every refusal that names a part. Anything else is some other code's
+      // wording, and repeated exactly as written.
+      const tail = 'a'.repeat(100);
+      it.each<[string, HttpException]>([
+        ['another 400 with " - " in it', new BadRequestException(`Import failed - ${tail}`)],
+        [
+          "a sentence of multer's without the separator",
+          new BadRequestException(`${sentence}: ${tail}`),
+        ],
+        [
+          "a sentence of multer's on another status",
+          new ConflictException(`Too many files - ${tail}`),
+        ],
+      ])('is not looked for in %s', (_case, exception) => {
+        expect(answer(exception)).toEqual(expect.objectContaining({ message: exception.message }));
+      });
     });
 
     it('leaves STREAM_DESTROYED to the 500 path, which logs and reports it', () => {
@@ -588,6 +628,53 @@ describe('AllExceptionsFilter', () => {
         ]),
       );
       expect(answered).toEqual(decided);
+    });
+
+    it('cuts a part name after every sentence the installed multer refuses a request with', () => {
+      const refusals = installedMulterCodes().filter(
+        (code) => code !== 'STREAM_DESTROYED' && code !== 'LIMIT_FILE_SIZE',
+      );
+      // The read is under test too: an empty list would make the comparison below vacuous.
+      expect(refusals).toEqual(expect.arrayContaining(['LIMIT_FIELD_VALUE', 'INVALID_FIELD_NAME']));
+
+      // Each sentence as Nest writes it for the codes it translates. A sentence multer rewords
+      // fails this until the filter's list has the new wording: a Nest that matches the new
+      // wording would otherwise hand this filter a whole name again.
+      const name = 'a'.repeat(1024);
+      const answered = Object.fromEntries(
+        refusals.map((code) => {
+          const { message } = new MulterError(code);
+          return [code, answer(new BadRequestException(`${message} - ${name}`)).message];
+        }),
+      );
+      const decided = Object.fromEntries(
+        refusals.map((code) => [
+          code,
+          `${new MulterError(code).message} - ${'a'.repeat(64)}[+960 more]`,
+        ]),
+      );
+      expect(answered).toEqual(decided);
+    });
+
+    it('never repeats more than 64 characters of a part name, whichever layer words it', () => {
+      // Every code the installed multer can raise, named after a part whether or not multer names
+      // one for that code today, through the installed Nest's `transformException` as
+      // `FileInterceptor` runs it. A separator Nest changes fails here.
+      const name = 'a'.repeat(1024);
+      const codes = installedMulterCodes();
+      const thrown: unknown[] = codes.map((code) =>
+        transformException(new MulterError(code, name)),
+      );
+      // The read is under test too: Nest words the refusal the bound exists for.
+      expect(thrown[codes.indexOf('LIMIT_FIELD_VALUE')]).toBeInstanceOf(HttpException);
+
+      const repeated = Object.fromEntries(
+        codes.map((code, index) => [
+          code,
+          String(answer(thrown[index]).message).includes('a'.repeat(65)),
+        ]),
+      );
+      expect(repeated).toEqual(Object.fromEntries(codes.map((code) => [code, false])));
     });
 
     it('ignores an Error that merely carries a multer code', () => {

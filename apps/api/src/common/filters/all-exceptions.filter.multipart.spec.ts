@@ -21,6 +21,7 @@ import { connect, type AddressInfo, type Socket } from 'node:net';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AttachmentModule } from '../../attachment/attachment.module';
+import { MAX_ATTACHMENT_URL_LENGTH } from '../../attachment/dto/attachment-limits';
 import { ImportModule } from '../../import/import.module';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 
@@ -176,10 +177,14 @@ describe.each<[string, () => Promise<MulterOptions>]>([
 ])('a multer refusal on %s, through FileInterceptor', (_route, options) => {
   let app: INestApplication<App>;
   let logError: jest.SpyInstance;
+  /** The route's own `limits.fieldSize`, the most bytes of a text value busboy holds. */
+  let fieldSize: number;
 
   beforeAll(async () => {
+    const registered = await options();
+    fieldSize = registered.limits?.fieldSize ?? Number.NaN;
     const moduleRef = await Test.createTestingModule({
-      imports: [MulterModule.register(await options())],
+      imports: [MulterModule.register(registered)],
       controllers: [UploadProbeController],
     }).compile();
 
@@ -289,6 +294,41 @@ describe.each<[string, () => Promise<MulterOptions>]>([
     expect(logError).not.toHaveBeenCalled();
   });
 
+  /**
+   * multer checks a text value's size before its name's length, so a value over the route's
+   * `limits.fieldSize` is `LIMIT_FIELD_VALUE` naming its part whatever the name's length, and Nest
+   * words that refusal itself. Under a 16,340-character name, the longest a 16 KiB part-header
+   * block holds, it came back whole in a 16,472-byte envelope. busboy fires the limit on equality,
+   * so a value of exactly `fieldSize` bytes is the shortest it refuses.
+   */
+  it('refuses a text value at its limit, repeating at most 64 characters of the name', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/upload')
+      .field('n'.repeat(16_340), 'v'.repeat(fieldSize))
+      .attach('file', Buffer.alloc(16, 1), 'x.png')
+      .expect(400);
+
+    expect(response.body).toEqual({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: `Field value too long - ${'n'.repeat(64)}[+16276 more]`,
+      path: '/upload',
+      timestamp: expect.any(String),
+    });
+    expect(handler).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  // The control: the refusal above is the limit's, because a byte less under an ordinary name
+  // goes through.
+  it('takes a text value one byte under that limit', async () => {
+    await request(app.getHttpServer())
+      .post('/upload')
+      .field('note', 'v'.repeat(fieldSize - 1))
+      .attach('file', Buffer.alloc(16, 1), 'x.png')
+      .expect(201, { received: true });
+  });
+
   // The limit that was already mapped, still mapped: Nest turns `LIMIT_FILE_SIZE` into its own
   // `PayloadTooLargeException` before the filter sees it, and nothing here may change that.
   it('still answers an over-limit file with 413', async () => {
@@ -354,5 +394,22 @@ describe.each<[string, () => Promise<MulterOptions>]>([
     });
     expect(handler).not.toHaveBeenCalled();
     expect(logError).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The one text value either route has a use for with any length to it is a LINK's `url`, which
+ * the attachment upload takes as a multipart field as well as in JSON. Its `limits.fieldSize` has
+ * to hold the longest one `CreateAttachmentDto` accepts, in the most bytes UTF-8 can spend on it.
+ */
+describe("the attachment upload's text-value limit", () => {
+  it('holds the longest url CreateAttachmentDto accepts, however it is written', async () => {
+    const { limits } = await registeredMulterOptions(AttachmentModule, { maxBytes: MAX_BYTES });
+    // Three bytes a character, as `MaxLength` counts characters, is the most UTF-8 ever spends,
+    // and busboy refuses a value of exactly `fieldSize` bytes.
+    const widest = Buffer.byteLength('\u20ac'.repeat(MAX_ATTACHMENT_URL_LENGTH));
+
+    expect(widest).toBe(3 * MAX_ATTACHMENT_URL_LENGTH);
+    expect(widest).toBeLessThan(limits?.fieldSize ?? 0);
   });
 });

@@ -1493,10 +1493,14 @@ aramasıdır.
 Her iki uygulama da stdout'a loglar; Docker toplar. `docker compose logs -f api` ile geri
 okunur.
 
-API her tamamlanan istek için tek bir JSON nesnesi yazar — `ts`, `level`, `requestId`,
-`method`, `path`, `status`, `durationMs`, `userId`. Bu alan listesi bilerek kapalıdır: istek
-gövdeleri, query string'ler, header'lar ve cookie'ler asla loglanmaz; çünkü bu API session
-cookie'leri, davet token'ları ve task içeriği taşır.
+API her istek için, response'u tamamlandığında, `ts`, `level`, `requestId`, `method`, `path`,
+`status`, `durationMs`, `userId` ve `ip` alanlarıyla tek bir JSON nesnesi yazar. Bağlantısı
+ondan önce kapanan bir istek, örneğin yüklemenin ortasında ayrılan bir client, satırını yine de
+alır: bağlantı kapandığında, `aborted: true` ile ve hiçbir status gönderilmemişse `status`'ü
+`null` olarak yazılır (her alanı [api-conventions.md](api-conventions.md#request-korelasyonu)
+anlatır). Bu alan listesi bilerek kapalıdır: istek gövdeleri, query string'ler, header'lar ve
+cookie'ler asla loglanmaz; çünkü bu API session cookie'leri, davet token'ları ve task içeriği
+taşır.
 
 Her iki compose dosyasındaki her servis log'larını **3 dosya × 10 MB** ile sınırlar
 (`docker-compose.yml` başındaki `x-logging`). Docker'ın `json-file` varsayılanı

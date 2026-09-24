@@ -2,22 +2,29 @@ import type { NextFunction, Request, Response } from 'express';
 import { createAccessLogMiddleware, type AccessLogLine } from './access-log.middleware';
 import type { RequestWithId } from './request-id';
 
+type ResponseEvent = 'finish' | 'close';
+
 interface FakeRes {
   statusCode: number;
+  headersSent: boolean;
   once: (event: string, listener: () => void) => FakeRes;
-  finish: () => void;
+  /** Emits `event` the way Node does: each `once` listener runs at most one time. */
+  fire: (event: ResponseEvent) => void;
 }
 
-function createRes(statusCode = 200): FakeRes {
+function createRes(statusCode = 200, headersSent = true): FakeRes {
   const listeners: Record<string, Array<() => void>> = {};
   const res: FakeRes = {
     statusCode,
+    headersSent,
     once(event, listener) {
       (listeners[event] ??= []).push(listener);
       return res;
     },
-    finish() {
-      for (const listener of listeners.finish ?? []) {
+    fire(event) {
+      const pending = listeners[event] ?? [];
+      listeners[event] = [];
+      for (const listener of pending) {
         listener();
       }
     },
@@ -33,10 +40,12 @@ interface RequestOverrides {
   ip?: string;
 }
 
-function emit(
-  overrides: RequestOverrides = {},
-  statusCode = 200,
-): { lines: string[]; parsed: AccessLogLine } {
+/** Runs one request through the middleware, then fires `events` on its response in order. */
+function run(
+  overrides: RequestOverrides,
+  res: FakeRes,
+  events: readonly ResponseEvent[],
+): string[] {
   const lines: string[] = [];
   const middleware = createAccessLogMiddleware((line) => lines.push(line));
 
@@ -47,16 +56,37 @@ function emit(
     ip: '203.0.113.7',
     ...overrides,
   } as unknown as RequestWithId;
-  const res = createRes(statusCode);
   const next = jest.fn();
 
   middleware(req as Request, res as unknown as Response, next as unknown as NextFunction);
 
   expect(next).toHaveBeenCalledTimes(1);
-  // Nothing is written until the response is actually finished.
+  // Nothing is written until the response has finished, or its connection has closed.
   expect(lines).toHaveLength(0);
 
-  res.finish();
+  for (const event of events) {
+    res.fire(event);
+  }
+  return lines;
+}
+
+function emit(
+  overrides: RequestOverrides = {},
+  statusCode = 200,
+): { lines: string[]; parsed: AccessLogLine } {
+  // A response that finished, which Node follows with `close`: still one line.
+  const lines = run(overrides, createRes(statusCode), ['finish', 'close']);
+
+  expect(lines).toHaveLength(1);
+  return { lines, parsed: JSON.parse(lines[0] ?? '{}') as AccessLogLine };
+}
+
+/** A request whose connection closed before its response finished, so `finish` never came. */
+function emitAborted(
+  overrides: RequestOverrides = {},
+  res: FakeRes = createRes(200, false),
+): { lines: string[]; parsed: AccessLogLine } {
+  const lines = run(overrides, res, ['close']);
 
   expect(lines).toHaveLength(1);
   return { lines, parsed: JSON.parse(lines[0] ?? '{}') as AccessLogLine };
@@ -201,6 +231,87 @@ describe('createAccessLogMiddleware', () => {
       'ts',
       'userId',
     ]);
+  });
+
+  /**
+   * A response whose connection is gone never emits `finish`, so until the middleware listened for
+   * `close` too, a client that left mid-body, or while its handler ran, or partway through a
+   * download left no line at all (measured through `configureApp`; the real sockets are in
+   * `configure-app.spec.ts`).
+   */
+  describe('a request whose connection closed before its response finished', () => {
+    it('still gets its line, marked aborted, with no status when none was sent', () => {
+      const { lines, parsed } = emitAborted({
+        method: 'POST',
+        originalUrl: '/workspaces/w_1/tasks/t_1/attachments',
+        requestId: 'req-abcdefgh',
+      });
+
+      expect(lines[0]).not.toContain('\n');
+      expect(parsed).toMatchObject({
+        level: 'warn',
+        requestId: 'req-abcdefgh',
+        method: 'POST',
+        path: '/workspaces/w_1/tasks/t_1/attachments',
+        status: null,
+        aborted: true,
+        ip: '203.0.113.7',
+      });
+      expect(parsed.durationMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('never reports a status the client was not sent', () => {
+      // Measured: Nest sets a route's `@HttpCode` on the response ahead of the handler, so an
+      // upload whose client left read 201 on `res.statusCode` with nothing written at all.
+      expect(emitAborted({}, createRes(201, false)).parsed).toMatchObject({
+        status: null,
+        level: 'warn',
+      });
+    });
+
+    it.each<[number, AccessLogLine['level']]>([
+      [200, 'info'],
+      [404, 'warn'],
+      [503, 'error'],
+    ])('keeps a %i that went out, at level %s, when the body was cut short', (status, level) => {
+      // A download whose client left partway: the status line reached it, the body did not.
+      expect(emitAborted({}, createRes(status, true)).parsed).toMatchObject({
+        status,
+        level,
+        aborted: true,
+      });
+    });
+
+    it('logs the same closed set, plus the marker', () => {
+      const { parsed } = emitAborted({ requestId: 'req-abcdefgh', user: { id: 'u_1' } });
+
+      expect(Object.keys(parsed).sort()).toEqual([
+        'aborted',
+        'durationMs',
+        'ip',
+        'level',
+        'method',
+        'path',
+        'requestId',
+        'status',
+        'ts',
+        'userId',
+      ]);
+    });
+  });
+
+  it.each<[string, ResponseEvent[]]>([
+    ['finished, then closed', ['finish', 'close']],
+    ['closed, then finished', ['close', 'finish']],
+    ['closed twice', ['close', 'close']],
+  ])('writes one line, never two, for a response %s', (_order, events) => {
+    // Node emits `close` after `finish` on every response that finished; the other orders cannot
+    // happen, and the guard holds either way.
+    expect(run({}, createRes(200), events)).toHaveLength(1);
+  });
+
+  it('marks nothing on a response that finished', () => {
+    expect('aborted' in emit().parsed).toBe(false);
   });
 
   it('covers non-GET methods', () => {

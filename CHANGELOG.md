@@ -53,6 +53,48 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cannot pad the envelope either; up to 64 the message is exactly Nest's. One echo is left, and
   it is Nest's: multer checks a text value's size before its name's length, so a value over 1 MiB
   still comes back as `Field value too long - <name>`, bounded by the 16 KiB header block.
+- **The part name in `Field value too long` is cut after 64 characters too, and a multipart text
+  value gets the room its route needs rather than 1 MiB.** multer checks a text value's size
+  before its name's length, so a value over the limit under a long name is refused with the name
+  in the message, and `@nestjs/platform-express` 11.2.1 words that refusal itself,
+  `Field value too long - <name>`, before `AllExceptionsFilter` sees a `MulterError`:
+  `limits.fieldNameSize` never reaches it. Measured through `FileInterceptor` on both multipart
+  routes, a 16,340-character name, the longest a 16 KiB part-header block holds, came back whole
+  in a 16,472-byte error envelope. The filter now recognises a `400` that is one of multer's
+  refusal sentences followed by the ` - ` Nest writes after it, and cuts the name the way it cuts
+  its own: the same request is a 209-byte envelope ending in `[+16276 more]`. A spec reads
+  multer's sentence table and runs Nest's translation over every code, so a rewording on either
+  side fails a test instead of letting a whole name through again. busboy also held up to 1 MiB
+  of every text field, 8 MiB across the eight the attachment upload allows and 4 MiB across the
+  Trello import's four, though the import reads none: `limits.fieldSize` is now 8 KiB on the
+  attachment upload, four bytes a character of the longest `url` a LINK takes, and 1 KiB on the
+  import. A value of the limit or more is refused as `Field value too long`, naming its part.
+- **A key the DTO does not declare is no longer repeated back at any length.** The global
+  `ValidationPipe` refuses such a key by name, twice, in `details[].field` and in
+  `property <name> should not exist`, and a key is as long as the JSON body limit or the request
+  line allows. Measured through the stack `configureApp` installs: a 20 KiB key came back as a
+  41,239-byte error envelope, a key filling the 1 MiB body as a 2 MiB envelope, and a
+  16,000-character query key three times over in 48,284 bytes. `validationExceptionFactory` now
+  cuts a name after 64 characters with the same `[+N more]` the multipart refusals use: `field`
+  as one path, so a nested one still reads from its declared start (`items[0].` and then the
+  key), and the name in `message` on its own. The 20 KiB key is now a 433-byte envelope. The query
+  key is cut in `details` as well and still comes back once in `path`, which repeats the request's
+  URL for every error, as it always has, within the 16 KiB Node allows a request's head. A name of
+  64 characters or fewer, which is every name a DTO declares, comes back exactly as before, and
+  `details` keeps its shape. One function, `common/echoed-name.ts`, cuts both kinds of name, and
+  `AllExceptionsFilter` shares it.
+- **A request whose client leaves before the response finishes is in the access log.** The line
+  was written on the response's `finish` event, which a response whose connection is gone never
+  emits, so a JSON body or an upload abandoned mid-body, a client that gave up while its handler
+  was still running, and a download cut short left no line at all (measured through the stack
+  `configureApp` installs, with a raw socket that stopped partway). `AllExceptionsFilter` logs no
+  disconnect either, so those requests were in no log anywhere. The line is now also written when
+  the connection closes, with the same fields and `"aborted": true`. `status` is the one the
+  client was sent, so a download cut short still reads `200`, or `null` when none went out:
+  `res.statusCode` is no evidence before then, and read `201` on an abandoned upload because Nest
+  sets a route's status ahead of its handler. A line without a status is `warn`, like the `400`
+  the API gives a client that stops sending mid-body. A response that finishes emits `close` too,
+  and still writes one line; lines for such requests are exactly as they were.
 
 ### Security
 

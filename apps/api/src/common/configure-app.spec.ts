@@ -10,9 +10,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, MulterModule } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import { IsString } from 'class-validator';
 import { diskStorage, memoryStorage } from 'multer';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+import { connect, type AddressInfo, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
@@ -98,6 +101,23 @@ class EchoProbeController {
   echo(@Body() payload: Record<string, unknown>): { keys: number } {
     echoHandler(payload);
     return { keys: Object.keys(payload ?? {}).length };
+  }
+}
+
+class TitleDto {
+  @IsString()
+  title!: string;
+}
+
+/** Records whether a body got past the global `ValidationPipe`, so "refused by it" is observable. */
+const titleHandler = jest.fn();
+
+@Controller('probe')
+class TitleProbeController {
+  @Post('title')
+  create(@Body() dto: TitleDto): { ok: true } {
+    titleHandler(dto);
+    return { ok: true };
   }
 }
 
@@ -742,5 +762,216 @@ describe('configureApp request body limit (configured)', () => {
 
     expect(response.body).toMatchObject({ statusCode: 400, error: 'Bad Request' });
     expect(logError).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `forbidNonWhitelisted` refuses a key the DTO does not declare by name, in `field` and again in
+ * `message` (`property <name> should not exist`), and a key is as long as the body limit lets it
+ * be. Asserted through the whole stack `configureApp` installs, the JSON parser at its default
+ * limit, the global `ValidationPipe` with `validationExceptionFactory`, and `AllExceptionsFilter`,
+ * because the claim is about what a client reads, not what the factory returns on its own
+ * (`validation-exception.factory.spec.ts` pins that).
+ */
+describe('configureApp validation of a key the DTO does not declare', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TitleProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    titleHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('repeats at most 64 characters of a 20 KiB key', async () => {
+    const echoed = `${'k'.repeat(64)}[+20416 more]`;
+
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ title: 'x', ['k'.repeat(20 * 1024)]: 1 }))
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Validation failed',
+      details: [
+        {
+          field: echoed,
+          constraint: 'whitelistValidation',
+          message: `property ${echoed} should not exist`,
+        },
+      ],
+    });
+    // 41,239 bytes before the bound, measured through this same stack.
+    expect(Buffer.byteLength(response.text)).toBeLessThan(512);
+    expect(titleHandler).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The access log's line for a request whose connection closed before its response finished.
+ *
+ * `finish` never fires on such a response, and until the middleware listened for `close` as well
+ * a request that ended that way left no line anywhere (measured with exactly these requests).
+ * Sent through a raw socket, the technique `all-exceptions.filter.multipart.spec.ts` uses, since a
+ * client that stops partway is the only way to produce one: a JSON body the parser is still
+ * reading, and an upload multer is still reading.
+ */
+describe('configureApp access log for a client that leaves mid-request', () => {
+  const BOUNDARY = 'kurul-abandoned-upload';
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logLines: string[];
+  let onBodyFlowing: (() => void) | undefined;
+  let onResponseClosed: (() => void) | undefined;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        MulterModule.register({
+          storage: memoryStorage(),
+          limits: { fileSize: PROBE_MAX_BYTES, files: 1, fields: 8 },
+        }),
+      ],
+      controllers: [EchoProbeController, UploadProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    // Ahead of everything `configureApp` installs, so its `close` listener runs before the access
+    // log's: by the time a test awaiting it resumes, the access log has had its turn.
+    app.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      req.once('resume', () => onBodyFlowing?.());
+      res.once('close', () => onResponseClosed?.());
+      next();
+    });
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    logLines = [];
+    echoHandler.mockClear();
+    uploadHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      logLines.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /** Every access-log line written so far, parsed. */
+  function accessLogLines(): AccessLogLine[] {
+    return logLines
+      .filter((line) => line.startsWith('{'))
+      .map((line) => JSON.parse(line) as AccessLogLine);
+  }
+
+  /** Resolves when the next request's body starts flowing, or when its response closes. */
+  function nextEvent(hook: 'body' | 'close'): Promise<void> {
+    return new Promise((resolve) => {
+      if (hook === 'body') onBodyFlowing = resolve;
+      else onResponseClosed = resolve;
+    });
+  }
+
+  /** Sends `head` and the start of a body, then drops the connection once the body is read. */
+  async function abandon(head: string, bodyStart: string): Promise<void> {
+    const server = app.getHttpServer() as unknown as Server;
+    if (!server.listening) {
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    }
+    const { port } = server.address() as AddressInfo;
+    const socket = await new Promise<Socket>((resolve, reject) => {
+      const opened: Socket = connect(port, '127.0.0.1', () => resolve(opened));
+      opened.once('error', reject);
+    });
+    socket.on('error', () => undefined);
+
+    const flowing = nextEvent('body');
+    const closed = nextEvent('close');
+    socket.write(`${head}\r\n\r\n${bodyStart}`);
+    await flowing;
+    socket.destroy();
+    await closed;
+  }
+
+  // The control, and the other half of "one line per request": a response that finishes emits
+  // `close` as well, and must not be logged twice.
+  it('writes one line for a request that finished, and marks nothing on it', async () => {
+    const closed = nextEvent('close');
+    await request(app.getHttpServer()).post('/probe/echo').send({ a: 1 }).expect(201);
+    await closed;
+
+    const lines = accessLogLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ method: 'POST', path: '/probe/echo', status: 201 });
+    expect('aborted' in (lines[0] ?? {})).toBe(false);
+  });
+
+  it('writes one line for a JSON body whose client left partway', async () => {
+    await abandon(
+      'POST /probe/echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n' +
+        'Content-Length: 8192',
+      `{"pad":"${'x'.repeat(64)}`,
+    );
+
+    const lines = accessLogLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      level: 'warn',
+      method: 'POST',
+      path: '/probe/echo',
+      status: null,
+      aborted: true,
+    });
+    expect(lines[0]?.requestId).toMatch(UUID_V7_REGEX);
+    expect(echoHandler).not.toHaveBeenCalled();
+  });
+
+  it('writes one line for an upload whose client left partway, with no status', async () => {
+    await abandon(
+      'POST /probe/upload HTTP/1.1\r\nHost: localhost\r\n' +
+        `Content-Type: multipart/form-data; boundary=${BOUNDARY}\r\nContent-Length: 8192`,
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="x.png"\r\n` +
+        `Content-Type: image/png\r\n\r\n${'x'.repeat(64)}`,
+    );
+
+    const lines = accessLogLines();
+    expect(lines).toHaveLength(1);
+    // `status` is `null` although Nest had already put the route's 201 on the response.
+    expect(lines[0]).toMatchObject({
+      level: 'warn',
+      method: 'POST',
+      path: '/probe/upload',
+      status: null,
+      aborted: true,
+    });
+    expect(uploadHandler).not.toHaveBeenCalled();
   });
 });
