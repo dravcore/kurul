@@ -1089,9 +1089,12 @@ proxy's ceiling is too low (see "Why the proxy's number is 26 MiB and the API's 
 The third row is a different limit that happens to share the status code: `REQUEST_BODY_MAX_BYTES`
 (default `1048576`, 1 MiB) caps the **JSON and form-encoded** bodies every other endpoint takes,
 and no attachment ever passes through it. The same sentence under a `path` starting with `/auth/`
-is the smaller `AUTH_BODY_MAX_BYTES` (64 KiB) instead; see rule 1 above. If you see either,
-nothing about your storage or your proxy is misconfigured: some request simply sent more JSON
-than the API accepts.
+is the smaller `AUTH_BODY_MAX_BYTES` (64 KiB) instead; see rule 1 above. The same sentence also
+answers a JSON body holding more than 1,000 values, or a form body with more than 1,000 fields,
+however few bytes it takes: the API refuses those before validating them (see
+[api-conventions.md](api-conventions.md#request-body-size)). If you see any of these, nothing
+about your storage or your proxy is misconfigured: some request simply sent more JSON than the
+API accepts.
 
 The fourth row is a different failure again: the file is under `ATTACHMENT_MAX_BYTES`, but storing
 it would push a workspace or the instance over its quota. See "Attachment storage is unbounded

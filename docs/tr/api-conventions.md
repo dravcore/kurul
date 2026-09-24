@@ -414,6 +414,14 @@ Kurallar:
 form-encoded body'dir.** Bunun üstünde cevap, yukarıdaki hata zarfı içinde `413`'tür — bir client
 hatasıdır ve tıpkı bir `404` ya da `403` gibi hata takibine **bilinçli olarak** bildirilmez.
 
+**Bir JSON body ayrıca en fazla 1.000 değer taşır**; her derinlikteki her objenin her üyesi ve her
+array'in her elemanı sayılır, kaç bayt tuttukları fark etmez. Bunun üstünde cevap, body'yi hiçbir
+şey doğrulamadan önce, yine aynı `413`'tür: doğrulama her anahtarı dolaşır ve on binlerce anahtarlı
+tek bir obje bütün süreci saniyelerce meşgul ediyordu (868.891 bayttaki 80.000 kısa anahtar 3
+saniye sürüyordu). 1.000, form-encoded parser'ın bir form body'ye her zaman izin verdiği ve
+aşıldığında aynı şekilde reddettiği alan sayısıdır; herhangi bir ucun aldığı en büyük body ise 802
+değer taşır: kabul ettiği en fazla workspace kararıyla, 200 kararla, bir hesap silme.
+
 Bu, _parse edilmiş bir body'nin_ boyutudur ve `ATTACHMENT_MAX_BYTES` ile ilgisi yoktur: bir
 yükleme `multipart/form-data`'dır ve bu limit onu hiç görmez — onları multer okur, kendi
 tavanıyla (bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)).
@@ -637,21 +645,29 @@ isimleriyle):
 }
 ```
 
-| Alan         | Tip    | Zorunlu | Anlam                                                                            |
-| ------------ | ------ | ------- | -------------------------------------------------------------------------------- |
-| `statusCode` | number | evet    | HTTP status'ünü yansıtır                                                         |
-| `error`      | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`) |
-| `message`    | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                       |
-| `details`    | array  | hayır   | Alan bazlı validation problemleri; yalnızca `400`/`422`'de mevcut                |
-| `path`       | string | evet    | Request path'i                                                                   |
-| `timestamp`  | string | evet    | ISO 8601 UTC                                                                     |
-| `requestId`  | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                 |
+| Alan             | Tip    | Zorunlu | Anlam                                                                                |
+| ---------------- | ------ | ------- | ------------------------------------------------------------------------------------ |
+| `statusCode`     | number | evet    | HTTP status'ünü yansıtır                                                             |
+| `error`          | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`)     |
+| `message`        | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                           |
+| `details`        | array  | hayır   | Alan bazlı validation problemleri, en fazla 100; yalnızca `400`/`422`'de mevcut      |
+| `detailsOmitted` | number | hayır   | `details`'in dışarıda bıraktığı problem sayısı; yalnızca bir şey bıraktığında mevcut |
+| `path`           | string | evet    | Request path'i, query string olmadan                                                 |
+| `timestamp`      | string | evet    | ISO 8601 UTC                                                                         |
+| `requestId`      | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                     |
 
 - Tek bir global exception filter, ele alınmamışlar dahil **her** hata için bu şekli
   üretir. API'nin hiçbir yerinde ikinci bir hata formatı yoktur.
 - `message`, production'da asla ham bir exception string'i değildir, stack trace'ler
   döndürülmez, loglanır.
 - Client'lar `message` metnine değil, `statusCode` ve `error`'a göre dallanır.
+- `path`, isteğin gönderildiği yoldur ve ondan sonrasını içermez: ne query string ne fragment.
+  Bir query bir linkten gelen token'ı taşıyabilir ve client onu zaten bilir. Nest'in var olmayan
+  bir rota için verdiği kendi `404`'ü de aynı yolu anar: tüm URL'yi değil, `Cannot GET /nope`.
+  API'nin sunduğu en uzun rotanın (üç id'si yazılmış hâliyle 153 karakter) çok üstündeki 256
+  karakteri aşan bir yol, ilk 256 karakterine kesilir ve ardından `[+N more]` gelir, bir adın
+  kesildiği gibi (sonraki madde). Erişim logu da yolu yazar, bu kesme olmadan
+  ([Request korelasyonu](#request-korelasyonu)); ikisini `requestId` birleştirir.
 - Client'ın seçtiği bir ad `details` içinde yalnızca 64 karaktere kadar olduğu gibi yazılır.
   DTO'nun tanımlamadığı bir anahtar adıyla reddedilir, hem `field`'da hem yeniden `message`'da
   (`property <ad> should not exist`); 64 karakteri aşan her biri ilk 64 karakterine kesilir ve
@@ -659,6 +675,13 @@ isimleriyle):
   başlangıcından okunmaya devam eder (`items[0].` ve ardından anahtar). Bir DTO'nun tanımladığı
   her ad bundan kısadır ve olduğu gibi yazılır. Multipart bir parça adı da aşağıda aynı sınırı
   alır.
+- `details` en fazla 100 problem listeler: validation'ın onları bulduğu sıradaki ilkleri, ki bu
+  sıra DTO'nun tanımlamadığı anahtarları öne koyar. Daha fazlasını bulan bir ret, kaçını dışarıda
+  bıraktığını `detailsOmitted` içinde söyler; bu alan pozitif bir tam sayıdır ve yalnızca o
+  durumda bulunur. `details` şeklini korur. Bir değerin geçemediği her kural için bir, tanımlanmamış
+  her anahtar için bir kayıt vardır, yani liste eskiden gövdeyle birlikte büyürdü: 868.891 baytlık
+  bir gövdedeki 80.000 kısa anahtar 7.898.051 baytlık bir zarf üretiyordu. Hiçbir form 100'e
+  yaklaşmaz; en büyük DTO, her alanı yanlış olduğunda 12 şekilde reddedilir.
 - Hata sözlüğü _zaten_ HTTP status kodları olan bir kütüphanenin fırlattığı bir hata —
   Express'in body parser'larının fırlattığı `http-errors` — bu zarf içinde **kendi 4xx'i** ile
   cevaplanır; metin kütüphanenin değil, burada seçilendir. Eşleme bilinçli olarak 4xx'te durur:

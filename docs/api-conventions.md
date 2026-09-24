@@ -406,6 +406,14 @@ Rules:
 the API will read.** Over it, the answer is `413` in the error envelope above — a client error,
 and one that is deliberately **not** reported to error tracking, exactly like a `404` or a `403`.
 
+**A JSON body also holds at most 1,000 values**, counting every member of every object and every
+element of every array at any depth, however few bytes they take. Over that, the answer is the
+same `413`, before anything validates the body: validation walks every key, and one object with
+tens of thousands of them held the whole process for seconds (80,000 short keys in 868,891 bytes
+took 3 seconds). 1,000 is the number of fields the form-encoded parser has always allowed a form
+body, refused the same way, and the largest body any endpoint takes holds 802 values: an account
+deletion with the most workspace dispositions it accepts, 200.
+
 This is the size of a _parsed body_ and it is unrelated to `ATTACHMENT_MAX_BYTES`: an upload is
 `multipart/form-data`, which this limit never sees — multer reads those, with its own ceiling
 (see [File uploads and downloads](#file-uploads-and-downloads)).
@@ -625,27 +633,41 @@ the framework's built-in exceptions and hand-written ones look identical):
 }
 ```
 
-| Field        | Type   | Required | Meaning                                                             |
-| ------------ | ------ | -------- | ------------------------------------------------------------------- |
-| `statusCode` | number | yes      | Mirrors the HTTP status                                             |
-| `error`      | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
-| `message`    | string | yes      | Human-readable, single sentence, safe to log                        |
-| `details`    | array  | no       | Per-field validation problems; present only for `400`/`422`         |
-| `path`       | string | yes      | Request path                                                        |
-| `timestamp`  | string | yes      | ISO 8601 UTC                                                        |
-| `requestId`  | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
+| Field            | Type   | Required | Meaning                                                             |
+| ---------------- | ------ | -------- | ------------------------------------------------------------------- |
+| `statusCode`     | number | yes      | Mirrors the HTTP status                                             |
+| `error`          | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
+| `message`        | string | yes      | Human-readable, single sentence, safe to log                        |
+| `details`        | array  | no       | Per-field validation problems, at most 100; only for `400`/`422`    |
+| `detailsOmitted` | number | no       | How many problems `details` left out; present only when it did      |
+| `path`           | string | yes      | Request path, without the query string                              |
+| `timestamp`      | string | yes      | ISO 8601 UTC                                                        |
+| `requestId`      | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
 
 - One global exception filter produces this shape for **every** error, including unhandled
   ones. There is no second error format anywhere in the API.
 - `message` is never a raw exception string in production, and stack traces are logged, not
   returned.
 - Clients branch on `statusCode` and `error`, never on `message` text.
+- `path` is the path the request was sent to and nothing after it: no query string and no
+  fragment. A query can carry a token from a link, and the client already has it. Nest's own
+  `404` for a route that does not exist names the same path, `Cannot GET /nope` and not the whole
+  URL. Past 256 characters, well beyond the longest route the API serves (153 with its three ids
+  filled in), a path is cut to its first 256 followed by `[+N more]`, as a name is (next item).
+  The access log writes the path as well, without that cut (see
+  [Request correlation](#request-correlation)), and the `requestId` joins the two.
 - A name the client chose is repeated in `details` whole only up to 64 characters. A key the DTO
   does not declare is refused by name, in `field` and again in `message`
   (`property <name> should not exist`), and past 64 characters each is cut to its first 64
   followed by `[+N more]`: a nested `field` is cut as one path, so it still reads from its
   declared start (`items[0].` and then the key). Every name a DTO declares is shorter than that
   and is repeated exactly. A multipart part name gets the same bound, below.
+- `details` lists at most 100 problems, the first ones in the order validation found them, which
+  puts keys the DTO does not declare first. A refusal that found more says how many it left out
+  in `detailsOmitted`, a positive integer present only then; `details` keeps its shape. There is
+  one entry per rule a value failed and one per undeclared key, so the list used to grow with the
+  body: 80,000 short keys in an 868,891-byte body made a 7,898,051-byte envelope. No form comes
+  near 100, and the largest DTO fails in 12 ways with every field wrong.
 - A failure thrown by a library whose error vocabulary _is_ HTTP status codes — `http-errors`,
   which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
   with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx

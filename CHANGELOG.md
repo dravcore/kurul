@@ -50,9 +50,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   multipart routes now set `limits.fieldNameSize` to `64`, which multer enforces itself: a longer
   name is `Field name too long`, a refusal that names no part. `AllExceptionsFilter` repeats at
   most 64 characters of a part name, then `[+N more]`, so a name that reaches it another way
-  cannot pad the envelope either; up to 64 the message is exactly Nest's. One echo is left, and
-  it is Nest's: multer checks a text value's size before its name's length, so a value over 1 MiB
-  still comes back as `Field value too long - <name>`, bounded by the 16 KiB header block.
+  cannot pad the envelope either; up to 64 the message is exactly Nest's. That includes the one
+  refusal multer raises before it checks a name's length, `Field value too long - <name>`, which
+  Nest words itself: the next entry cuts its name the same way.
 - **The part name in `Field value too long` is cut after 64 characters too, and a multipart text
   value gets the room its route needs rather than 1 MiB.** multer checks a text value's size
   before its name's length, so a value over the limit under a long name is refused with the name
@@ -78,11 +78,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cuts a name after 64 characters with the same `[+N more]` the multipart refusals use: `field`
   as one path, so a nested one still reads from its declared start (`items[0].` and then the
   key), and the name in `message` on its own. The 20 KiB key is now a 433-byte envelope. The query
-  key is cut in `details` as well and still comes back once in `path`, which repeats the request's
-  URL for every error, as it always has, within the 16 KiB Node allows a request's head. A name of
-  64 characters or fewer, which is every name a DTO declares, comes back exactly as before, and
-  `details` keeps its shape. One function, `common/echoed-name.ts`, cuts both kinds of name, and
-  `AllExceptionsFilter` shares it.
+  key is cut in `details` as well, and `path` no longer carries the query string at all: see the
+  entry on `path` below. A name of 64 characters or fewer, which is every name a DTO declares,
+  comes back exactly as before, and `details` keeps its shape. One function,
+  `common/echoed-name.ts`, cuts both kinds of name, and `AllExceptionsFilter` shares it.
 - **A request whose client leaves before the response finishes is in the access log.** The line
   was written on the response's `finish` event, which a response whose connection is gone never
   emits, so a JSON body or an upload abandoned mid-body, a client that gave up while its handler
@@ -95,6 +94,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sets a route's status ahead of its handler. A line without a status is `warn`, like the `400`
   the API gives a client that stops sending mid-body. A response that finishes emits `close` too,
   and still writes one line; lines for such requests are exactly as they were.
+- **The error envelope's `path` is the request path, without the query string.**
+  `docs/api-conventions.md` defines `path` as the request path, but `AllExceptionsFilter` and the
+  Better Auth mount wrote the whole request URL there, and Nest's own answer to a route that does
+  not exist, `Cannot GET <url>`, repeated the URL again in `message`. A query string can carry a
+  token from a link and is as long as Node lets a request's head be: measured through the stack
+  `configureApp` installs, a 16,000-character query key on a route that does not exist came back
+  twice in a 32,174-byte envelope, and a `?token=` came back in both fields. `path` now stops at
+  the first `?` or `#`, where Express stops when it routes, and the filter writes Nest's not-found
+  sentence with the same path, `Cannot GET /nope`: the same request is a 172-byte envelope. Past
+  256 characters, well beyond the 153 of the longest route with its three ids filled in, a path is
+  cut to its first 256 followed by `[+N more]`, so a 16,000-character path is a 700-byte envelope
+  where it was 32,174. The origin check's `403` writes `path` the same way, and a `500` reported
+  to error tracking carries the same path the client read. The access log, which has always
+  dropped the query, is unchanged, and `requestId` still joins its line to the envelope.
+- **A validation refusal lists at most 100 problems, and says how many more it found.**
+  `validationExceptionFactory` writes one `details` entry per rule a value failed, and the global
+  `ValidationPipe` fails every key the DTO does not declare, so the list was as long as the body
+  let it be; the 64-character cut above bounds each entry, not how many there are. Measured
+  through the stack `configureApp` installs, 80,000 short unknown keys in an 868,891-byte body
+  came back as a 7,898,051-byte envelope listing 80,001 entries, and 40,000 empty `dispositions`
+  in an account deletion body, 120,042 bytes, as a 9,458,100-byte one. `AllExceptionsFilter` now
+  lists the first 100 in the order class-validator reported them and adds `detailsOmitted`, the
+  number it left out, a member present only then: both requests are now envelopes under 12 KiB.
+  `details` keeps its shape, so a client that reads only the list sees the first hundred problems,
+  and the web app reads neither. No form comes near the cap: the largest DTO fails in twelve ways
+  with every field wrong. `VALIDATION_DETAILS_MAX` in `@kurul/shared-types` carries the number,
+  and the OpenAPI document describes the new member.
 
 ### Security
 
@@ -105,6 +131,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `express`, directly and through the `body-parser` it depends on, into `apps/api`'s tree under
   `@nestjs/platform-express`. Express asks for `qs@^6.14.0` and body-parser for `qs@^6.15.2`;
   every range already admits 6.16.0, so this is a lockfile change and nothing more.
+- **A JSON body holding more values than any endpoint takes is refused before validation.** The
+  global `ValidationPipe` hands every body to class-transformer before class-validator sees it,
+  and class-transformer 0.5.1 de-duplicates an object's keys in time quadratic in their number,
+  so what a body cost followed its shape, which nothing bounded, rather than its size, which
+  `REQUEST_BODY_MAX_BYTES` did. Measured through the stack `configureApp` installs: 80,000 short
+  keys in an 868,891-byte body took 3 seconds to refuse, during which the process served nothing
+  else, and 131,071 keys filling the 1 MiB default took 8. A value nested 10,000 deep, 20 KB, and
+  349,511 empty `dispositions` in an account deletion body were each a `500`, logged and reported
+  to error tracking, the second after 3.3 seconds. Every such route needs a session or a token,
+  which open sign-up, the default, gives anyone, and the default rate limit lets one address send
+  100 of these requests a minute to each route. A JSON body may now hold at most 1,000 values,
+  every member and every array element at any depth, the number of fields the form-encoded parser
+  has always allowed a form body; over that, the answer is the same `413`
+  (`Request body is too large`), and nothing is validated. All four bodies above are refused in
+  under 100 ms. The largest body any endpoint takes, an account deletion with the most workspace
+  dispositions it accepts, holds 802 values.
 
 ## [0.4.1] - 2026-09-23
 

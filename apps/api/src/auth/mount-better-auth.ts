@@ -3,6 +3,7 @@ import { toNodeHandler } from 'better-auth/node';
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { PLAN_LIMIT_ERROR, SIGNUP_DISABLED_ERROR, type PlanLimitDetail } from '@kurul/shared-types';
+import { echoedPath } from '../common/echoed-name';
 import { isProductionEnv } from '../common/env';
 import { REQUEST_BODY_TOO_LARGE_MESSAGE } from '../common/filters/all-exceptions.filter';
 import { getRequestId } from '../common/logging/request-id';
@@ -100,7 +101,10 @@ interface Refusal {
  * By hand because no exception filter is listening below the Nest router, which is the reason
  * the organization firewall writes its own. It carries the fields the filter would have
  * produced, `requestId` included: `requestIdMiddleware` runs above this mount, so the id in
- * the response body is the id in the `X-Request-Id` header and in the access log line.
+ * the response body is the id in the `X-Request-Id` header and in the access log line. `path`
+ * is the filter's too, here and in `failClosed` below: the request path without its query string
+ * (`echoedPath`). The verification link Better Auth emails carries its token in the query
+ * (`/auth/verify-email?token=`), and a `500` on it used to read the token back.
  */
 function refuse(req: Request, res: Response, refusal: Refusal): void {
   const requestId = getRequestId(req);
@@ -110,7 +114,7 @@ function refuse(req: Request, res: Response, refusal: Refusal): void {
     error: refusal.error,
     message: refusal.message,
     ...(refusal.planLimit === undefined ? {} : { planLimit: refusal.planLimit }),
-    path: req.url,
+    path: echoedPath(req.url),
     timestamp: new Date().toISOString(),
     ...(requestId === undefined ? {} : { requestId }),
   });
@@ -141,7 +145,7 @@ function failClosed(req: Request, res: Response, cause: unknown): void {
   captureServerError(error, {
     ...(requestId === undefined ? {} : { requestId }),
     ...(typeof req.method === 'string' ? { method: req.method } : {}),
-    ...(typeof req.url === 'string' ? { path: req.url } : {}),
+    ...(typeof req.url === 'string' ? { path: echoedPath(req.url) } : {}),
     statusCode: 500,
   });
 
@@ -154,7 +158,7 @@ function failClosed(req: Request, res: Response, cause: unknown): void {
     statusCode: 500,
     error: 'Internal Server Error',
     message: isProductionEnv() ? 'An unexpected error occurred' : error.message,
-    path: req.url,
+    path: echoedPath(req.url),
     timestamp: new Date().toISOString(),
     ...(requestId === undefined ? {} : { requestId }),
   });

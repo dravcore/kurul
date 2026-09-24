@@ -8,12 +8,14 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
 import { transformException } from '@nestjs/platform-express/multer/multer/multer.utils';
 import { MulterError } from 'multer';
 import { IsInt, IsNotEmpty, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { VALIDATION_DETAILS_MAX } from '@kurul/shared-types';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { Prisma } from '../../generated/prisma';
 import { initSentry, resetSentryForTesting } from '../observability/sentry';
@@ -195,6 +197,61 @@ describe('AllExceptionsFilter', () => {
     });
   });
 
+  /**
+   * `path` is the request path (`docs/api-conventions.md#errors`), and the envelope used to carry
+   * the whole request URL there: a query string as long as Node lets a request's head be, and any
+   * token a link put in it. The request-level case, with Nest's real not-found handler, is in
+   * `configure-app.spec.ts`.
+   */
+  describe('path', () => {
+    it('repeats the request path without its query string', () => {
+      const { host, response } = createHost('/workspaces/w_1/tasks?token=s3cr3t&q=salary');
+
+      filter.catch(new HttpException('Nope', HttpStatus.FORBIDDEN), host);
+
+      expect(body(response).path).toBe('/workspaces/w_1/tasks');
+      expect(JSON.stringify(body(response))).not.toContain('s3cr3t');
+    });
+
+    it('writes the same path into Nest’s own sentence for a route that does not exist', () => {
+      const url = '/nope?token=s3cr3t';
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET', originalUrl: url });
+
+      // What `RoutesResolver.registerNotFoundHandler` throws, word for word.
+      filter.catch(new NotFoundException(`Cannot GET ${url}`), host);
+
+      expect(body(response)).toMatchObject({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'Cannot GET /nope',
+        path: '/nope',
+      });
+      expect(JSON.stringify(body(response))).not.toContain('s3cr3t');
+    });
+
+    it('cuts a path past 256 characters, in `path` and in that sentence alike', () => {
+      const url = `/nope/${'p'.repeat(16_000)}`;
+      const echoed = `/nope/${'p'.repeat(250)}[+15750 more]`;
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET', originalUrl: url });
+
+      filter.catch(new NotFoundException(`Cannot GET ${url}`), host);
+
+      expect(body(response)).toMatchObject({ message: `Cannot GET ${echoed}`, path: echoed });
+    });
+
+    it('leaves a handler’s own 404 as written, even one that names a URL', () => {
+      const url = '/workspaces/w_1/tasks?view=board';
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET', originalUrl: url });
+
+      filter.catch(new NotFoundException(`Cannot find ${url}`), host);
+
+      expect(body(response)).toMatchObject({
+        message: `Cannot find ${url}`,
+        path: '/workspaces/w_1/tasks',
+      });
+    });
+  });
+
   describe('validation details', () => {
     it('reports the real field name and constraint for each failure', async () => {
       const pipe = new ValidationPipe({
@@ -260,6 +317,84 @@ describe('AllExceptionsFilter', () => {
       const problem = body(response);
       expect(problem.message).toBe('Validation failed');
       expect(problem.details).toEqual([{ field: 'title', message: 'title should not be empty' }]);
+    });
+
+    /**
+     * One entry per failed rule, and every key the DTO does not declare is one: 80,000 short keys
+     * in an 868,891-byte body made a 7,898,051-byte envelope (measured through `configureApp`,
+     * where `configure-app.spec.ts` sends the request-level case). The first hundred are listed,
+     * in class-validator's order, and `detailsOmitted` counts the rest.
+     */
+    describe('how many are listed', () => {
+      /** The refusal for a valid `CreateTaskDto` carrying `count` keys it does not declare. */
+      async function refusalWithUnknownKeys(count: number): Promise<unknown> {
+        const pipe = new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+          exceptionFactory: validationExceptionFactory,
+        });
+        const unknown = Object.fromEntries(Array.from({ length: count }, (_, i) => [`k${i}`, 1]));
+
+        return pipe
+          .transform(
+            { title: 'x', estimatedMinutes: 0, assignee: { email: 'a' }, ...unknown },
+            { type: 'body', metatype: CreateTaskDto },
+          )
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+      }
+
+      it('is at most 100, the number `VALIDATION_DETAILS_MAX` publishes', () => {
+        expect(VALIDATION_DETAILS_MAX).toBe(100);
+      });
+
+      it('lists 100 problems whole and adds nothing', async () => {
+        const { host, response } = createHost();
+
+        filter.catch(await refusalWithUnknownKeys(100), host);
+
+        const problem = body(response);
+        expect(problem.details).toHaveLength(100);
+        expect('detailsOmitted' in problem).toBe(false);
+      });
+
+      it('lists the first 100 of 101 in the order they came, and counts the one left out', async () => {
+        const { host, response } = createHost();
+
+        filter.catch(await refusalWithUnknownKeys(101), host);
+
+        const problem = body(response);
+        const details = problem.details as Array<Record<string, unknown>>;
+        expect(details).toHaveLength(100);
+        expect(details[0]).toEqual({
+          field: 'k0',
+          constraint: 'whitelistValidation',
+          message: 'property k0 should not exist',
+        });
+        expect(details[99]?.field).toBe('k99');
+        expect(problem.detailsOmitted).toBe(1);
+        expect(problem).toMatchObject({ statusCode: 400, message: 'Validation failed' });
+      });
+
+      it('bounds class-validator’s own string messages the same way', () => {
+        const { host, response } = createHost();
+        const messages = Array.from({ length: 101 }, (_, i) => `k${i} should not exist`);
+
+        filter.catch(
+          new HttpException(
+            { statusCode: 400, message: messages, error: 'Bad Request' },
+            HttpStatus.BAD_REQUEST,
+          ),
+          host,
+        );
+
+        const problem = body(response);
+        expect(problem.details).toHaveLength(100);
+        expect(problem.detailsOmitted).toBe(1);
+      });
     });
   });
 
@@ -1282,6 +1417,18 @@ describe('AllExceptionsFilter', () => {
       filter.catch(error, createHost().host);
 
       expect(captureException).toHaveBeenCalledWith(error);
+    });
+
+    it('reports the path it repeats, cut the same way', async () => {
+      const { scope } = await enableFakeSentry();
+      const url = `/workspaces/${'w'.repeat(16_000)}?token=s3cr3t`;
+      const { host, response } = createHost(url, REQUEST_ID, { method: 'GET' });
+
+      filter.catch(new Error('database unreachable'), host);
+
+      const { path } = body(response);
+      expect(path).toBe(`/workspaces/${'w'.repeat(244)}[+15756 more]`);
+      expect(scope.setContext).toHaveBeenCalledWith('request', { method: 'GET', path });
     });
 
     it('wraps a non-Error throw so Sentry has something to group by', async () => {

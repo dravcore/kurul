@@ -1109,8 +1109,11 @@ API'ninki neden 25" bölümüne bakın).
 (varsayılan `1048576`, 1 MiB) diğer bütün uçların aldığı **JSON ve form-encoded** gövdeleri
 sınırlar ve hiçbir attachment oradan geçmez. Aynı cümle `/auth/` ile başlayan bir `path` altında
 geliyorsa limit, daha küçük olan `AUTH_BODY_MAX_BYTES`'tır (64 KiB); yukarıdaki kural 1'e bakın.
-İkisinden birini görüyorsanız ne storage'ınızda ne proxy'nizde yanlış bir şey var; bir istek
-yalnızca API'nin kabul ettiğinden fazla JSON göndermiştir.
+Aynı cümle, kaç bayt tutarsa tutsun 1.000'den fazla değer taşıyan bir JSON gövdeye ya da 1.000'den
+fazla alanlı bir form gövdeye de verilir: API bunları doğrulamadan önce reddeder (bkz.
+[api-conventions.md](api-conventions.md#request-body-boyutu)). Bunlardan birini görüyorsanız ne
+storage'ınızda ne proxy'nizde yanlış bir şey var; bir istek yalnızca API'nin kabul ettiğinden
+fazla JSON göndermiştir.
 
 Dördüncü satır ise başka bir başarısızlıktır: dosya `ATTACHMENT_MAX_BYTES`'ın altındadır, ama onu
 saklamak bir workspace'i ya da instance'ı kendi kotasının üzerine çıkarır. Boyutlandırma için

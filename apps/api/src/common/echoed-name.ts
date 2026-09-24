@@ -5,6 +5,35 @@
 const ECHOED_NAME_MAX_LENGTH = 64;
 
 /**
+ * The longest request path an error envelope repeats whole, in the same unit.
+ *
+ * Above every path the API serves, so none is ever shortened. The longest route in
+ * `apps/api/openapi.json`, which lists every route the Nest router owns, is
+ * `/workspaces/{workspaceId}/tasks/{taskId}/checklist-items/{itemId}/position`: 153 characters
+ * with its three UUIDs filled in. The Better Auth mount, which the document leaves out, serves
+ * nothing longer than `/auth/reset-password/<token>`, 45 characters with Better Auth's 24-character
+ * token. 256 leaves room for a route one id deeper than today's deepest. The cut is for a path
+ * nothing routes, which Node's 16 KiB limit on a request's head bounds and nothing else.
+ */
+const ECHOED_PATH_MAX_LENGTH = 256;
+
+/**
+ * `value` whole up to `maxLength` characters, and past that the first `maxLength` followed by
+ * `[+N more]`: the one cut both bounds below share.
+ */
+function echoed(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  const cut = value.slice(0, maxLength);
+  // Never half a surrogate pair: `JSON.stringify` would write the orphan out as a bare `\ud83d`.
+  const last = cut.charCodeAt(cut.length - 1);
+  const head = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  return `${head}[+${value.length - head.length} more]`;
+}
+
+/**
  * A name the client chose, as an error message repeats it back: whole up to 64 characters, and
  * past that the first 64 followed by `[+N more]`.
  *
@@ -26,13 +55,34 @@ const ECHOED_NAME_MAX_LENGTH = 64;
  * shortened either.
  */
 export function echoedName(name: string): string {
-  if (name.length <= ECHOED_NAME_MAX_LENGTH) {
-    return name;
-  }
+  return echoed(name, ECHOED_NAME_MAX_LENGTH);
+}
 
-  const cut = name.slice(0, ECHOED_NAME_MAX_LENGTH);
-  // Never half a surrogate pair: `JSON.stringify` would write the orphan out as a bare `\ud83d`.
-  const last = cut.charCodeAt(cut.length - 1);
-  const head = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
-  return `${head}[+${name.length - head.length} more]`;
+/**
+ * The path of a request as an error envelope repeats it back: the request target up to its query
+ * string or fragment, whole up to 256 characters and past that cut as `echoedName` cuts a name.
+ *
+ * `docs/api-conventions.md` defines the envelope's `path` as the request path, and the filter and
+ * the Better Auth mount wrote the whole request URL there instead. A query string is the client's
+ * own input, and nothing in it helps a client that already sent it: it can carry a token from a
+ * link (`?token=`), which the envelope then repeats to wherever the client shows or logs its
+ * errors, and it is as long as Node lets a request's head be. Measured through the stack
+ * `configureApp` installs, a 16,000-character query key sent to a route that does not exist came
+ * back twice, in `path` and in Nest's `Cannot GET <url>`, as a 32,174-byte envelope. The access
+ * log for the same request wrote `/nope`: it has always dropped the query
+ * (`access-log.middleware.ts`), so the two now agree, and the `requestId` both carry joins them.
+ *
+ * Cut at the first `?` or `#`, whichever comes first, which is the pathname Express routes on:
+ * its `parseurl` stops at `?`, and hands a target holding a `#` to `url.parse`, whose pathname
+ * stops there as well. No browser sends a `#`, but Node passes one through in the request line
+ * (measured: `GET /probe/list#frag` reached the `/probe/list` handler). An absolute-form target
+ * (`GET http://host/path`), which only a proxy or a hand-written request sends, keeps its scheme
+ * and host, as the access log keeps them.
+ *
+ * `AllExceptionsFilter`, the Better Auth mount and the origin check all write `path` with this,
+ * so an envelope reads the same whichever of them wrote it.
+ */
+export function echoedPath(url: string): string {
+  const end = url.search(/[?#]/);
+  return echoed(end === -1 ? url : url.slice(0, end), ECHOED_PATH_MAX_LENGTH);
 }

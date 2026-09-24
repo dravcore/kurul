@@ -68,6 +68,24 @@ describe('createAuthRequestHandler', () => {
       expect(authHandler).not.toHaveBeenCalled();
     });
 
+    it('repeats the path without its query string, as the exception filter does', async () => {
+      process.env[SIGNUP_ENABLED_ENV] = 'false';
+      const { handle } = build();
+      const { res, json } = fakeResponse();
+
+      await handle(
+        fakeRequest(
+          'POST',
+          '/auth/sign-up/email?callbackURL=%2Fverified&token=s3cr3t',
+          'req-0000005',
+        ),
+        res,
+      );
+
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({ path: '/auth/sign-up/email' }));
+      expect(JSON.stringify(json.mock.calls)).not.toContain('s3cr3t');
+    });
+
     it('leaves sign-in and every other auth route open', async () => {
       process.env[SIGNUP_ENABLED_ENV] = 'false';
       const { handle, authHandler } = build();

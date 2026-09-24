@@ -825,6 +825,215 @@ describe('configureApp validation of a key the DTO does not declare', () => {
     expect(Buffer.byteLength(response.text)).toBeLessThan(512);
     expect(titleHandler).not.toHaveBeenCalled();
   });
+
+  it('lists the first 100 of 1,001 problems and counts the rest', async () => {
+    const keys = Array.from({ length: 1000 }, (_, i) => [`k${i}`, 1]);
+
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify(Object.fromEntries(keys)))
+      .expect(400);
+
+    // A thousand unknown keys and the missing title, in class-validator's order: the keys first.
+    // The hundred listed are the first hundred keys; the title is among the 901 counted.
+    const details = response.body.details as Array<{ field: string }>;
+    expect(details).toHaveLength(100);
+    expect(details.map((detail) => detail.field)).toEqual(keys.slice(0, 100).map(([key]) => key));
+    expect(response.body).toMatchObject({ message: 'Validation failed', detailsOmitted: 901 });
+    // 95,051 bytes listing all 1,001, measured through this same stack; 80,000 short keys made
+    // 7,898,051.
+    expect(Buffer.byteLength(response.text)).toBeLessThan(12 * 1024);
+  });
+});
+
+/**
+ * A JSON body holds at most 1,000 values (`json-value-limit.ts`). `REQUEST_BODY_MAX_BYTES` bounds
+ * a body's size and nothing bounded its shape, and `ValidationPipe` pays for the shape: measured
+ * through this same stack, 80,000 short keys took 3 seconds to refuse, the process doing nothing
+ * else meanwhile, and a value nested 10,000 deep was a `500`. The urlencoded parser has always
+ * refused a form body over 1,000 fields with the same `413`.
+ */
+describe('configureApp JSON body value ceiling', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logError: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TitleProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    titleHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+    logError.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /** A JSON object of `count` keys the DTO does not declare, and nothing else. */
+  function keys(count: number): string {
+    return JSON.stringify(
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`k${i}`, 1])),
+    );
+  }
+
+  it('refuses 80,000 keys with the 413 an oversized body gets, before validating them', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(keys(80_000))
+      .expect(413);
+
+    expect(response.body).toMatchObject({
+      statusCode: 413,
+      error: 'Payload Too Large',
+      message: 'Request body is too large',
+      path: '/probe/title',
+    });
+    expect(titleHandler).not.toHaveBeenCalled();
+    // A client's doing, like every 413: not logged, so not reported either.
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('lets 1,000 values through to validation and refuses 1,001', async () => {
+    await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(keys(1000))
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(keys(1001))
+      .expect(413);
+  });
+
+  it('answers a value nested 10,000 deep with the same 413, where it was a 500', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(`{"title":"x","deep":${'['.repeat(10_000)}${']'.repeat(10_000)}}`)
+      .expect(413);
+
+    expect(response.body.message).toBe('Request body is too large');
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it('leaves a form body to the parameter limit of its own parser', async () => {
+    // 600 fields nested one level down are 1,200 values as this ceiling counts them, and within
+    // the 1,000 fields the urlencoded parser allows, so validation is what refuses them.
+    const form = Array.from({ length: 600 }, (_, i) => `k${i}[a]=1`).join('&');
+
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(`${form}&title=x`)
+      .expect(400);
+
+    expect(response.body).toMatchObject({ message: 'Validation failed', detailsOmitted: 500 });
+  });
+});
+
+/**
+ * The envelope's `path` is the request path (`docs/api-conventions.md#errors`), and it used to be
+ * the whole request URL. Asserted through the whole stack `configureApp` installs because two
+ * layers wrote the URL: `AllExceptionsFilter` in `path`, and Nest's own not-found handler in
+ * `message`, which only a real router produces.
+ */
+describe('configureApp error envelope path', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+  let logLines: string[];
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TitleProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    titleHandler.mockClear();
+    logLines = [];
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      logLines.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /** The access-log line for the request just made, parsed. */
+  function accessLog(): AccessLogLine {
+    const lines = logLines.filter((line) => line.startsWith('{'));
+    expect(lines).toHaveLength(1);
+    return JSON.parse(lines[0] ?? '{}') as AccessLogLine;
+  }
+
+  it('leaves a 16,000-character query out of a 404, which named it twice', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/nope?${'q'.repeat(16_000)}`)
+      .expect(404);
+
+    expect(response.body).toMatchObject({
+      statusCode: 404,
+      error: 'Not Found',
+      message: 'Cannot GET /nope',
+      path: '/nope',
+    });
+    // 32,174 bytes before, measured through this same stack: the query in `path` and again in
+    // Nest's `Cannot GET <url>`.
+    expect(Buffer.byteLength(response.text)).toBeLessThan(512);
+    // The access log has always written the path alone; the two now agree, and the id joins them.
+    expect(accessLog()).toMatchObject({ path: '/nope', requestId: response.body.requestId });
+    expect(response.headers['x-request-id']).toBe(response.body.requestId);
+  });
+
+  it('never reads a token in the query back, on a route that exists', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/probe/title?token=s3cr3t')
+      .send({})
+      .expect(400);
+
+    expect(response.body).toMatchObject({ message: 'Validation failed', path: '/probe/title' });
+    expect(response.text).not.toContain('s3cr3t');
+    expect(titleHandler).not.toHaveBeenCalled();
+  });
+
+  it('cuts a path longer than any route after 256 characters', async () => {
+    const echoed = `/nope/${'p'.repeat(250)}[+15750 more]`;
+
+    const response = await request(app.getHttpServer())
+      .get(`/nope/${'p'.repeat(16_000)}`)
+      .expect(404);
+
+    expect(response.body).toMatchObject({ message: `Cannot GET ${echoed}`, path: echoed });
+    expect(Buffer.byteLength(response.text)).toBeLessThan(1024);
+  });
 });
 
 /**

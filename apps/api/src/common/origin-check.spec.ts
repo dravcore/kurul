@@ -154,6 +154,17 @@ describe('origin check middleware', () => {
       expect(JSON.stringify(response.body)).not.toContain(WEB_ORIGIN);
     });
 
+    it('with the path the exception filter would write, query dropped and length cut', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/probe/${'p'.repeat(16_000)}?token=s3cr3t`)
+        .set('Origin', EVIL_ORIGIN)
+        .send({ name: 'csrf' })
+        .expect(403);
+
+      expect(response.body.path).toBe(`/probe/${'p'.repeat(249)}[+15751 more]`);
+      expect(response.text).not.toContain('s3cr3t');
+    });
+
     it('a form-encoded cross-site POST — the shape no CORS preflight ever sees', async () => {
       // The vector this middleware exists for: `application/x-www-form-urlencoded` makes the
       // request "simple", so the browser sends it without asking CORS anything at all. Nest's

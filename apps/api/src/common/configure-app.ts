@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { mountBetterAuth } from '../auth/mount-better-auth';
 import { envInt } from './env';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { jsonValueLimit } from './json-value-limit';
 import { createAccessLogMiddleware } from './logging/access-log.middleware';
 import { requestIdMiddleware } from './logging/request-id';
 import { createOriginCheckMiddleware, resolveAllowedOrigins } from './origin-check';
@@ -24,8 +25,8 @@ import { validationExceptionFactory } from './validation/validation-exception.fa
  * over that — generous enough that no honest client meets it, small enough that a body sits in
  * memory for a moment rather than being a denial-of-service primitive (`ValidationPipe` and
  * `class-transformer` both walk the parsed object, so the cost of a body is not linear in its
- * size). Ten times the accidental default it replaces, which is the direction the accident was
- * wrong in.
+ * size, which is why a JSON body's shape has a ceiling of its own: `json-value-limit.ts`). Ten
+ * times the accidental default it replaces, which is the direction the accident was wrong in.
  *
  * **Why it is a variable and not a constant.** P3-3 (Trello import) will POST a real board
  * export as a JSON body, and a real export passes 100 kB easily and can pass 1 MiB. That item
@@ -183,6 +184,12 @@ export function configureApp(
   const bodyParserApp = app as INestApplication & BodyParserCapable;
   bodyParserApp.useBodyParser('json', { limit: bodyLimit });
   bodyParserApp.useBodyParser('urlencoded', { limit: bodyLimit, extended: true });
+
+  // The ceiling on a JSON body's shape, which the byte limit above does not bound: at most 1,000
+  // values, the number of fields the urlencoded parser already allows a form body. Straight after
+  // the parsers, so a body is refused as soon as it is parsed and before `ValidationPipe` walks
+  // it, which is where the cost of a body with too many keys was measured (`json-value-limit.ts`).
+  app.use(jsonValueLimit);
 
   app.useGlobalPipes(
     new ValidationPipe({

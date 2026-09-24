@@ -9,11 +9,11 @@ import {
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma';
-import { echoedName } from '../echoed-name';
+import { echoedName, echoedPath } from '../echoed-name';
 import { isProductionEnv } from '../env';
 import { getRequestId } from '../logging/request-id';
 import { captureServerError, type ServerErrorContext } from '../observability/sentry';
-import { PlanLimitCode, type PlanLimitDetail } from '@kurul/shared-types';
+import { PlanLimitCode, VALIDATION_DETAILS_MAX, type PlanLimitDetail } from '@kurul/shared-types';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -21,8 +21,11 @@ interface ProblemDetails {
   error: string;
   message: string;
   details?: ValidationDetail[];
+  /** Present only when `details` left entries out: how many. See `cappedDetails`. */
+  detailsOmitted?: number;
   /** Present only on a plan-limit refusal (ADR 0032): which ceiling, and the two numbers. */
   planLimit?: PlanLimitDetail;
+  /** The request path, without its query string, as `echoedPath` gives it. */
   path: string;
   timestamp: string;
   requestId?: string;
@@ -74,6 +77,46 @@ function asValidationDetails(value: unknown): ValidationDetail[] | undefined {
   }
 
   return details;
+}
+
+/**
+ * `details` as the envelope lists it: the first `VALIDATION_DETAILS_MAX` entries in the order they
+ * came, and how many were left out.
+ *
+ * `validationExceptionFactory` writes one entry per rule a value failed, and `forbidNonWhitelisted`
+ * fails every key the DTO does not declare, so the list was as long as the body let it be.
+ * Measured through the stack `configureApp` installs: 80,000 short unknown keys, an 868,891-byte
+ * body, came back as a 7,898,051-byte envelope listing 80,001 entries, and 40,000 empty
+ * `dispositions` sent to `DeleteAccountDto`, 120,042 bytes, as 9,458,100 bytes listing 80,001.
+ * Each entry was already bounded (`echoedName`); their number was not.
+ *
+ * A hundred is more than any client needs to see what it got wrong, and more than any form
+ * produces: `CreateTaskDto`, the largest, fails in twelve ways with every field wrong. The one
+ * DTO whose own bounds allow more is `DeleteAccountDto`, 401 entries when all 200 of its
+ * `dispositions` are wrong, and its first hundred already show the pattern. The first hundred in
+ * the order class-validator reported them, rather than a choice among them, so the cut never
+ * reorders what a client reads; a key the DTO does not declare comes first in that order, which
+ * is class-validator's.
+ *
+ * The count goes in a member of its own, `detailsOmitted`, present only when something was left
+ * out, and not in the list: an entry names a field a client may render or focus, and one that
+ * stood for the rest would name a field that does not exist. `details` keeps its shape, so a
+ * client reading only the list is unaffected.
+ *
+ * Capped here, where the envelope is written, rather than in the factory, because `details`
+ * reaches the envelope from two places, the factory's list and class-validator's own `string[]`
+ * messages (`detailsFromMessages`), and a cap in one of them would leave the other unbounded.
+ */
+function cappedDetails(details: ValidationDetail[]): {
+  details: ValidationDetail[];
+  detailsOmitted?: number;
+} {
+  return details.length <= VALIDATION_DETAILS_MAX
+    ? { details }
+    : {
+        details: details.slice(0, VALIDATION_DETAILS_MAX),
+        detailsOmitted: details.length - VALIDATION_DETAILS_MAX,
+      };
 }
 
 const PLAN_LIMIT_CODES = new Set<string>(Object.values(PlanLimitCode));
@@ -378,6 +421,28 @@ function boundedMulterRefusal(message: string): string {
 }
 
 /**
+ * Nest's sentence for a request no route matched, with the path in it as the envelope's `path`
+ * has it, and any other message as it was.
+ *
+ * `RoutesResolver.registerNotFoundHandler` (`@nestjs/core` 11.2.1) answers such a request with a
+ * `NotFoundException` reading `Cannot <method> <url>`, the URL being `request.originalUrl`: the
+ * whole request target, query string included, as long as Node lets a request's head be.
+ * `echoedPath` takes the query out of `path`, and without this the same query would still come
+ * back one field up. Measured through the stack `configureApp` installs, a 16,000-character query
+ * key on a route that does not exist was a 16,017-character message, and a `?token=` came back in
+ * it.
+ *
+ * Only that exact sentence, rebuilt from this request, counts. A handler's own `404` that happens
+ * to name a URL is somebody else's wording and stays as written.
+ */
+function boundedNotFound(message: string, request: Request, path: string): string {
+  const url = typeof request.originalUrl === 'string' ? request.originalUrl : request.url;
+  return message === `Cannot ${request.method} ${url}`
+    ? `Cannot ${request.method} ${path}`
+    : message;
+}
+
+/**
  * The sentences multer raises as a plain `Error` when the request stream fails under it, rather
  * than because of anything in the body (`lib/make-middleware.js`, multer 2.3.0): on the request's
  * `aborted` event, on a `close` that comes before the body ended, and on an `error` event that
@@ -560,18 +625,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const requestId = getRequestId(request);
+    // The path the envelope repeats and the report carries, one value for both: the request
+    // target without its query string, cut after 256 characters. See `echoedPath`.
+    const path = echoedPath(typeof request.url === 'string' ? request.url : '');
     // Built once and shared by every `reportFailure` branch below. `statusCode` is filled in
     // per branch because only the `HttpException` path knows a code other than 500.
     const failureContext: ServerErrorContext = {
       ...(requestId !== undefined ? { requestId } : {}),
       ...(typeof request.method === 'string' ? { method: request.method } : {}),
-      ...(typeof request.url === 'string' ? { path: request.url } : {}),
+      ...(typeof request.url === 'string' ? { path } : {}),
     };
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = reasonPhrase(HttpStatus.INTERNAL_SERVER_ERROR);
     let message = 'An unexpected error occurred';
     let details: ValidationDetail[] | undefined;
+    let detailsOmitted: number | undefined;
     let planLimit: PlanLimitDetail | undefined;
 
     const httpClientError = mapHttpClientError(exception);
@@ -601,10 +670,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
         planLimit = asPlanLimitDetail(body.planLimit);
       }
 
+      // However long the list the refusal carried, the envelope lists a bounded part of it. See
+      // `cappedDetails`.
+      if (details !== undefined) {
+        ({ details, detailsOmitted } = cappedDetails(details));
+      }
+
       // A multer refusal Nest translated itself, whose part name nothing upstream bounds. See
       // `boundedMulterRefusal`.
       if (statusCode === HttpStatus.BAD_REQUEST) {
         message = boundedMulterRefusal(message);
+      }
+
+      // Nest's answer to a request no route matched, which repeats the whole request URL. See
+      // `boundedNotFound`.
+      if (statusCode === HttpStatus.NOT_FOUND) {
+        message = boundedNotFound(message, request, path);
       }
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -698,8 +779,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error,
       message,
       ...(details ? { details } : {}),
+      ...(detailsOmitted !== undefined ? { detailsOmitted } : {}),
       ...(planLimit ? { planLimit } : {}),
-      path: request.url,
+      path,
       timestamp: new Date().toISOString(),
       // Present on every response the running app produces (`requestIdMiddleware` runs
       // ahead of the router), which is what makes a reported failure traceable: the same id

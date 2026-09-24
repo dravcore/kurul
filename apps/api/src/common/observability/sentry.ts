@@ -206,8 +206,9 @@ export function captureServerError(error: unknown, context: ServerErrorContext =
       }
       scope.setContext('request', {
         method: context.method ?? null,
-        // The route path only — `all-exceptions.filter.ts` passes `request.url`, which can
-        // carry a query string, so it is truncated here rather than trusted.
+        // The route path only. `all-exceptions.filter.ts` and the auth mount pass the path
+        // `echoedPath` gives, which has no query string; the cut stays so a caller that passes a
+        // URL still cannot send one.
         path: context.path === undefined ? null : context.path.split('?')[0],
       });
       sentry?.captureException(error);

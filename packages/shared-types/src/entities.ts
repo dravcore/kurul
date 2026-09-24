@@ -157,16 +157,31 @@ export type PlanLimitCode = (typeof PlanLimitCode)[keyof typeof PlanLimitCode];
 /**
  * The `planLimit` member of the error envelope on a plan-limit refusal (ADR 0032).
  *
- * The only optional envelope member other than `details`, and it exists for the same reason:
- * "you cannot do that" is not actionable, "you are using 10 of 10 seats" is. `current` is what
- * was counted at the moment of the refusal, so it can equal or exceed `limit` but never
- * disagree with it silently.
+ * An optional envelope member like `details`, and it exists for the same reason: "you cannot do
+ * that" is not actionable, "you are using 10 of 10 seats" is. `current` is what was counted at
+ * the moment of the refusal, so it can equal or exceed `limit` but never disagree with it
+ * silently.
  */
 export interface PlanLimitDetail {
   code: PlanLimitCode;
   limit: number;
   current: number;
 }
+
+/**
+ * The most entries the error envelope's `details` lists (`docs/api-conventions.md#errors`).
+ *
+ * A validation refusal that found more lists the first {@link VALIDATION_DETAILS_MAX}, in the
+ * order validation reported them, and carries `detailsOmitted`: how many it left out, a positive
+ * integer, present only then. `details` keeps its shape either way, so a client that reads only
+ * the list sees the first hundred problems and nothing else changes for it.
+ *
+ * The list has one entry per rule a value failed, and every key a DTO does not declare is one of
+ * them, so before the cap it grew with the body: 80,000 short unknown keys, an 868,891-byte body,
+ * came back as a 7,898,051-byte envelope. No form comes near a hundred. `CreateTaskDto`, the
+ * largest, fails in twelve ways with every field wrong.
+ */
+export const VALIDATION_DETAILS_MAX = 100;
 
 /** The demo-instance section of {@link InstanceConfigDto}. */
 export interface DemoConfigDto {
