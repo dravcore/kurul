@@ -15,6 +15,7 @@ import { transformException } from '@nestjs/platform-express/multer/multer/multe
 import { MulterError } from 'multer';
 import { IsInt, IsNotEmpty, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { VALIDATION_DETAILS_MAX } from '@kurul/shared-types';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { Prisma } from '../../generated/prisma';
 import { initSentry, resetSentryForTesting } from '../observability/sentry';
@@ -316,6 +317,84 @@ describe('AllExceptionsFilter', () => {
       const problem = body(response);
       expect(problem.message).toBe('Validation failed');
       expect(problem.details).toEqual([{ field: 'title', message: 'title should not be empty' }]);
+    });
+
+    /**
+     * One entry per failed rule, and every key the DTO does not declare is one: 80,000 short keys
+     * in an 868,891-byte body made a 7,898,051-byte envelope (measured through `configureApp`,
+     * where `configure-app.spec.ts` sends the request-level case). The first hundred are listed,
+     * in class-validator's order, and `detailsOmitted` counts the rest.
+     */
+    describe('how many are listed', () => {
+      /** The refusal for a valid `CreateTaskDto` carrying `count` keys it does not declare. */
+      async function refusalWithUnknownKeys(count: number): Promise<unknown> {
+        const pipe = new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+          exceptionFactory: validationExceptionFactory,
+        });
+        const unknown = Object.fromEntries(Array.from({ length: count }, (_, i) => [`k${i}`, 1]));
+
+        return pipe
+          .transform(
+            { title: 'x', estimatedMinutes: 0, assignee: { email: 'a' }, ...unknown },
+            { type: 'body', metatype: CreateTaskDto },
+          )
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+      }
+
+      it('is at most 100, the number `VALIDATION_DETAILS_MAX` publishes', () => {
+        expect(VALIDATION_DETAILS_MAX).toBe(100);
+      });
+
+      it('lists 100 problems whole and adds nothing', async () => {
+        const { host, response } = createHost();
+
+        filter.catch(await refusalWithUnknownKeys(100), host);
+
+        const problem = body(response);
+        expect(problem.details).toHaveLength(100);
+        expect('detailsOmitted' in problem).toBe(false);
+      });
+
+      it('lists the first 100 of 101 in the order they came, and counts the one left out', async () => {
+        const { host, response } = createHost();
+
+        filter.catch(await refusalWithUnknownKeys(101), host);
+
+        const problem = body(response);
+        const details = problem.details as Array<Record<string, unknown>>;
+        expect(details).toHaveLength(100);
+        expect(details[0]).toEqual({
+          field: 'k0',
+          constraint: 'whitelistValidation',
+          message: 'property k0 should not exist',
+        });
+        expect(details[99]?.field).toBe('k99');
+        expect(problem.detailsOmitted).toBe(1);
+        expect(problem).toMatchObject({ statusCode: 400, message: 'Validation failed' });
+      });
+
+      it('bounds class-validator’s own string messages the same way', () => {
+        const { host, response } = createHost();
+        const messages = Array.from({ length: 101 }, (_, i) => `k${i} should not exist`);
+
+        filter.catch(
+          new HttpException(
+            { statusCode: 400, message: messages, error: 'Bad Request' },
+            HttpStatus.BAD_REQUEST,
+          ),
+          host,
+        );
+
+        const problem = body(response);
+        expect(problem.details).toHaveLength(100);
+        expect(problem.detailsOmitted).toBe(1);
+      });
     });
   });
 

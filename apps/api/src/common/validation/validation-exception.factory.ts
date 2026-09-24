@@ -78,6 +78,10 @@ function flattenValidationErrors(
  * `ValidationPipe` exception factory that preserves the field name and the failed
  * constraint. The pipe's default factory throws away both, flattening everything into
  * opaque message strings.
+ *
+ * Every error becomes an entry, however many there are. How many of them a client reads is
+ * bounded where the envelope is written, `cappedDetails` in `all-exceptions.filter.ts`, which
+ * lists the first `VALIDATION_DETAILS_MAX` and counts the rest in `detailsOmitted`.
  */
 export function validationExceptionFactory(errors: ValidationError[]): BadRequestException {
   return new BadRequestException({

@@ -13257,11 +13257,15 @@
             "description": "One human-readable sentence, safe to log.\n\nNever a raw exception string under `NODE_ENV=production`, and never a stack trace anywhere."
           },
           "details": {
-            "description": "Per-field problems. Present on validation failures (`400`, `422`) and nowhere else.",
+            "description": "Per-field problems. Present on validation failures (`400`, `422`) and nowhere else.\n\nAt most 100, the first ones in the order validation found them; `detailsOmitted` counts the\nrest.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ValidationDetailSchema"
             }
+          },
+          "detailsOmitted": {
+            "type": "number",
+            "description": "How many problems `details` left out. Present only when there were more than 100, and then a\npositive integer."
           },
           "path": {
             "type": "string",

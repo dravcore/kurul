@@ -625,15 +625,16 @@ the framework's built-in exceptions and hand-written ones look identical):
 }
 ```
 
-| Field        | Type   | Required | Meaning                                                             |
-| ------------ | ------ | -------- | ------------------------------------------------------------------- |
-| `statusCode` | number | yes      | Mirrors the HTTP status                                             |
-| `error`      | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
-| `message`    | string | yes      | Human-readable, single sentence, safe to log                        |
-| `details`    | array  | no       | Per-field validation problems; present only for `400`/`422`         |
-| `path`       | string | yes      | Request path, without the query string                              |
-| `timestamp`  | string | yes      | ISO 8601 UTC                                                        |
-| `requestId`  | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
+| Field            | Type   | Required | Meaning                                                             |
+| ---------------- | ------ | -------- | ------------------------------------------------------------------- |
+| `statusCode`     | number | yes      | Mirrors the HTTP status                                             |
+| `error`          | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
+| `message`        | string | yes      | Human-readable, single sentence, safe to log                        |
+| `details`        | array  | no       | Per-field validation problems, at most 100; only for `400`/`422`    |
+| `detailsOmitted` | number | no       | How many problems `details` left out; present only when it did      |
+| `path`           | string | yes      | Request path, without the query string                              |
+| `timestamp`      | string | yes      | ISO 8601 UTC                                                        |
+| `requestId`      | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
 
 - One global exception filter produces this shape for **every** error, including unhandled
   ones. There is no second error format anywhere in the API.
@@ -653,6 +654,12 @@ the framework's built-in exceptions and hand-written ones look identical):
   followed by `[+N more]`: a nested `field` is cut as one path, so it still reads from its
   declared start (`items[0].` and then the key). Every name a DTO declares is shorter than that
   and is repeated exactly. A multipart part name gets the same bound, below.
+- `details` lists at most 100 problems, the first ones in the order validation found them, which
+  puts keys the DTO does not declare first. A refusal that found more says how many it left out
+  in `detailsOmitted`, a positive integer present only then; `details` keeps its shape. There is
+  one entry per rule a value failed and one per undeclared key, so the list used to grow with the
+  body: 80,000 short keys in an 868,891-byte body made a 7,898,051-byte envelope. No form comes
+  near 100, and the largest DTO fails in 12 ways with every field wrong.
 - A failure thrown by a library whose error vocabulary _is_ HTTP status codes — `http-errors`,
   which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
   with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx

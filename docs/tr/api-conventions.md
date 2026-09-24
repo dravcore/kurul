@@ -637,15 +637,16 @@ isimleriyle):
 }
 ```
 
-| Alan         | Tip    | Zorunlu | Anlam                                                                            |
-| ------------ | ------ | ------- | -------------------------------------------------------------------------------- |
-| `statusCode` | number | evet    | HTTP status'ünü yansıtır                                                         |
-| `error`      | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`) |
-| `message`    | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                       |
-| `details`    | array  | hayır   | Alan bazlı validation problemleri; yalnızca `400`/`422`'de mevcut                |
-| `path`       | string | evet    | Request path'i, query string olmadan                                             |
-| `timestamp`  | string | evet    | ISO 8601 UTC                                                                     |
-| `requestId`  | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                 |
+| Alan             | Tip    | Zorunlu | Anlam                                                                                |
+| ---------------- | ------ | ------- | ------------------------------------------------------------------------------------ |
+| `statusCode`     | number | evet    | HTTP status'ünü yansıtır                                                             |
+| `error`          | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`)     |
+| `message`        | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                           |
+| `details`        | array  | hayır   | Alan bazlı validation problemleri, en fazla 100; yalnızca `400`/`422`'de mevcut      |
+| `detailsOmitted` | number | hayır   | `details`'in dışarıda bıraktığı problem sayısı; yalnızca bir şey bıraktığında mevcut |
+| `path`           | string | evet    | Request path'i, query string olmadan                                                 |
+| `timestamp`      | string | evet    | ISO 8601 UTC                                                                         |
+| `requestId`      | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                     |
 
 - Tek bir global exception filter, ele alınmamışlar dahil **her** hata için bu şekli
   üretir. API'nin hiçbir yerinde ikinci bir hata formatı yoktur.
@@ -666,6 +667,13 @@ isimleriyle):
   başlangıcından okunmaya devam eder (`items[0].` ve ardından anahtar). Bir DTO'nun tanımladığı
   her ad bundan kısadır ve olduğu gibi yazılır. Multipart bir parça adı da aşağıda aynı sınırı
   alır.
+- `details` en fazla 100 problem listeler: validation'ın onları bulduğu sıradaki ilkleri, ki bu
+  sıra DTO'nun tanımlamadığı anahtarları öne koyar. Daha fazlasını bulan bir ret, kaçını dışarıda
+  bıraktığını `detailsOmitted` içinde söyler; bu alan pozitif bir tam sayıdır ve yalnızca o
+  durumda bulunur. `details` şeklini korur. Bir değerin geçemediği her kural için bir, tanımlanmamış
+  her anahtar için bir kayıt vardır, yani liste eskiden gövdeyle birlikte büyürdü: 868.891 baytlık
+  bir gövdedeki 80.000 kısa anahtar 7.898.051 baytlık bir zarf üretiyordu. Hiçbir form 100'e
+  yaklaşmaz; en büyük DTO, her alanı yanlış olduğunda 12 şekilde reddedilir.
 - Hata sözlüğü _zaten_ HTTP status kodları olan bir kütüphanenin fırlattığı bir hata —
   Express'in body parser'larının fırlattığı `http-errors` — bu zarf içinde **kendi 4xx'i** ile
   cevaplanır; metin kütüphanenin değil, burada seçilendir. Eşleme bilinçli olarak 4xx'te durur:

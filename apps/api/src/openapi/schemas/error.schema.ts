@@ -61,8 +61,19 @@ export class ErrorEnvelopeSchema {
    */
   message!: string;
 
-  /** Per-field problems. Present on validation failures (`400`, `422`) and nowhere else. */
+  /**
+   * Per-field problems. Present on validation failures (`400`, `422`) and nowhere else.
+   *
+   * At most 100, the first ones in the order validation found them; `detailsOmitted` counts the
+   * rest.
+   */
   details?: ValidationDetailSchema[];
+
+  /**
+   * How many problems `details` left out. Present only when there were more than 100, and then a
+   * positive integer.
+   */
+  detailsOmitted?: number;
 
   /**
    * The path of the request that failed, without its query string, which can carry a token from a

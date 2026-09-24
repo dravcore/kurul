@@ -825,6 +825,26 @@ describe('configureApp validation of a key the DTO does not declare', () => {
     expect(Buffer.byteLength(response.text)).toBeLessThan(512);
     expect(titleHandler).not.toHaveBeenCalled();
   });
+
+  it('lists the first 100 of 1,001 problems and counts the rest', async () => {
+    const keys = Array.from({ length: 1000 }, (_, i) => [`k${i}`, 1]);
+
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify(Object.fromEntries(keys)))
+      .expect(400);
+
+    // A thousand unknown keys and the missing title, in class-validator's order: the keys first.
+    // The hundred listed are the first hundred keys; the title is among the 901 counted.
+    const details = response.body.details as Array<{ field: string }>;
+    expect(details).toHaveLength(100);
+    expect(details.map((detail) => detail.field)).toEqual(keys.slice(0, 100).map(([key]) => key));
+    expect(response.body).toMatchObject({ message: 'Validation failed', detailsOmitted: 901 });
+    // 95,051 bytes listing all 1,001, measured through this same stack; 80,000 short keys made
+    // 7,898,051.
+    expect(Buffer.byteLength(response.text)).toBeLessThan(12 * 1024);
+  });
 });
 
 /**

@@ -109,6 +109,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   where it was 32,174. The origin check's `403` writes `path` the same way, and a `500` reported
   to error tracking carries the same path the client read. The access log, which has always
   dropped the query, is unchanged, and `requestId` still joins its line to the envelope.
+- **A validation refusal lists at most 100 problems, and says how many more it found.**
+  `validationExceptionFactory` writes one `details` entry per rule a value failed, and the global
+  `ValidationPipe` fails every key the DTO does not declare, so the list was as long as the body
+  let it be; the 64-character cut above bounds each entry, not how many there are. Measured
+  through the stack `configureApp` installs, 80,000 short unknown keys in an 868,891-byte body
+  came back as a 7,898,051-byte envelope listing 80,001 entries, and 40,000 empty `dispositions`
+  in an account deletion body, 120,042 bytes, as a 9,458,100-byte one. `AllExceptionsFilter` now
+  lists the first 100 in the order class-validator reported them and adds `detailsOmitted`, the
+  number it left out, a member present only then: both requests are now envelopes under 12 KiB.
+  `details` keeps its shape, so a client that reads only the list sees the first hundred problems,
+  and the web app reads neither. No form comes near the cap: the largest DTO fails in twelve ways
+  with every field wrong. `VALIDATION_DETAILS_MAX` in `@kurul/shared-types` carries the number,
+  and the OpenAPI document describes the new member.
 
 ### Security
 

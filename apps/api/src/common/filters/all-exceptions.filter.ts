@@ -13,7 +13,7 @@ import { echoedName, echoedPath } from '../echoed-name';
 import { isProductionEnv } from '../env';
 import { getRequestId } from '../logging/request-id';
 import { captureServerError, type ServerErrorContext } from '../observability/sentry';
-import { PlanLimitCode, type PlanLimitDetail } from '@kurul/shared-types';
+import { PlanLimitCode, VALIDATION_DETAILS_MAX, type PlanLimitDetail } from '@kurul/shared-types';
 import type { ValidationDetail } from '../validation/validation-exception.factory';
 
 interface ProblemDetails {
@@ -21,6 +21,8 @@ interface ProblemDetails {
   error: string;
   message: string;
   details?: ValidationDetail[];
+  /** Present only when `details` left entries out: how many. See `cappedDetails`. */
+  detailsOmitted?: number;
   /** Present only on a plan-limit refusal (ADR 0032): which ceiling, and the two numbers. */
   planLimit?: PlanLimitDetail;
   /** The request path, without its query string, as `echoedPath` gives it. */
@@ -75,6 +77,46 @@ function asValidationDetails(value: unknown): ValidationDetail[] | undefined {
   }
 
   return details;
+}
+
+/**
+ * `details` as the envelope lists it: the first `VALIDATION_DETAILS_MAX` entries in the order they
+ * came, and how many were left out.
+ *
+ * `validationExceptionFactory` writes one entry per rule a value failed, and `forbidNonWhitelisted`
+ * fails every key the DTO does not declare, so the list was as long as the body let it be.
+ * Measured through the stack `configureApp` installs: 80,000 short unknown keys, an 868,891-byte
+ * body, came back as a 7,898,051-byte envelope listing 80,001 entries, and 40,000 empty
+ * `dispositions` sent to `DeleteAccountDto`, 120,042 bytes, as 9,458,100 bytes listing 80,001.
+ * Each entry was already bounded (`echoedName`); their number was not.
+ *
+ * A hundred is more than any client needs to see what it got wrong, and more than any form
+ * produces: `CreateTaskDto`, the largest, fails in twelve ways with every field wrong. The one
+ * DTO whose own bounds allow more is `DeleteAccountDto`, 401 entries when all 200 of its
+ * `dispositions` are wrong, and its first hundred already show the pattern. The first hundred in
+ * the order class-validator reported them, rather than a choice among them, so the cut never
+ * reorders what a client reads; a key the DTO does not declare comes first in that order, which
+ * is class-validator's.
+ *
+ * The count goes in a member of its own, `detailsOmitted`, present only when something was left
+ * out, and not in the list: an entry names a field a client may render or focus, and one that
+ * stood for the rest would name a field that does not exist. `details` keeps its shape, so a
+ * client reading only the list is unaffected.
+ *
+ * Capped here, where the envelope is written, rather than in the factory, because `details`
+ * reaches the envelope from two places, the factory's list and class-validator's own `string[]`
+ * messages (`detailsFromMessages`), and a cap in one of them would leave the other unbounded.
+ */
+function cappedDetails(details: ValidationDetail[]): {
+  details: ValidationDetail[];
+  detailsOmitted?: number;
+} {
+  return details.length <= VALIDATION_DETAILS_MAX
+    ? { details }
+    : {
+        details: details.slice(0, VALIDATION_DETAILS_MAX),
+        detailsOmitted: details.length - VALIDATION_DETAILS_MAX,
+      };
 }
 
 const PLAN_LIMIT_CODES = new Set<string>(Object.values(PlanLimitCode));
@@ -598,6 +640,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let error = reasonPhrase(HttpStatus.INTERNAL_SERVER_ERROR);
     let message = 'An unexpected error occurred';
     let details: ValidationDetail[] | undefined;
+    let detailsOmitted: number | undefined;
     let planLimit: PlanLimitDetail | undefined;
 
     const httpClientError = mapHttpClientError(exception);
@@ -625,6 +668,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // A structured payload always wins over the message-string fallback.
         details = asValidationDetails(body.details) ?? details;
         planLimit = asPlanLimitDetail(body.planLimit);
+      }
+
+      // However long the list the refusal carried, the envelope lists a bounded part of it. See
+      // `cappedDetails`.
+      if (details !== undefined) {
+        ({ details, detailsOmitted } = cappedDetails(details));
       }
 
       // A multer refusal Nest translated itself, whose part name nothing upstream bounds. See
@@ -730,6 +779,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error,
       message,
       ...(details ? { details } : {}),
+      ...(detailsOmitted !== undefined ? { detailsOmitted } : {}),
       ...(planLimit ? { planLimit } : {}),
       path,
       timestamp: new Date().toISOString(),
