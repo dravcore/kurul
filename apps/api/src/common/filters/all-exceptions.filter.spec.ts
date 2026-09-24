@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { ArgumentsHost, HttpException, HttpStatus, Logger, ValidationPipe } from '@nestjs/common';
 import { transformException } from '@nestjs/platform-express/multer/multer/multer.utils';
@@ -21,6 +22,9 @@ const REQUEST_ID = '0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d';
 function createHost(
   url = '/workspaces/w_1/tasks',
   requestId: string | null = REQUEST_ID,
+  // Added to the request object, for the tests that need its stream or its connection in a
+  // particular state.
+  request: Record<string, unknown> = {},
 ): {
   host: ArgumentsHost;
   response: CapturedResponse;
@@ -33,11 +37,20 @@ function createHost(
   const host = {
     switchToHttp: () => ({
       getResponse: () => response,
-      getRequest: () => (requestId === null ? { url } : { url, requestId }),
+      getRequest: () => ({ url, ...(requestId === null ? {} : { requestId }), ...request }),
     }),
   } as unknown as ArgumentsHost;
 
   return { host, response };
+}
+
+/**
+ * A request as Node leaves it once its client stopped sending mid-body, measured through
+ * `FileInterceptor`: the stream destroyed before the message arrived in full, on a connection that
+ * is gone. `connection: 'open'` keeps the socket, for the case where an answer can still be sent.
+ */
+function abandonedRequest(connection: 'open' | 'gone' = 'gone'): Record<string, unknown> {
+  return { destroyed: true, complete: false, socket: { destroyed: connection === 'gone' } };
 }
 
 function body(response: CapturedResponse): Record<string, unknown> {
@@ -77,11 +90,36 @@ function httpError(status: number, message: string, extra: Record<string, unknow
  * Resolved through `@nestjs/platform-express`, because `FileInterceptor` runs that copy.
  */
 function installedMulterCodes(): string[] {
-  const nest = dirname(require.resolve('@nestjs/platform-express/package.json'));
-  const multer = dirname(require.resolve('multer/package.json', { paths: [nest] }));
-  const source = readFileSync(join(multer, 'lib', 'multer-error.js'), 'utf8');
+  const source = readFileSync(join(installedMulterDir(), 'lib', 'multer-error.js'), 'utf8');
   const table = /errorMessages\s*=\s*\{([^}]*)\}/.exec(source)?.[1] ?? '';
   return [...table.matchAll(/^\s*([A-Z][A-Z_]*)\s*:/gm)].map(([, code]) => code ?? '');
+}
+
+/** The multer `FileInterceptor` runs: `@nestjs/platform-express`'s own, not `apps/api`'s. */
+function installedMulterDir(): string {
+  const nest = dirname(require.resolve('@nestjs/platform-express/package.json'));
+  return dirname(require.resolve('multer/package.json', { paths: [nest] }));
+}
+
+/**
+ * The busboy multer parses with, found by a `require` anchored in multer's own directory, which is
+ * how multer's `require('busboy')` finds it. busboy is multer's dependency, not `apps/api`'s.
+ */
+function installedBusboyDir(): string {
+  const requireFromMulter = createRequire(join(installedMulterDir(), 'package.json'));
+  return dirname(requireFromMulter.resolve('busboy/package.json'));
+}
+
+/**
+ * Every sentence one installed file hands to `new Error(...)`, as written in its source. Read for
+ * the reason `installedMulterCodes` reads the code table: a copy would still pass on the day the
+ * library rewords one. A template literal comes back with its `${...}` placeholders in it.
+ */
+function constructedErrors(dir: string, ...file: string[]): string[] {
+  const source = readFileSync(join(dir, ...file), 'utf8');
+  return [...source.matchAll(/new Error\((['`])(.*?)\1\)/g)].map(
+    ([, , sentence]) => sentence ?? '',
+  );
 }
 
 class AssigneeDto {
@@ -451,6 +489,61 @@ describe('AllExceptionsFilter', () => {
       expect(answer(new MulterError(code, field))).toEqual(answer(translated));
     });
 
+    /**
+     * The part name is the client's own, and busboy's multipart parser bounds it only by the
+     * 16 KiB of a part's header block. Both routes refuse a name over 64 characters before multer
+     * would name it (`limits.fieldNameSize`); this is the filter's own bound, for a name that gets
+     * here anyway.
+     */
+    describe('the part name', () => {
+      const sentence = 'Field name array index too large';
+
+      it('is repeated whole up to 64 characters, as Nest repeats it', () => {
+        const name = `${'a'.repeat(61)}[1]`;
+        expect(name).toHaveLength(64);
+
+        expect(answer(new MulterError('LIMIT_FIELD_ARRAY_INDEX', name))).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `${sentence} - ${name}`,
+        });
+        // The parity above, at the boundary: a code Nest translates reads the same at 64.
+        expect(answer(new MulterError('LIMIT_UNEXPECTED_FILE', name))).toEqual(
+          answer(transformException(new MulterError('LIMIT_UNEXPECTED_FILE', name))),
+        );
+      });
+
+      it('is cut after 64 characters past that, followed by how many more there were', () => {
+        const name = `${'a'.repeat(62)}[1]`;
+
+        expect(answer(new MulterError('LIMIT_FIELD_ARRAY_INDEX', name))).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `${sentence} - ${name.slice(0, 64)}[+1 more]`,
+        });
+      });
+
+      it('keeps the envelope small however long busboy let the name get', () => {
+        // 16,340 characters, the longest name a 16 KiB part-header block holds (measured through
+        // `FileInterceptor`), was a 16,484-byte envelope before the cap.
+        const name = `${'a'.repeat(16_337)}[1]`;
+
+        expect(answer(new MulterError('LIMIT_FIELD_ARRAY_INDEX', name))).toEqual(
+          expect.objectContaining({ message: `${sentence} - ${'a'.repeat(64)}[+16276 more]` }),
+        );
+      });
+
+      it('never ends on half of a surrogate pair', () => {
+        // U+1F600 is two UTF-16 code units, the 64th and 65th here. Cutting between them would
+        // leave a lone `\ud83d` in the JSON; the cut steps back one instead.
+        const name = `${'a'.repeat(63)}\u{1F600}b`;
+
+        expect(answer(new MulterError('INVALID_FIELD_NAME', name))).toEqual(
+          expect.objectContaining({ message: `Invalid field name - ${'a'.repeat(63)}[+3 more]` }),
+        );
+      });
+    });
+
     it('leaves STREAM_DESTROYED to the 500 path, which logs and reports it', () => {
       // Raised by multer's disk storage when the file stream is gone before it opens its output
       // file: the upload's own plumbing failing, not a refusal of anything the client sent.
@@ -521,6 +614,227 @@ describe('AllExceptionsFilter', () => {
       );
 
       expect(response.status).toHaveBeenCalledWith(500);
+    });
+  });
+
+  /**
+   * The plain `Error`s multer passes on about a multipart request, which Nest's
+   * `transformException` returns untranslated. Until `mapMultipartFailure` both kinds below were a
+   * `500` and a Sentry report. The real errors, through `FileInterceptor` and a real socket, are in
+   * `all-exceptions.filter.multipart.spec.ts`; this pins the mapping and what it refuses to take.
+   */
+  describe('plain errors multer passes on', () => {
+    /** The three envelope fields a client reads, for one exception on one request. */
+    function answer(exception: unknown, request: Record<string, unknown> = {}): unknown {
+      const { host, response } = createHost('/upload', REQUEST_ID, request);
+      filter.catch(exception, host);
+      const { statusCode, error, message } = body(response);
+      return { statusCode, error, message };
+    }
+
+    describe('a client that left mid-upload', () => {
+      // Each sentence multer's `lib/make-middleware.js` raises when the request stream fails.
+      // `Request aborted` is the one a client that stops sending produces, measured; the other two
+      // report the same thing and are answered the same way.
+      it.each(['Request aborted', 'Request closed', 'Request error'])(
+        'answers %s with 400 in the envelope while an answer can still be sent',
+        (sentence) => {
+          const { host, response } = createHost('/upload', REQUEST_ID, abandonedRequest('open'));
+
+          filter.catch(new Error(sentence), host);
+
+          expect(response.status).toHaveBeenCalledWith(400);
+          expect(body(response)).toMatchObject({
+            statusCode: 400,
+            error: 'Bad Request',
+            message: 'Bad Request',
+            path: '/upload',
+            requestId: REQUEST_ID,
+          });
+          expect(logError).not.toHaveBeenCalled();
+        },
+      );
+
+      it('writes nothing once the connection is gone, and does not throw', () => {
+        // Where every real abort lands: Node has closed the connection by the time multer's error
+        // reaches the filter (measured for a close, a reset and a half-close).
+        const { host, response } = createHost('/upload', REQUEST_ID, abandonedRequest());
+
+        expect(() => filter.catch(new Error('Request aborted'), host)).not.toThrow();
+
+        expect(response.status).not.toHaveBeenCalled();
+        expect(response.json).not.toHaveBeenCalled();
+        expect(logError).not.toHaveBeenCalled();
+      });
+
+      it('answers what the JSON parsers answer for the same abort', () => {
+        // `raw-body`'s `request aborted`, mapped by `mapHttpClientError`: the same client leaving,
+        // under the other parser.
+        const underJson = httpError(400, 'request aborted', {
+          code: 'ECONNABORTED',
+          type: 'request.aborted',
+        });
+
+        expect(answer(new Error('Request aborted'), abandonedRequest('open'))).toEqual(
+          answer(underJson, abandonedRequest('open')),
+        );
+      });
+
+      it.each<[string, Record<string, unknown>]>([
+        ['still intact', {}],
+        ['that arrived in full', { destroyed: true, complete: true }],
+      ])('leaves the same sentence to the 500 path on a request %s', (_state, request) => {
+        // The sentence alone is not evidence: Express's `res.sendFile` raises a plain
+        // `Error('Request aborted')` for a download, on a request that arrived in full, and
+        // `Request error` is wording any code could use.
+        const { host, response } = createHost('/upload', REQUEST_ID, request);
+        const error = new Error('Request aborted');
+
+        filter.catch(error, host);
+
+        expect(response.status).toHaveBeenCalledWith(500);
+        expect(logError).toHaveBeenCalledWith(
+          `Request aborted (requestId=${REQUEST_ID})`,
+          error.stack,
+        );
+      });
+
+      it('leaves the server failing to the 500 path, whatever state its client left in', () => {
+        // Measured: a guard that throws after its client disconnected reaches the filter with the
+        // request destroyed and incomplete, exactly as an abort leaves it. The sentence is what
+        // tells the two apart, which is why the request's state is never matched on its own.
+        const { host, response } = createHost('/upload', REQUEST_ID, abandonedRequest('open'));
+        const failure = new Error('database unreachable');
+
+        filter.catch(failure, host);
+
+        expect(response.status).toHaveBeenCalledWith(500);
+        expect(logError).toHaveBeenCalledWith(
+          `database unreachable (requestId=${REQUEST_ID})`,
+          failure.stack,
+        );
+      });
+
+      it('leaves a subclass carrying the sentence to the 500 path', () => {
+        // undici's `RequestAbortedError` reads `Request aborted` and means a request this server
+        // made was cut off: another library's failure, and one the server needs to hear about.
+        class RequestAbortedError extends Error {}
+
+        expect(
+          answer(new RequestAbortedError('Request aborted'), abandonedRequest('open')),
+        ).toEqual(expect.objectContaining({ statusCode: 500 }));
+        expect(logError).toHaveBeenCalled();
+      });
+
+      it('answers every request-stream failure the installed multer raises', () => {
+        const sentences = constructedErrors(installedMulterDir(), 'lib', 'make-middleware.js');
+        // The read is under test too: an empty list would make the comparison below vacuous.
+        expect(sentences).toEqual(expect.arrayContaining(['Request aborted']));
+
+        // A sentence multer adds or rewords fails this until the filter's list says what it means.
+        const answered = Object.fromEntries(
+          sentences.map((sentence) => [
+            sentence,
+            answer(new Error(sentence), abandonedRequest('open')),
+          ]),
+        );
+        const decided = Object.fromEntries(
+          sentences.map((sentence) => [
+            sentence,
+            { statusCode: 400, error: 'Bad Request', message: 'Bad Request' },
+          ]),
+        );
+        expect(answered).toEqual(decided);
+        expect(logError).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('a Content-Type busboy cannot parse', () => {
+      // busboy's entry point throws these from multer's `try`, and multer passes them to `next`.
+      // The first two are reachable from any client (`multipart/mixed`, and spaces around the `=`
+      // of the boundary, which `type-is` accepts and busboy does not); multer's `type-is` check
+      // keeps the third out.
+      it.each<[string, string]>([
+        [
+          'Unsupported content type: multipart/mixed; boundary=x',
+          'Multipart: Unsupported content type',
+        ],
+        ['Malformed content type', 'Multipart: Malformed content type'],
+        ['Missing Content-Type', 'Multipart: Missing Content-Type'],
+      ])('answers "%s" with 400 and "%s"', (thrown, message) => {
+        expect(answer(new Error(thrown))).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message,
+        });
+        expect(logError).not.toHaveBeenCalled();
+      });
+
+      it('never reads the Content-Type back, however long the client made it', () => {
+        const thrown = new Error(
+          `Unsupported content type: multipart/mixed; boundary=${'x'.repeat(8000)}`,
+        );
+
+        expect(JSON.stringify(answer(thrown))).not.toContain('boundary');
+      });
+
+      it('leaves a sentence that only starts the same way to the 500 path', () => {
+        // Matched whole, or up to the `: ` busboy appends the header after, and nothing looser.
+        expect(answer(new Error('Malformed content type header in upstream reply'))).toEqual(
+          expect.objectContaining({ statusCode: 500 }),
+        );
+      });
+
+      it('answers every error the installed busboy can raise under multer with 400', () => {
+        // Its entry point's refusals are mapped here; its multipart parser's are translated by Nest
+        // before the filter runs (`Multipart: Unexpected end of form`). Either way the client's
+        // body is at fault, so either way a 400. `lib/types/urlencoded.js` is left out: multer runs
+        // busboy only for `multipart/*`, which busboy never hands to that parser. A placeholder is
+        // the request's own header, filled in with one.
+        const busboy = installedBusboyDir();
+        const sentences = [
+          ...constructedErrors(busboy, 'lib', 'index.js'),
+          ...constructedErrors(busboy, 'lib', 'types', 'multipart.js'),
+        ].map((sentence) => sentence.replace(/\$\{[^}]*\}/g, 'multipart/mixed; boundary=x'));
+        expect(sentences).toEqual(
+          expect.arrayContaining(['Malformed content type', 'Unexpected end of form']),
+        );
+
+        const answered = Object.fromEntries(
+          sentences.map((sentence) => [
+            sentence,
+            (answer(transformException(new Error(sentence))) as { statusCode: number }).statusCode,
+          ]),
+        );
+        expect(answered).toEqual(Object.fromEntries(sentences.map((sentence) => [sentence, 400])));
+        expect(logError).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // A client that is no longer there cannot be answered, whatever went wrong; what the server
+  // logs and reports about it must not depend on that.
+  describe('a connection that is gone', () => {
+    it('writes no envelope', () => {
+      const { host, response } = createHost('/upload', REQUEST_ID, { socket: { destroyed: true } });
+
+      filter.catch(new HttpException('Task does not exist', HttpStatus.NOT_FOUND), host);
+
+      expect(response.status).not.toHaveBeenCalled();
+      expect(response.json).not.toHaveBeenCalled();
+    });
+
+    it('still logs a failure of the server', () => {
+      const { host, response } = createHost('/upload', REQUEST_ID, { socket: { destroyed: true } });
+      const failure = new Error('database unreachable');
+
+      filter.catch(failure, host);
+
+      expect(response.json).not.toHaveBeenCalled();
+      expect(logError).toHaveBeenCalledWith(
+        `database unreachable (requestId=${REQUEST_ID})`,
+        failure.stack,
+      );
     });
   });
 
@@ -846,6 +1160,30 @@ describe('AllExceptionsFilter', () => {
       const failure = new MulterError('STREAM_DESTROYED');
 
       filter.catch(failure, createHost().host);
+
+      expect(captureException).toHaveBeenCalledWith(failure);
+    });
+
+    // A client that closes the tab mid-upload was a `500` and an event on the quota, filed as a
+    // server fault, for every upload anyone abandoned.
+    it('does not report a client that left mid-upload', async () => {
+      const { captureException } = await enableFakeSentry();
+
+      filter.catch(
+        new Error('Request aborted'),
+        createHost('/upload', REQUEST_ID, abandonedRequest()).host,
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('still reports a failure whose client happened to leave first', async () => {
+      // The control: a connection that is gone changes what is written, never what is reported.
+      const { captureException } = await enableFakeSentry();
+      const failure = new Error('database unreachable');
+
+      filter.catch(failure, createHost('/upload', REQUEST_ID, abandonedRequest()).host);
 
       expect(captureException).toHaveBeenCalledWith(failure);
     });

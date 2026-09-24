@@ -103,7 +103,47 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // large - items[4294967294]`, and no Sentry report, since the client chose the field
         // names. `all-exceptions.filter.multipart.spec.ts` sends that request through this
         // configuration and through `import.module.ts`'s.
-        limits: { fileSize: storage.maxBytes, files: 1, fields: 8, fieldArrayIndexLimit: 0 },
+        //
+        // ## `fieldNameSize: 64`, because nothing else bounds a part's name
+        //
+        // busboy 1.6.0's multipart parser never reads the option: it reports every name as
+        // untruncated, and the default of 100 that Nest's `MulterOptions` documents belongs to
+        // busboy's urlencoded parser, which multer never runs. A name is bounded only by the
+        // 16 KiB busboy allows a part's header block, and a name of 16,340 characters fits. multer
+        // 2.3.0 enforces the option itself once it is set, for text fields and file parts alike,
+        // refusing a longer name as `LIMIT_FIELD_KEY` (`Field name too long`, which names no
+        // part) before any check that would repeat it: nesting, array index, append-field, and
+        // `LIMIT_UNEXPECTED_FILE` for a file under another name. Measured through
+        // `FileInterceptor` with this configuration minus the option, a 1 KiB name ending in `[1]`
+        // came back inside a 1,059-character `message`, one on a file part as
+        // `Unexpected field - <name>`, and a 16 KiB name the DTO does not know was accepted by
+        // multer and then repeated twice by `ValidationPipe`'s `property <name> should not
+        // exist`, a 32,899-byte envelope. With it, all three are `Field name too long`.
+        //
+        // 64 is eight times the longest name this route takes (`filename`), and the length up to
+        // which `AllExceptionsFilter` repeats a part name whole (`echoedPartName`), so no name
+        // multer lets through is ever shortened in a refusal. One echo stays out of its reach:
+        // multer checks a text value's size before its name's length, so a value over busboy's
+        // 1 MiB default still comes back as `Field value too long - <name>`, worded by Nest and
+        // bounded only by the 16 KiB header block.
+        //
+        // ## What multer hands on besides the refusals these limits make
+        //
+        // Two plain `Error`s, which no option here decides and Nest translates neither of. A
+        // client that drops the connection mid-upload arrives as `Request aborted`, from multer's
+        // own listener on the request, and a `Content-Type` busboy cannot parse (`multipart/mixed`,
+        // or spaces around the `=` of the boundary) as whatever busboy's constructor threw. Both
+        // were a 500 and a Sentry report. `AllExceptionsFilter` answers both `400`, reports
+        // neither (`mapMultipartFailure`), and writes nothing to a connection that is already
+        // gone; every abort measured through this configuration had lost its connection by the
+        // time multer gave up. The same spec sends both through each route's options.
+        limits: {
+          fileSize: storage.maxBytes,
+          files: 1,
+          fields: 8,
+          fieldArrayIndexLimit: 0,
+          fieldNameSize: 64,
+        },
       }),
     }),
   ],

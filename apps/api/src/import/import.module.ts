@@ -63,11 +63,23 @@ import { TrelloImportService } from './trello-import.service';
         // event loop for 74 seconds without it (measured and explained in `attachment.module.ts`,
         // whose route has the same exposure). Four fields are headroom, and nothing that posts
         // here sends a field at all, so the smallest value costs nothing.
+        //
+        // `fieldNameSize: 64` because busboy's multipart parser puts no limit on a part's name
+        // at all, only on the 16 KiB header block around it, and a refusal that names its part
+        // repeated a name that long in the error envelope. multer enforces the option itself,
+        // refusing a longer name as `Field name too long` before anything repeats it (measured
+        // and explained in `attachment.module.ts`). The one name this route takes is `file`.
+        //
+        // What a refusal becomes is `AllExceptionsFilter`'s to decide, the same for both routes,
+        // and `attachment.module.ts` walks through it: a `400` in the error envelope (`413` for
+        // the file's size), and a `400` too for the two plain errors multer passes on, a client
+        // that left mid-upload and a `Content-Type` busboy cannot parse. None is reported.
         limits: {
           fileSize: readTrelloImportMaxBytes(),
           files: 1,
           fields: 4,
           fieldArrayIndexLimit: 0,
+          fieldNameSize: 64,
         },
       }),
     }),

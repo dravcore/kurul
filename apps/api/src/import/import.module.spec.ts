@@ -99,6 +99,13 @@ describe('ImportModule multipart configuration', () => {
     expect(limits?.fieldArrayIndexLimit).toBe(0);
   });
 
+  it("bounds a part's name, which busboy's multipart parser never does", async () => {
+    // busboy 1.6.0 reports every multipart name as untruncated, whatever `fieldNameSize` says, so
+    // a name was bounded only by the 16 KiB of its part's header block. multer 2.3.0 applies the
+    // option itself, and only once it is set (measured in `attachment.module.ts`).
+    expect((await multerOptions()).limits?.fieldNameSize).toBe(64);
+  });
+
   it('does not depend on file storage at all', () => {
     // An import writes LINK rows and stores no bytes, so it has to work on an instance with no
     // STORAGE_PATH — where `StorageService.write` answers 503. Importing StorageModule here would
