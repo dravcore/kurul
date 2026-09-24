@@ -490,16 +490,16 @@ başına olan gibi kapsayıcıdır. LINK ekleri byte saklamaz: ne kotadan düşe
 kota tarafından reddedilirler.
 
 **Multipart gövdeyi multer reddederse cevap `400`'dür.** İkinci bir dosya, `file` dışında bir
-adla gelen bir dosya parçası, rotanın aldığından fazla metin alanı ya da `0`'dan büyük bir dizi
-indeksi taşıyan bir alan adı (`items[1]`:
+adla gelen bir dosya parçası, rotanın aldığından fazla metin alanı, 8 KiB ya da daha uzun bir
+metin değeri veya `0`'dan büyük bir dizi indeksi taşıyan bir alan adı (`items[1]`:
 [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)'ü kapatan limit)
 handler'a hiç ulaşmaz. Zarfın `message`'ı multer'ın kendi cümlesi ve ardından parça adıdır;
 metnin neden multer'ın olduğunu [Hatalar](#hatalar) anlatır. 64 karakterden uzun bir parça adı
-kendi başına, `Field name too long` olarak reddedilir ve asla geri yazılmaz. Multipart
-ayrıştırıcının okuyamadığı bir `Content-Type`, örneğin `multipart/mixed`, de `400`'dür.
-İstemcinin yarıda bıraktığı bir yükleme asla raporlanmaz ve ancak ona hâlâ bir şey
-yazılabiliyorsa `400` alır; ayrıştırıcı bunu fark ettiğinde genellikle yazılabilecek bir şey
-kalmamıştır.
+kendi başına, `Field name too long` olarak reddedilir ve hiçbir ret bir adın 64 karakterinden
+fazlasını geri yazmaz. Multipart ayrıştırıcının okuyamadığı bir `Content-Type`, örneğin
+`multipart/mixed`, de `400`'dür. İstemcinin yarıda bıraktığı bir yükleme asla raporlanmaz ve
+ancak ona hâlâ bir şey yazılabiliyorsa `400` alır; ayrıştırıcı bunu fark ettiğinde genellikle
+yazılabilecek bir şey kalmamıştır.
 
 **İndirme.** `GET .../attachments/:attachmentId/content` byte'ları **sniff edilmiş** medya tipiyle
 (asla istemcinin yüklemede beyan ettiğiyle değil), `Content-Length` ve `Content-Disposition` ile
@@ -663,12 +663,13 @@ isimleriyle):
   metin budur, yani bir ret hangi katmanda yakalanırsa yakalansın aynı okunur. Bu metin multer'ın
   cümlesi, varsa ardından parça adıdır (`Field name array index too large - items[4294967294]`).
   Parça adı client'ın kendi girdisidir ve yalnızca 64 karaktere kadar olduğu gibi yazılır: iki
-  multipart rota da daha uzun bir adı, ona adıyla değinen hiçbir şey olmadan önce reddeder;
-  filter'a başka bir yoldan ulaşan bir ad ise ilk 64 karakterine kesilir ve ardından
-  `[+N more]` gelir. Daha uzun bir adı hâlâ taşıyabilen tek ret, 1 MiB'ı aşan bir metin değeri
-  için Nest'in kendi `Field value too long - <ad>` metnidir. multer'ın disk depolamasının, bir
-  yüklemenin kendi akışı bozulduğunda fırlattığı `STREAM_DESTROYED`, `500` olarak kalan tek
-  koddur.
+  multipart rota da daha uzun bir adı, ona adıyla değinen hiçbir şey olmadan önce reddeder; yine
+  de adıyla anılan bir ad, reddi hangi katman yazmış olursa olsun ilk 64 karakterine kesilir ve
+  ardından `[+N more]` gelir. Buna Nest'in kendi `Field value too long - <ad>` metni de dahildir:
+  multer bu reddi, adın uzunluğuna bakmadan önce, rotanın limitine ulaşan bir metin değeri için
+  verir (dosya ekinde 8 KiB, hiç metin alanı okumayan Trello import'unda 1 KiB). multer'ın disk
+  depolamasının, bir yüklemenin kendi akışı bozulduğunda fırlattığı `STREAM_DESTROYED`, `500`
+  olarak kalan tek koddur.
 - İstemcisi gövdenin tamamı gelmeden ayrılan bir multipart yükleme sunucu hatası değildir ve
   asla raporlanmaz. Hâlâ bir şey yazılabiliyorsa, JSON parser'larının aynı kesintiye verdiği gibi bu
   zarf içinde **`400`** ile cevaplanır; multer bunu bildirdiğinde bağlantı genellikle çoktan

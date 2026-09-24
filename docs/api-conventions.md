@@ -480,15 +480,15 @@ like the per-file one. LINK attachments store no bytes: they neither count again
 are refused by a full one.
 
 **A multipart body multer refuses is `400`.** A second file, a file part under any name but
-`file`, more text fields than the route takes, or a field name carrying an array index above `0`
-(`items[1]`: the limit that closes
+`file`, more text fields than the route takes, a text value of 8 KiB or more, or a field name
+carrying an array index above `0` (`items[1]`: the limit that closes
 [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)) never reaches the
 handler. The envelope's `message` is multer's own sentence with the part name after it;
 [Errors](#errors) says why the wording is multer's. A part name longer than 64 characters is
-refused on its own, as `Field name too long`, and never repeated. A `Content-Type` the multipart
-parser cannot read, such as `multipart/mixed`, is a `400` too. An upload the client abandons
-partway is never reported, and gets a `400` only if something can still be written to it, which
-by the time the parser notices is normally not the case.
+refused on its own, as `Field name too long`, and no refusal repeats more than 64 characters of a
+name. A `Content-Type` the multipart parser cannot read, such as `multipart/mixed`, is a `400`
+too. An upload the client abandons partway is never reported, and gets a `400` only if something
+can still be written to it, which by the time the parser notices is normally not the case.
 
 **Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
 media type (never the one the client declared at upload), `Content-Length`, and
@@ -651,11 +651,12 @@ the framework's built-in exceptions and hand-written ones look identical):
   translates, so a refusal reads the same whichever layer caught it. That is multer's sentence,
   then the part name when there is one (`Field name array index too large - items[4294967294]`).
   The part name is the client's own input and is repeated whole only up to 64 characters: both
-  multipart routes refuse a longer one before anything names it, and one that reaches the filter
-  some other way is cut to its first 64 characters followed by `[+N more]`. The one refusal that
-  can still carry a longer name is Nest's own `Field value too long - <name>`, for a text value
-  over 1 MiB. `STREAM_DESTROYED`, which multer's disk storage raises when an upload's own stream
-  has failed, is the one code that stays a `500`.
+  multipart routes refuse a longer one before anything names it, and one that is named anyway is
+  cut to its first 64 characters followed by `[+N more]`, whichever layer worded the refusal. That
+  includes Nest's own `Field value too long - <name>`, which multer raises before it looks at the
+  name's length, for a text value of the route's limit or more (8 KiB on the attachment upload,
+  1 KiB on the Trello import, which reads none). `STREAM_DESTROYED`, which multer's disk storage
+  raises when an upload's own stream has failed, is the one code that stays a `500`.
 - A multipart upload whose client leaves before the body has arrived in full is not a server
   failure and is never reported. It is answered **`400`** in this envelope, as the JSON parsers
   answer the same abort, when anything can still be written; by the time multer reports it the

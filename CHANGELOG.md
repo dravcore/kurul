@@ -53,6 +53,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cannot pad the envelope either; up to 64 the message is exactly Nest's. One echo is left, and
   it is Nest's: multer checks a text value's size before its name's length, so a value over 1 MiB
   still comes back as `Field value too long - <name>`, bounded by the 16 KiB header block.
+- **The part name in `Field value too long` is cut after 64 characters too, and a multipart text
+  value gets the room its route needs rather than 1 MiB.** multer checks a text value's size
+  before its name's length, so a value over the limit under a long name is refused with the name
+  in the message, and `@nestjs/platform-express` 11.2.1 words that refusal itself,
+  `Field value too long - <name>`, before `AllExceptionsFilter` sees a `MulterError`:
+  `limits.fieldNameSize` never reaches it. Measured through `FileInterceptor` on both multipart
+  routes, a 16,340-character name, the longest a 16 KiB part-header block holds, came back whole
+  in a 16,472-byte error envelope. The filter now recognises a `400` that is one of multer's
+  refusal sentences followed by the ` - ` Nest writes after it, and cuts the name the way it cuts
+  its own: the same request is a 209-byte envelope ending in `[+16276 more]`. A spec reads
+  multer's sentence table and runs Nest's translation over every code, so a rewording on either
+  side fails a test instead of letting a whole name through again. busboy also held up to 1 MiB
+  of every text field, 8 MiB across the eight the attachment upload allows and 4 MiB across the
+  Trello import's four, though the import reads none: `limits.fieldSize` is now 8 KiB on the
+  attachment upload, four bytes a character of the longest `url` a LINK takes, and 1 KiB on the
+  import. A value of the limit or more is refused as `Field value too long`, naming its part.
 
 ### Security
 

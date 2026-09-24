@@ -70,6 +70,14 @@ import { TrelloImportService } from './trello-import.service';
         // refusing a longer name as `Field name too long` before anything repeats it (measured
         // and explained in `attachment.module.ts`). The one name this route takes is `file`.
         //
+        // `fieldSize: 1024` because busboy holds up to that many bytes of each text field in
+        // memory, 1 MiB when nothing sets it, and nothing here reads a text field: the four
+        // `fields` allows could hold 4 MiB of heap for no purpose. A kibibyte is headroom of the
+        // same kind `fields: 4` is, room for a stray field such as a file's name. A value over it
+        // (or of exactly 1,024 bytes: busboy fires the limit on equality) is refused as
+        // `Field value too long - <name>`, worded by Nest, and the name in it is cut after 64
+        // characters by `AllExceptionsFilter` (`attachment.module.ts` has the measurements).
+        //
         // What a refusal becomes is `AllExceptionsFilter`'s to decide, the same for both routes,
         // and `attachment.module.ts` walks through it: a `400` in the error envelope (`413` for
         // the file's size), and a `400` too for the two plain errors multer passes on, a client
@@ -80,6 +88,7 @@ import { TrelloImportService } from './trello-import.service';
           fields: 4,
           fieldArrayIndexLimit: 0,
           fieldNameSize: 64,
+          fieldSize: 1024,
         },
       }),
     }),

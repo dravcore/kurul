@@ -106,6 +106,12 @@ describe('ImportModule multipart configuration', () => {
     expect((await multerOptions()).limits?.fieldNameSize).toBe(64);
   });
 
+  it('gives a text value next to no room, because nothing here reads one', async () => {
+    // busboy holds up to `fieldSize` bytes of each text field in memory, 1 MiB when nothing sets
+    // it, so the four fields `fields` allows could hold 4 MiB of heap that no code reads.
+    expect((await multerOptions()).limits?.fieldSize).toBe(1024);
+  });
+
   it('does not depend on file storage at all', () => {
     // An import writes LINK rows and stores no bytes, so it has to work on an instance with no
     // STORAGE_PATH — where `StorageService.write` answers 503. Importing StorageModule here would

@@ -257,8 +257,9 @@ const PART_NAME_ECHO_MAX_LENGTH = 64;
  * shortened here: up to 64 characters the message is exactly the one Nest gives, and the parity
  * `all-exceptions.filter.spec.ts` pins holds. The cap is for a name that arrives some other way:
  * `LIMIT_FIELD_VALUE`, which multer raises before it looks at the name's length and which Nest
- * 11.2.1 words itself, and a route registered without the limit. No log line carries the name
- * either way: a refusal is a 4xx, which this filter never logs.
+ * 11.2.1 words itself (`boundedMulterRefusal` applies the cap to Nest's wording), and a route
+ * registered without the limit. No log line carries the name either way: a refusal is a 4xx,
+ * which this filter never logs.
  */
 function echoedPartName(name: string): string {
   if (name.length <= PART_NAME_ECHO_MAX_LENGTH) {
@@ -350,6 +351,57 @@ function mapMulterError(exception: unknown): { statusCode: number; message: stri
         ? `${exception.message} - ${echoedPartName(field)}`
         : exception.message,
   };
+}
+
+/**
+ * multer's sentence for every code `MULTER_CLIENT_ERROR_STATUSES` answers `400`, as multer 2.3.0
+ * words it (`lib/multer-error.js`).
+ *
+ * The sentences rather than the codes, because what they pick out is a message Nest has already
+ * written. `transformException` turns eight of these codes into a `BadRequestException` of its own,
+ * reading `<sentence> - <part name>` whenever multer named a part, and hands this filter nothing
+ * else: the `MulterError`, its `code` and its `field` are gone by then. The two codes Nest 11.2.1
+ * leaves alone are here as well, because nestjs/nest#17857 words them the same way once a release
+ * carries it. A closed list, for the reason `MULTER_CLIENT_ERROR_STATUSES` is one:
+ * `all-exceptions.filter.spec.ts` holds it against the installed multer's table and the installed
+ * Nest's translation, so a rewording on either side fails there instead of passing a name through.
+ */
+const MULTER_REFUSAL_SENTENCES: readonly string[] = [
+  'Too many parts',
+  'Too many files',
+  'Field name too long',
+  'Field value too long',
+  'Too many fields',
+  'Unexpected field',
+  'Field name missing',
+  'Field name nesting too deep',
+  'Field name array index too large',
+  'Invalid field name',
+];
+
+/**
+ * A `400` message with the part name in a multer refusal Nest worded itself bounded as
+ * `echoedPartName` bounds it, and any other message as it was.
+ *
+ * multer checks a text value's length before its name's, so a value over `limits.fieldSize` under
+ * a long name is `LIMIT_FIELD_VALUE` naming it, a code Nest 11.2.1 translates before this filter
+ * runs. `limits.fieldNameSize` cannot reach that name, and `mapMulterError` never sees the error:
+ * it arrived here as `Field value too long - <name>`, bounded only by busboy's 16 KiB part-header
+ * block. Measured through `FileInterceptor` with each route's own options, a 16,340-character name
+ * came back whole in a 16,472-byte envelope.
+ *
+ * Only one of `MULTER_REFUSAL_SENTENCES` followed by Nest's ` - ` counts, never the shape alone:
+ * another `400` whose message happens to contain ` - ` is somebody else's wording and stays
+ * exactly as written. So does a part name of 64 characters or fewer, so the message is still
+ * Nest's word for word, which keeps the parity with `mapMulterError` that the spec pins.
+ */
+function boundedMulterRefusal(message: string): string {
+  const sentence = MULTER_REFUSAL_SENTENCES.find((candidate) =>
+    message.startsWith(`${candidate} - `),
+  );
+  return sentence === undefined
+    ? message
+    : `${sentence} - ${echoedPartName(message.slice(`${sentence} - `.length))}`;
 }
 
 /**
@@ -574,6 +626,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // A structured payload always wins over the message-string fallback.
         details = asValidationDetails(body.details) ?? details;
         planLimit = asPlanLimitDetail(body.planLimit);
+      }
+
+      // A multer refusal Nest translated itself, whose part name nothing upstream bounds. See
+      // `boundedMulterRefusal`.
+      if (statusCode === HttpStatus.BAD_REQUEST) {
+        message = boundedMulterRefusal(message);
       }
 
       if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {

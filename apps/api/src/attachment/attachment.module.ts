@@ -10,6 +10,7 @@ import { StorageService } from '../storage/storage.service';
 import { AttachmentController } from './attachment.controller';
 import { AttachmentDownloadService } from './attachment-download.service';
 import { AttachmentService } from './attachment.service';
+import { MAX_ATTACHMENT_URL_LENGTH } from './dto/attachment-limits';
 import { UploadBudgetGuard } from './upload-budget.guard';
 
 @Module({
@@ -122,10 +123,30 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         //
         // 64 is eight times the longest name this route takes (`filename`), and the length up to
         // which `AllExceptionsFilter` repeats a part name whole (`echoedPartName`), so no name
-        // multer lets through is ever shortened in a refusal. One echo stays out of its reach:
-        // multer checks a text value's size before its name's length, so a value over busboy's
-        // 1 MiB default still comes back as `Field value too long - <name>`, worded by Nest and
-        // bounded only by the 16 KiB header block.
+        // multer lets through is ever shortened in a refusal. One refusal names its part before
+        // this limit is looked at: multer checks a text value's size before its name's length, so
+        // a value over `fieldSize` below is `Field value too long - <name>` whatever the name's
+        // length, and that one is bounded where the refusal is answered instead (next section).
+        //
+        // ## `fieldSize`, because busboy keeps a mebibyte of every text field by default
+        //
+        // busboy holds up to `fieldSize` bytes of each text field in memory, 1 MiB when nothing
+        // sets it, so the eight fields `fields` allows could hold 8 MiB of heap on a route whose
+        // longest text value is a LINK's `url`: `CreateAttachmentDto` caps it at
+        // `MAX_ATTACHMENT_URL_LENGTH` (2,048) characters, and it can arrive as a multipart field
+        // (`origin-check.e2e-spec.ts` sends one). UTF-8 never spends more than three bytes on a
+        // character as `MaxLength` counts them (a UTF-16 code unit), so four bytes a character
+        // holds the longest `url` however it is written, with room to spare for busboy firing
+        // this limit on equality, as it does `fileSize`'s: a value of exactly `fieldSize` bytes
+        // is refused. That is 8 KiB a field, and 64 KiB for all eight.
+        //
+        // A value over it is refused as `LIMIT_FIELD_VALUE`, which names its part and which Nest
+        // 11.2.1 words itself, `Field value too long - <name>`, before `AllExceptionsFilter` sees
+        // it. Measured through `FileInterceptor` with this configuration, a 16,340-character name,
+        // the longest a 16 KiB part-header block holds, came back whole in a 16,472-byte envelope
+        // (at busboy's 1 MiB default, as it was). The filter now cuts a name Nest wrote after one
+        // of multer's sentences the way it cuts its own (`boundedMulterRefusal`): the same refusal
+        // is `Field value too long - ` and the first 64 characters, then `[+16276 more]`.
         //
         // ## What multer hands on besides the refusals these limits make
         //
@@ -143,6 +164,7 @@ import { UploadBudgetGuard } from './upload-budget.guard';
           fields: 8,
           fieldArrayIndexLimit: 0,
           fieldNameSize: 64,
+          fieldSize: 4 * MAX_ATTACHMENT_URL_LENGTH,
         },
       }),
     }),
