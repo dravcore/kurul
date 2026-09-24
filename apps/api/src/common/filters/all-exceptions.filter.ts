@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma';
+import { echoedName } from '../echoed-name';
 import { isProductionEnv } from '../env';
 import { getRequestId } from '../logging/request-id';
 import { captureServerError, type ServerErrorContext } from '../observability/sentry';
@@ -237,43 +238,6 @@ const MULTER_CLIENT_ERROR_STATUSES: ReadonlyMap<string, HttpStatus> = new Map([
 ]);
 
 /**
- * The longest part name a refusal repeats whole, in characters as `String.length` counts them,
- * which is the unit multer checks `limits.fieldNameSize` in.
- */
-const PART_NAME_ECHO_MAX_LENGTH = 64;
-
-/**
- * A part name as a refusal's `message` repeats it: whole up to `PART_NAME_ECHO_MAX_LENGTH`
- * characters, and past that the first 64 followed by `[+N more]`.
- *
- * The name is whatever the client put in a part's `Content-Disposition`, and busboy's multipart
- * parser bounds it only by the 16 KiB it allows a part's header block (`MAX_HEADER_SIZE`): its
- * `fieldNameSize` default applies to urlencoded bodies alone. A 16,340-character name fits, and
- * until this cap a field of that name ending in `[1]` came back as a 16,484-byte envelope
- * (measured through `FileInterceptor`).
- *
- * Both multipart routes now set `limits.fieldNameSize` to the same 64, which multer enforces
- * ahead of every refusal that names a part except one, so no name multer lets through is ever
- * shortened here: up to 64 characters the message is exactly the one Nest gives, and the parity
- * `all-exceptions.filter.spec.ts` pins holds. The cap is for a name that arrives some other way:
- * `LIMIT_FIELD_VALUE`, which multer raises before it looks at the name's length and which Nest
- * 11.2.1 words itself (`boundedMulterRefusal` applies the cap to Nest's wording), and a route
- * registered without the limit. No log line carries the name either way: a refusal is a 4xx,
- * which this filter never logs.
- */
-function echoedPartName(name: string): string {
-  if (name.length <= PART_NAME_ECHO_MAX_LENGTH) {
-    return name;
-  }
-
-  const cut = name.slice(0, PART_NAME_ECHO_MAX_LENGTH);
-  // Never half a surrogate pair: `JSON.stringify` would write the orphan out as a bare `\ud83d`.
-  const last = cut.charCodeAt(cut.length - 1);
-  const head = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
-  return `${head}[+${name.length - head.length} more]`;
-}
-
-/**
  * Maps a multer refusal that `@nestjs/platform-express` passed on untranslated onto a client
  * status.
  *
@@ -327,7 +291,16 @@ function echoedPartName(name: string): string {
  * the sentence alone on the 413, the part name after ` - ` on a 400. The same two spellings here
  * give a client one message per refusal whichever layer caught it, and they are what
  * nestjs/nest#17857 produces for these codes. The part name is the client's own input, echoed
- * back as Nest echoes it for the codes it knows, up to a length: see `echoedPartName`.
+ * back as Nest echoes it for the codes it knows, up to 64 characters (`echoedName`).
+ *
+ * Both multipart routes set `limits.fieldNameSize` to the same 64, which multer enforces ahead of
+ * every refusal that names a part except one, so no name multer lets through is ever shortened
+ * here: up to 64 characters the message is exactly the one Nest gives, and the parity
+ * `all-exceptions.filter.spec.ts` pins holds. The cut is for a name that arrives some other way:
+ * `LIMIT_FIELD_VALUE`, which multer raises before it looks at the name's length and which Nest
+ * 11.2.1 words itself (`boundedMulterRefusal` cuts the name in Nest's wording), and a route
+ * registered without the limit. No log line carries the name either way: a refusal is a 4xx,
+ * which this filter never logs.
  */
 function mapMulterError(exception: unknown): { statusCode: number; message: string } | null {
   if (!(exception instanceof Error) || exception.name !== 'MulterError') {
@@ -348,7 +321,7 @@ function mapMulterError(exception: unknown): { statusCode: number; message: stri
     statusCode,
     message:
       statusCode === HttpStatus.BAD_REQUEST && typeof field === 'string' && field !== ''
-        ? `${exception.message} - ${echoedPartName(field)}`
+        ? `${exception.message} - ${echoedName(field)}`
         : exception.message,
   };
 }
@@ -381,7 +354,7 @@ const MULTER_REFUSAL_SENTENCES: readonly string[] = [
 
 /**
  * A `400` message with the part name in a multer refusal Nest worded itself bounded as
- * `echoedPartName` bounds it, and any other message as it was.
+ * `echoedName` bounds it, and any other message as it was.
  *
  * multer checks a text value's length before its name's, so a value over `limits.fieldSize` under
  * a long name is `LIMIT_FIELD_VALUE` naming it, a code Nest 11.2.1 translates before this filter
@@ -401,7 +374,7 @@ function boundedMulterRefusal(message: string): string {
   );
   return sentence === undefined
     ? message
-    : `${sentence} - ${echoedPartName(message.slice(`${sentence} - `.length))}`;
+    : `${sentence} - ${echoedName(message.slice(`${sentence} - `.length))}`;
 }
 
 /**

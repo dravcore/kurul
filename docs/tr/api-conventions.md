@@ -652,6 +652,13 @@ isimleriyle):
 - `message`, production'da asla ham bir exception string'i değildir, stack trace'ler
   döndürülmez, loglanır.
 - Client'lar `message` metnine değil, `statusCode` ve `error`'a göre dallanır.
+- Client'ın seçtiği bir ad `details` içinde yalnızca 64 karaktere kadar olduğu gibi yazılır.
+  DTO'nun tanımlamadığı bir anahtar adıyla reddedilir, hem `field`'da hem yeniden `message`'da
+  (`property <ad> should not exist`); 64 karakteri aşan her biri ilk 64 karakterine kesilir ve
+  ardından `[+N more]` gelir: iç içe bir `field` tek bir yol olarak kesilir, böylece tanımlı
+  başlangıcından okunmaya devam eder (`items[0].` ve ardından anahtar). Bir DTO'nun tanımladığı
+  her ad bundan kısadır ve olduğu gibi yazılır. Multipart bir parça adı da aşağıda aynı sınırı
+  alır.
 - Hata sözlüğü _zaten_ HTTP status kodları olan bir kütüphanenin fırlattığı bir hata —
   Express'in body parser'larının fırlattığı `http-errors` — bu zarf içinde **kendi 4xx'i** ile
   cevaplanır; metin kütüphanenin değil, burada seçilendir. Eşleme bilinçli olarak 4xx'te durur:

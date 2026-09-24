@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, MulterModule } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import { IsString } from 'class-validator';
 import { diskStorage, memoryStorage } from 'multer';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
@@ -98,6 +99,23 @@ class EchoProbeController {
   echo(@Body() payload: Record<string, unknown>): { keys: number } {
     echoHandler(payload);
     return { keys: Object.keys(payload ?? {}).length };
+  }
+}
+
+class TitleDto {
+  @IsString()
+  title!: string;
+}
+
+/** Records whether a body got past the global `ValidationPipe`, so "refused by it" is observable. */
+const titleHandler = jest.fn();
+
+@Controller('probe')
+class TitleProbeController {
+  @Post('title')
+  create(@Body() dto: TitleDto): { ok: true } {
+    titleHandler(dto);
+    return { ok: true };
   }
 }
 
@@ -742,5 +760,67 @@ describe('configureApp request body limit (configured)', () => {
 
     expect(response.body).toMatchObject({ statusCode: 400, error: 'Bad Request' });
     expect(logError).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `forbidNonWhitelisted` refuses a key the DTO does not declare by name, in `field` and again in
+ * `message` (`property <name> should not exist`), and a key is as long as the body limit lets it
+ * be. Asserted through the whole stack `configureApp` installs, the JSON parser at its default
+ * limit, the global `ValidationPipe` with `validationExceptionFactory`, and `AllExceptionsFilter`,
+ * because the claim is about what a client reads, not what the factory returns on its own
+ * (`validation-exception.factory.spec.ts` pins that).
+ */
+describe('configureApp validation of a key the DTO does not declare', () => {
+  let app: INestApplication<App>;
+  let stdout: jest.SpyInstance;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TitleProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    configureApp(app, { corsOrigin: 'http://localhost:3000', trustProxy: false });
+    await app.init();
+  });
+
+  beforeEach(() => {
+    titleHandler.mockClear();
+    stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stdout.mockRestore();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('repeats at most 64 characters of a 20 KiB key', async () => {
+    const echoed = `${'k'.repeat(64)}[+20416 more]`;
+
+    const response = await request(app.getHttpServer())
+      .post('/probe/title')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ title: 'x', ['k'.repeat(20 * 1024)]: 1 }))
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Validation failed',
+      details: [
+        {
+          field: echoed,
+          constraint: 'whitelistValidation',
+          message: `property ${echoed} should not exist`,
+        },
+      ],
+    });
+    // 41,239 bytes before the bound, measured through this same stack.
+    expect(Buffer.byteLength(response.text)).toBeLessThan(512);
+    expect(titleHandler).not.toHaveBeenCalled();
   });
 });

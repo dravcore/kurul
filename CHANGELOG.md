@@ -69,6 +69,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Trello import's four, though the import reads none: `limits.fieldSize` is now 8 KiB on the
   attachment upload, four bytes a character of the longest `url` a LINK takes, and 1 KiB on the
   import. A value of the limit or more is refused as `Field value too long`, naming its part.
+- **A key the DTO does not declare is no longer repeated back at any length.** The global
+  `ValidationPipe` refuses such a key by name, twice, in `details[].field` and in
+  `property <name> should not exist`, and a key is as long as the JSON body limit or the request
+  line allows. Measured through the stack `configureApp` installs: a 20 KiB key came back as a
+  41,239-byte error envelope, a key filling the 1 MiB body as a 2 MiB envelope, and a
+  16,000-character query key three times over in 48,284 bytes. `validationExceptionFactory` now
+  cuts a name after 64 characters with the same `[+N more]` the multipart refusals use: `field`
+  as one path, so a nested one still reads from its declared start (`items[0].` and then the
+  key), and the name in `message` on its own. The 20 KiB key is now a 433-byte envelope. The query
+  key is cut in `details` as well and still comes back once in `path`, which repeats the request's
+  URL for every error, as it always has, within the 16 KiB Node allows a request's head. A name of
+  64 characters or fewer, which is every name a DTO declares, comes back exactly as before, and
+  `details` keeps its shape. One function, `common/echoed-name.ts`, cuts both kinds of name, and
+  `AllExceptionsFilter` shares it.
 
 ### Security
 

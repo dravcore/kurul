@@ -640,6 +640,12 @@ the framework's built-in exceptions and hand-written ones look identical):
 - `message` is never a raw exception string in production, and stack traces are logged, not
   returned.
 - Clients branch on `statusCode` and `error`, never on `message` text.
+- A name the client chose is repeated in `details` whole only up to 64 characters. A key the DTO
+  does not declare is refused by name, in `field` and again in `message`
+  (`property <name> should not exist`), and past 64 characters each is cut to its first 64
+  followed by `[+N more]`: a nested `field` is cut as one path, so it still reads from its
+  declared start (`items[0].` and then the key). Every name a DTO declares is shorter than that
+  and is repeated exactly. A multipart part name gets the same bound, below.
 - A failure thrown by a library whose error vocabulary _is_ HTTP status codes — `http-errors`,
   which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
   with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx

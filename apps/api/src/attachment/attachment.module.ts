@@ -122,11 +122,12 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // exist`, a 32,899-byte envelope. With it, all three are `Field name too long`.
         //
         // 64 is eight times the longest name this route takes (`filename`), and the length up to
-        // which `AllExceptionsFilter` repeats a part name whole (`echoedPartName`), so no name
-        // multer lets through is ever shortened in a refusal. One refusal names its part before
-        // this limit is looked at: multer checks a text value's size before its name's length, so
-        // a value over `fieldSize` below is `Field value too long - <name>` whatever the name's
-        // length, and that one is bounded where the refusal is answered instead (next section).
+        // which `AllExceptionsFilter` repeats a part name whole (`common/echoed-name.ts`), so no
+        // name multer lets through is ever shortened in a refusal. One refusal names its part
+        // before this limit is looked at: multer checks a text value's size before its name's
+        // length, so a value over `fieldSize` below is `Field value too long - <name>` whatever
+        // the name's length, and that one is bounded where the refusal is answered instead (next
+        // section).
         //
         // ## `fieldSize`, because busboy keeps a mebibyte of every text field by default
         //
