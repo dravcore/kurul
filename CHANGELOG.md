@@ -1,225 +1,256 @@
 # Changelog
 
-All notable changes to Kurul are documented in this file.
+Kurul'daki dikkate değer bütün değişiklikler bu dosyada belgelenir.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
-project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/)'a dayanır ve bu proje
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html)'e uyar.
+
+`[0.4.1]` ve öncesindeki sürümlerin kayıtları yayımlandıkları dilde, yani İngilizce olarak durur; bu
+noktadan sonraki kayıtlar Türkçe yazılır (karar:
+[ADR 0036](docs/decisions/0036-turkish-only-documentation.md)).
 
 ## [Unreleased]
 
-### Changed
+### Değişti
 
-- **Better Auth 1.7.5, and a migration that lets it create accounts again.** 1.7.3 went back on
-  the account identity 1.7.0 introduced: an account is keyed on `(providerId, accountId)` again,
-  as in 1.6, and nothing writes the `Account.issuer` column 0.4.0 added for 1.7.1, `NOT NULL`
-  and with a unique `(issuer, accountId)` index. Left that way, the column refuses every row
-  Better Auth inserts: on Dependabot's pull requests for 1.7.4 and 1.7.5
-  ([#367](https://github.com/dravcore/kurul/pull/367),
-  [#377](https://github.com/dravcore/kurul/pull/377)) 28 of the 34 integration suites failed,
-  each sign-up a `500` on Prisma's `Argument issuer is missing`, and the seed and the demo reset
-  fail the same way. Migration `20260924090000_account_issuer_nullable` drops the index and the
-  `NOT NULL`, the two statements Better Auth's 1.7 upgrade guide gives for Postgres, and
-  `pnpm db:migrate` applies it like any other. The column stays, with the `local:credential`
-  every existing account holds: a rollback to 0.4.1, whose Better Auth still signs in by issuer,
-  needs no schema change, though an account created after the upgrade cannot sign in on it.
-  Dropping the column is left to a later release.
+- **Dokümantasyon artık yalnız Türkçe.** İngilizce `docs/**` dosyaları ve kök `README.md`
+  kaldırıldı; Türkçe dosyalar aynı yollara taşındı (`docs/tr/<dosya>` → `docs/<dosya>`,
+  `README.tr.md` → `README.md`), yani `docs/...` yolları değişmedi. `ROADMAP.md`, `CONTRIBUTING.md`,
+  `SECURITY.md`, `CODE_OF_CONDUCT.md` ile PR ve issue şablonları da Türkçeye çevrildi. Bu dosyanın
+  `[0.4.1]` ve öncesindeki kayıtları İngilizce kaldı. Başlık çapaları artık Türkçe olduğu için
+  dokümanlara dışarıdan verilmiş `#çapa` bağlantıları (eski İngilizce çapalar) bölüme atlamaz; sayfa
+  yine açılır. `docs/tr/...` altındaki eski Türkçe yollar ile `README.tr.md` ise artık yok, bu
+  adresler hiç açılmaz; aynı içerik `docs/...` ve `README.md` yollarındadır. Ürünün İngilizcesi
+  değişmedi: arayüzün `en` dili, API ve OpenAPI açıklaması olduğu gibi duruyor. Karar
+  [ADR 0036](docs/decisions/0036-turkish-only-documentation.md)'da.
 
-  1.7.3 also validates the database schema at startup and refuses auth requests while it
-  disagrees, but through a Prisma 7 client it sees column names only, so it passed the column
-  that broke every sign-up. `auth-schema.spec.ts` holds `schema.prisma` to the same rule with the
-  `?` and the `@default` in view, and fails on the old schema.
+- **Better Auth 1.7.5 ve onun yeniden hesap oluşturabilmesini sağlayan bir migration.** 1.7.3,
+  1.7.0'ın getirdiği hesap kimliğinden vazgeçti: bir hesap, 1.6'daki gibi yine
+  `(providerId, accountId)` ile anahtarlanıyor ve 0.4.0'ın 1.7.1 için eklediği, `NOT NULL` olan ve
+  benzersiz bir `(issuer, accountId)` indeksi taşıyan `Account.issuer` sütununa artık hiçbir şey
+  yazmıyor. Öyle kalırsa sütun, Better Auth'un eklediği her satırı reddediyor: Dependabot'un 1.7.4
+  ve 1.7.5 için açtığı pull request'lerde ([#367](https://github.com/dravcore/kurul/pull/367),
+  [#377](https://github.com/dravcore/kurul/pull/377)) 34 integration suite'inin 28'i başarısız oldu,
+  her sign-up Prisma'nın `Argument issuer is missing` hatası yüzünden `500` döndü; seed ile demo
+  reset de aynı şekilde başarısız oluyor. `20260924090000_account_issuer_nullable` migration'ı
+  indeksi ve `NOT NULL`'u kaldırıyor, ki bunlar Better Auth'un 1.7 upgrade rehberinin Postgres için
+  verdiği iki ifadedir; `pnpm db:migrate` onu diğer her migration gibi uyguluyor. Sütun, her mevcut
+  hesabın taşıdığı `local:credential` değeriyle birlikte kalıyor: Better Auth'u oturum açmayı hâlâ
+  issuer üzerinden yapan 0.4.1'e geri dönmek şema değişikliği gerektirmiyor, ama yükseltmeden sonra
+  oluşturulan bir hesap o sürümde oturum açamaz. Sütunun kaldırılması sonraki bir release'e
+  bırakıldı.
 
-- **Prisma 7.10.0**: `prisma`, `@prisma/client`, `@prisma/adapter-pg` and
-  `@prisma/client-runtime-utils` from 7.9.1, together, because the generated client, its runtime
-  and the CLI that generates it have to match. The release's fixes that reach Kurul's code are in
-  interactive transactions, which the API opens in 26 places: `$disconnect()`, which the shutdown
-  path calls on every client, now also cleans up a transaction whose start is still in progress
-  at the driver, and a cleanup that fails after a timeout or a terminated backend no longer
-  becomes an unhandled rejection. The `PrismaClientValidationError` that failed the attachment
-  integration suite on #367 was not Prisma's: it is the `issuer` column in the entry above.
-  7.10.0 still pins the CLI's `mysql2` at 3.15.3 and `@prisma/config`'s `deepmerge-ts` at 7.1.5,
-  so both overrides stay; without either, `pnpm audit --audit-level high` fails again, on
-  GHSA-3f6p-5ww8-9rcr or GHSA-ggr8-5vv4-36mx.
+  1.7.3 ayrıca açılışta veritabanı şemasını doğrular ve şema uyuşmadığı sürece auth request'lerini
+  reddeder; ama bir Prisma 7 client'ı üzerinden yalnızca sütun adlarını görür, bu yüzden her
+  sign-up'ı bozan sütunu kabul etti. `auth-schema.spec.ts` aynı kuralı `schema.prisma`'ya `?` ile
+  `@default`'u da hesaba katarak uygular ve eski şemada başarısız olur.
 
-- **Next.js 16.3.6 and React 19.3.0**, with `@types/react` and `@types/react-dom` 19.3.0. Next
-  16.3.4 turned AVIF image optimisation back on, which 16.3.3 had switched off to answer
-  GHSA-2xp9-vwfh-vxw4 in 0.4.1, and now requires `sharp` 0.35.4, the version 0.4.1 already took
-  for its libheif fix. React 19.3 adds `<ViewTransition>` and refs on `<Fragment>`, and renders
-  concurrent transitions independently rather than as one. Nothing in `apps/web` needed a change
-  and its unit suite passes as it did; the browser suite, which runs nightly and on pull requests
-  to `main`, is where a change in timing would show.
+- **Prisma 7.10.0**: `prisma`, `@prisma/client`, `@prisma/adapter-pg` ve
+  `@prisma/client-runtime-utils` 7.9.1'den birlikte yükseltildi, çünkü üretilen client'ın,
+  runtime'ının ve onu üreten CLI'ın eşleşmesi gerekir. Sürümün Kurul'un koduna ulaşan düzeltmeleri,
+  API'nin 26 yerde açtığı interactive transaction'lardadır: kapanış yolunun her client'ta çağırdığı
+  `$disconnect()` artık, driver'da başlangıcı hâlâ süren bir transaction'ı da temizliyor ve bir
+  timeout'tan ya da sonlandırılmış bir backend'den sonra başarısız olan bir temizlik artık unhandled
+  rejection'a dönüşmüyor. #367'de attachment integration suite'ini düşüren
+  `PrismaClientValidationError` Prisma'dan kaynaklanmıyordu: yukarıdaki maddedeki `issuer`
+  sütunudur. 7.10.0 hâlâ CLI'ın `mysql2`'sini 3.15.3'e ve `@prisma/config`'in `deepmerge-ts`'ini
+  7.1.5'e sabitliyor, bu yüzden iki override da kalıyor; ikisinden biri olmadan
+  `pnpm audit --audit-level high` yeniden başarısız olur, GHSA-3f6p-5ww8-9rcr ya da
+  GHSA-ggr8-5vv4-36mx yüzünden.
 
-- **The rest of Dependabot's production and development groups**
+- **Next.js 16.3.6 ve React 19.3.0**, `@types/react` ve `@types/react-dom` 19.3.0 ile birlikte. Next
+  16.3.4, 16.3.3'ün 0.4.1'de GHSA-2xp9-vwfh-vxw4'ü yanıtlamak için kapattığı AVIF image
+  optimizasyonunu yeniden açtı ve artık `sharp` 0.35.4'ü gerektiriyor; 0.4.1 bu sürümü libheif
+  düzeltmesi için zaten almıştı. React 19.3, `<ViewTransition>` bileşenini ve `<Fragment>` üzerinde
+  ref'leri ekliyor ve eşzamanlı transition'ları tek bir bütün olarak değil, bağımsız olarak render
+  ediyor. `apps/web`'de hiçbir şeyin değişmesi gerekmedi ve unit suite'i eskisi gibi geçiyor;
+  zamanlamadaki bir değişikliğin görüneceği yer, nightly ve `main`'e açılan pull request'lerde koşan
+  browser suite'idir.
+
+- **Dependabot'un production ve development gruplarının geri kalanı**
   ([#377](https://github.com/dravcore/kurul/pull/377),
-  [#375](https://github.com/dravcore/kurul/pull/375)), at the versions they propose, which the
-  seven-day cooldown in `dependabot.yml` had already aged: `@nestjs/throttler` 6.6.0,
-  `@sentry/node` and `@sentry/nextjs` 10.75.0, `bullmq` 6.3.6, `file-type` 22.1.0 (which now
-  recognises ISO 9660 images; as an attachment one is still a `415`), `lucide-react` 1.46.0,
-  `next-intl` 4.14.5 and `tailwind-merge` 3.7.0, and among the development tools eslint 10.10.0,
-  typescript-eslint 8.70.0, jest 30.5.1, Playwright 1.63.0, prettier 3.9.7 and knip 6.36.0.
-  Nothing needed a change for them: `pnpm lint` and `pnpm knip` find nothing new, and prettier
-  3.9.7 moves no file. typescript-eslint 8.70.0 still peers on TypeScript below 6.1, so
-  [ADR 0030](docs/decisions/0030-typescript-7-hold.md)'s hold on TypeScript 7 stands.
+  [#375](https://github.com/dravcore/kurul/pull/375)), önerdikleri sürümlerle; bunlar
+  `dependabot.yml`'deki yedi günlük cooldown'dan zaten geçmişti: `@nestjs/throttler` 6.6.0,
+  `@sentry/node` ve `@sentry/nextjs` 10.75.0, `bullmq` 6.3.6, `file-type` 22.1.0 (artık ISO 9660
+  image'larını tanıyor; attachment olarak biri hâlâ `415`'tir), `lucide-react` 1.46.0, `next-intl`
+  4.14.5 ve `tailwind-merge` 3.7.0, development araçlarından ise eslint 10.10.0, typescript-eslint
+  8.70.0, jest 30.5.1, Playwright 1.63.0, prettier 3.9.7 ve knip 6.36.0. Bunlar için hiçbir
+  değişiklik gerekmedi: `pnpm lint` ve `pnpm knip` yeni bir şey bulmuyor, prettier 3.9.7 hiçbir
+  dosyayı değiştirmiyor. typescript-eslint 8.70.0'ın TypeScript peer aralığı hâlâ 6.1'in altında
+  kalıyor, bu yüzden [ADR 0030](docs/decisions/0030-typescript-7-hold.md)'un TypeScript 7 hold'u
+  geçerliliğini koruyor.
 
-### Fixed
+### Düzeltildi
 
-- **A field name multer refuses is a `400`, not a `500` filed in Sentry.** 0.4.1 set multer's
-  `limits.fieldArrayIndexLimit` to `0` on both multipart routes, the attachment upload and the
-  Trello import, to close [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4),
-  and the request that limit refuses, a field such as `items[4294967294]` or any other index above
-  `0`, reached the client as a `500` and error tracking as a server fault.
-  `@nestjs/platform-express` 11.2.1 translates the nine error codes multer had up to 2.2.0 and
-  passes the three 2.3.0 added through unchanged, so `LIMIT_FIELD_ARRAY_INDEX` and
-  `INVALID_FIELD_NAME` fell to the catch-all in `AllExceptionsFilter`. The filter now maps a multer
-  refusal Nest passes on, keyed on the error's `code` rather than its message: a `400` in the
-  standard envelope, with multer's sentence and the part name as `message`
-  (`Field name array index too large - items[4294967294]`, the wording Nest already gives the codes
-  it translates), a `413` for an oversized file, and no report. `STREAM_DESTROYED`, which multer's
-  disk storage raises and the memory storage Kurul uses never does, stays a `500`, as it does in
-  Nest's own fix for the same gap ([nestjs/nest#17857](https://github.com/nestjs/nest/pull/17857)),
-  which no Nest release carries yet.
-- **An upload the client abandons is not a `500` filed in Sentry, and neither is a `Content-Type`
-  the multipart parser cannot read.** multer aborts an upload whose client stops sending with a
-  plain `Error('Request aborted')`, not a coded `MulterError`, and hands on whatever busboy's
-  constructor throws for a `Content-Type` it cannot parse; `@nestjs/platform-express` translates
-  neither, so both reached the catch-all in `AllExceptionsFilter`. A closed tab or a dropped
-  connection partway through an upload was an error-level log line and a Sentry event, and
-  `multipart/mixed; boundary=x`, or a boundary with spaces around its `=`, was a `500` whose
-  message outside production read the request's own `Content-Type` back. An abandoned upload is
-  now answered as the JSON parsers already answered the same abort: a `400` in the standard
-  envelope, not logged and not reported. In practice nothing is written at all, because the
-  filter no longer writes to a connection that is gone, and in every abort measured through
-  `FileInterceptor` the connection was gone by the time multer gave up. The match is multer's own
-  sentence on a request whose body never arrived in full, so a server failure whose client
-  happened to leave first is still reported. The two `Content-Type` refusals are a `400` worded as
-  Nest words the busboy errors it translates, `Multipart: Unsupported content type` and
-  `Multipart: Malformed content type`, without the header.
-- **A multipart part name is no longer repeated back at any length.** busboy's multipart parser
-  puts no limit on a part's name (the `fieldNameSize` default of 100 is its urlencoded parser's),
-  only on the 16 KiB of the header block around it, and the refusals that name their part
-  repeated all of it. Measured through `FileInterceptor`: a 16,340-character field name ending in
-  `[1]` came back as a 16,484-byte error envelope, a 1 KiB file part under the wrong name as
-  `Unexpected field - <name>`, and on the attachment upload a 16 KiB text field the DTO does not
-  know was accepted by multer and repeated twice by `ValidationPipe`, a 32,899-byte envelope. Both
-  multipart routes now set `limits.fieldNameSize` to `64`, which multer enforces itself: a longer
-  name is `Field name too long`, a refusal that names no part. `AllExceptionsFilter` repeats at
-  most 64 characters of a part name, then `[+N more]`, so a name that reaches it another way
-  cannot pad the envelope either; up to 64 the message is exactly Nest's. That includes the one
-  refusal multer raises before it checks a name's length, `Field value too long - <name>`, which
-  Nest words itself: the next entry cuts its name the same way.
-- **The part name in `Field value too long` is cut after 64 characters too, and a multipart text
-  value gets the room its route needs rather than 1 MiB.** multer checks a text value's size
-  before its name's length, so a value over the limit under a long name is refused with the name
-  in the message, and `@nestjs/platform-express` 11.2.1 words that refusal itself,
-  `Field value too long - <name>`, before `AllExceptionsFilter` sees a `MulterError`:
-  `limits.fieldNameSize` never reaches it. Measured through `FileInterceptor` on both multipart
-  routes, a 16,340-character name, the longest a 16 KiB part-header block holds, came back whole
-  in a 16,472-byte error envelope. The filter now recognises a `400` that is one of multer's
-  refusal sentences followed by the ` - ` Nest writes after it, and cuts the name the way it cuts
-  its own: the same request is a 209-byte envelope ending in `[+16276 more]`. A spec reads
-  multer's sentence table and runs Nest's translation over every code, so a rewording on either
-  side fails a test instead of letting a whole name through again. busboy also held up to 1 MiB
-  of every text field, 8 MiB across the eight the attachment upload allows and 4 MiB across the
-  Trello import's four, though the import reads none: `limits.fieldSize` is now 8 KiB on the
-  attachment upload, four bytes a character of the longest `url` a LINK takes, and 1 KiB on the
-  import. A value of the limit or more is refused as `Field value too long`, naming its part.
-- **A key the DTO does not declare is no longer repeated back at any length.** The global
-  `ValidationPipe` refuses such a key by name, twice, in `details[].field` and in
-  `property <name> should not exist`, and a key is as long as the JSON body limit or the request
-  line allows. Measured through the stack `configureApp` installs: a 20 KiB key came back as a
-  41,239-byte error envelope, a key filling the 1 MiB body as a 2 MiB envelope, and a
-  16,000-character query key three times over in 48,284 bytes. `validationExceptionFactory` now
-  cuts a name after 64 characters with the same `[+N more]` the multipart refusals use: `field`
-  as one path, so a nested one still reads from its declared start (`items[0].` and then the
-  key), and the name in `message` on its own. The 20 KiB key is now a 433-byte envelope. The query
-  key is cut in `details` as well, and `path` no longer carries the query string at all: see the
-  entry on `path` below. A name of 64 characters or fewer, which is every name a DTO declares,
-  comes back exactly as before, and `details` keeps its shape. One function,
-  `common/echoed-name.ts`, cuts both kinds of name, and `AllExceptionsFilter` shares it.
-- **A request whose client leaves before the response finishes is in the access log.** The line
-  was written on the response's `finish` event, which a response whose connection is gone never
-  emits, so a JSON body or an upload abandoned mid-body, a client that gave up while its handler
-  was still running, and a download cut short left no line at all (measured through the stack
-  `configureApp` installs, with a raw socket that stopped partway). `AllExceptionsFilter` logs no
-  disconnect either, so those requests were in no log anywhere. The line is now also written when
-  the connection closes, with the same fields and `"aborted": true`. `status` is the one the
-  client was sent, so a download cut short still reads `200`, or `null` when none went out:
-  `res.statusCode` is no evidence before then, and read `201` on an abandoned upload because Nest
-  sets a route's status ahead of its handler. A line without a status is `warn`, like the `400`
-  the API gives a client that stops sending mid-body. A response that finishes emits `close` too,
-  and still writes one line; lines for such requests are exactly as they were.
-- **The error envelope's `path` is the request path, without the query string.**
-  `docs/api-conventions.md` defines `path` as the request path, but `AllExceptionsFilter` and the
-  Better Auth mount wrote the whole request URL there, and Nest's own answer to a route that does
-  not exist, `Cannot GET <url>`, repeated the URL again in `message`. A query string can carry a
-  token from a link and is as long as Node lets a request's head be: measured through the stack
-  `configureApp` installs, a 16,000-character query key on a route that does not exist came back
-  twice in a 32,174-byte envelope, and a `?token=` came back in both fields. `path` now stops at
-  the first `?` or `#`, where Express stops when it routes, and the filter writes Nest's not-found
-  sentence with the same path, `Cannot GET /nope`: the same request is a 172-byte envelope. Past
-  256 characters, well beyond the 153 of the longest route with its three ids filled in, a path is
-  cut to its first 256 followed by `[+N more]`, so a 16,000-character path is a 700-byte envelope
-  where it was 32,174. The origin check's `403` writes `path` the same way, and a `500` reported
-  to error tracking carries the same path the client read. The access log, which has always
-  dropped the query, is unchanged, and `requestId` still joins its line to the envelope.
-- **A validation refusal lists at most 100 problems, and says how many more it found.**
-  `validationExceptionFactory` writes one `details` entry per rule a value failed, and the global
-  `ValidationPipe` fails every key the DTO does not declare, so the list was as long as the body
-  let it be; the 64-character cut above bounds each entry, not how many there are. Measured
-  through the stack `configureApp` installs, 80,000 short unknown keys in an 868,891-byte body
-  came back as a 7,898,051-byte envelope listing 80,001 entries, and 40,000 empty `dispositions`
-  in an account deletion body, 120,042 bytes, as a 9,458,100-byte one. `AllExceptionsFilter` now
-  lists the first 100 in the order class-validator reported them and adds `detailsOmitted`, the
-  number it left out, a member present only then: both requests are now envelopes under 12 KiB.
-  `details` keeps its shape, so a client that reads only the list sees the first hundred problems,
-  and the web app reads neither. No form comes near the cap: the largest DTO fails in twelve ways
-  with every field wrong. `VALIDATION_DETAILS_MAX` in `@kurul/shared-types` carries the number,
-  and the OpenAPI document describes the new member.
+- **multer'ın reddettiği bir alan adı, Sentry'ye raporlanan bir `500` değil, bir `400`'dür.** 0.4.1,
+  [GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)'ü kapatmak için multer'ın
+  `limits.fieldArrayIndexLimit` değerini iki multipart rotada da, attachment yüklemesinde ve Trello
+  import'unda, `0` yaptı; o limitin reddettiği istek, yani `items[4294967294]` gibi bir alan ya da
+  `0`'ın üzerindeki herhangi bir indeks, client'a `500` olarak, hata takibine ise bir sunucu hatası
+  olarak ulaşıyordu. `@nestjs/platform-express` 11.2.1, multer'ın 2.2.0'a kadar sahip olduğu dokuz
+  hata kodunu çeviriyor ve 2.3.0'ın eklediği üçünü olduğu gibi geçiriyor; bu yüzden
+  `LIMIT_FIELD_ARRAY_INDEX` ile `INVALID_FIELD_NAME`, `AllExceptionsFilter`'daki catch-all'a
+  düşüyordu. Filter artık Nest'in geçirdiği bir multer reddini mesaja göre değil, hatanın `code`'una
+  göre eşliyor: standart zarf içinde bir `400` (`message` olarak multer'ın cümlesi ve parça adı:
+  `Field name array index too large - items[4294967294]`, Nest'in çevirdiği kodlara zaten verdiği
+  ifade), aşırı büyük bir dosya için `413` ve rapor yok. multer'ın disk depolamasının fırlattığı,
+  Kurul'un kullandığı bellek depolamasının ise hiç fırlatmadığı `STREAM_DESTROYED`, aynı boşluk için
+  Nest'in kendi düzeltmesinde ([nestjs/nest#17857](https://github.com/nestjs/nest/pull/17857))
+  olduğu gibi `500` olarak kalıyor; o düzeltmeyi henüz hiçbir Nest release'i taşımıyor.
+- **Client'ın terk ettiği bir yükleme de, multipart parser'ın okuyamadığı bir `Content-Type` de
+  Sentry'ye raporlanan bir `500` değildir.** multer, client'ı göndermeyi bırakan bir yüklemeyi hata
+  kodu olan bir `MulterError` ile değil, düz bir `Error('Request aborted')` ile iptal eder ve
+  ayrıştıramadığı bir `Content-Type` için busboy'un constructor'ının fırlattığı her neyse onu olduğu
+  gibi iletir; `@nestjs/platform-express` ikisini de çevirmez, bu yüzden ikisi de
+  `AllExceptionsFilter`'daki catch-all'a ulaşıyordu. Bir yüklemenin ortasında kapanan bir sekme ya
+  da kopan bir bağlantı, error seviyesinde bir log satırı ve bir Sentry event'i demekti;
+  `multipart/mixed; boundary=x` ya da `=` işaretinin çevresinde boşluk olan bir boundary ise, mesajı
+  production dışında isteğin kendi `Content-Type`'ını geri okuyan bir `500` demekti. Terk edilmiş
+  bir yükleme artık JSON parser'larının aynı iptale zaten verdiği gibi cevaplanıyor: standart zarf
+  içinde bir `400`, loglanmıyor ve raporlanmıyor. Pratikte hiçbir şey yazılmıyor, çünkü filter artık
+  gitmiş bir bağlantıya yazmıyor ve `FileInterceptor` üzerinden ölçülen her iptalde, multer
+  vazgeçtiğinde bağlantı çoktan gitmişti. Eşleşme, gövdesi hiçbir zaman tam gelmemiş bir istekteki
+  multer'ın kendi cümlesidir; bu yüzden client'ı tesadüfen önce ayrılmış bir sunucu hatası hâlâ
+  raporlanır. İki `Content-Type` reddi, Nest'in çevirdiği busboy hatalarını yazdığı gibi yazılmış
+  bir `400`'dür: `Multipart: Unsupported content type` ve `Multipart: Malformed content type`,
+  header olmadan.
+- **Bir multipart parça adı artık ne kadar uzun olursa olsun geri yansıtılmaz.** busboy'un multipart
+  parser'ı bir parçanın adına hiçbir limit koymaz (100 olan `fieldNameSize` varsayılanı urlencoded
+  parser'ınındır), yalnızca çevresindeki header bloğunun 16 KiB'ına koyar; parçasını adıyla anan
+  retler de adın tamamını tekrarlıyordu. `FileInterceptor` üzerinden ölçüldü: `[1]` ile biten 16.340
+  karakterlik bir alan adı 16.484 baytlık bir hata zarfı olarak geri geldi, yanlış adla gelen
+  1 KiB'lık bir dosya parçası `Unexpected field - <name>` olarak geri geldi, attachment yüklemesinde
+  ise DTO'nun tanımadığı 16 KiB'lık bir metin alanı multer tarafından kabul edildi ve
+  `ValidationPipe` tarafından iki kez tekrarlandı: 32.899 baytlık bir zarf. İki multipart rota da
+  artık `limits.fieldNameSize`'ı `64` yapıyor ve bunu multer'ın kendisi uyguluyor: daha uzun bir ad
+  `Field name too long`'dur, hiçbir parçayı anmayan bir ret. `AllExceptionsFilter` bir parça adının
+  en fazla 64 karakterini tekrarlar, ardından `[+N more]` gelir; böylece ona başka bir yoldan ulaşan
+  bir ad da zarfı şişiremez; 64'e kadar mesaj tam olarak Nest'in mesajıdır. Buna, multer'ın bir adın
+  uzunluğuna bakmadan önce verdiği tek ret olan `Field value too long - <name>` de dahildir; onu
+  Nest kendisi ifade eder: sonraki madde onun adını da aynı şekilde keser.
+- **`Field value too long` içindeki parça adı da 64 karakterden sonra kesilir ve bir multipart metin
+  değerine 1 MiB yerine rotasının ihtiyaç duyduğu kadar yer tanınır.** multer bir metin değerinin
+  boyutunu adının uzunluğundan önce denetler; bu yüzden uzun bir ad altındaki limit üstü bir değer,
+  adı mesajda olacak şekilde reddedilir ve `@nestjs/platform-express` 11.2.1 bu reddi,
+  `AllExceptionsFilter` bir `MulterError` görmeden önce, kendisi `Field value too long - <name>`
+  diye ifade eder: `limits.fieldNameSize` ona hiç ulaşmaz. İki multipart rotada `FileInterceptor`
+  üzerinden ölçüldü: 16 KiB'lık bir parça header bloğunun alabildiği en uzun ad olan 16.340
+  karakterlik bir ad, 16.472 baytlık bir hata zarfında bütün olarak geri geldi. Filter artık,
+  multer'ın ret cümlelerinden biri olan ve ardından Nest'in yazdığı ` - ` gelen bir `400`'ü tanıyor
+  ve adı, kendi yazdığı adları kestiği gibi kesiyor: aynı istek `[+16276 more]` ile biten 209
+  baytlık bir zarf oluyor. Bir spec multer'ın cümle tablosunu okuyor ve Nest'in çevirisini her kodun
+  üzerinde çalıştırıyor; böylece iki taraftan birinde ifadenin değişmesi, bütün bir adın yeniden
+  sızmasına izin vermek yerine bir testi düşürüyor. busboy ayrıca her metin alanının 1 MiB'ına
+  kadarını tutuyordu: attachment yüklemesinin izin verdiği sekiz alanda toplam 8 MiB, Trello
+  import'unun dört alanında toplam 4 MiB, oysa import hiçbirini okumaz. `limits.fieldSize` artık
+  attachment yüklemesinde 8 KiB, yani bir LINK'in alabildiği en uzun `url`'nin karakter başına dört
+  baytı, import'ta ise 1 KiB. Limite eşit ya da ondan büyük bir değer, parçasını anarak
+  `Field value too long` olarak reddedilir.
+- **DTO'nun tanımlamadığı bir anahtar artık ne kadar uzun olursa olsun geri yansıtılmaz.** Global
+  `ValidationPipe` böyle bir anahtarı adıyla, iki kez reddeder: `details[].field` içinde ve
+  `property <name> should not exist` içinde. Bir anahtar da JSON body limitinin ya da request
+  satırının izin verdiği kadar uzun olabilir. `configureApp`'in kurduğu stack üzerinden ölçüldü:
+  20 KiB'lık bir anahtar 41.239 baytlık bir hata zarfı olarak, 1 MiB'lık body'yi dolduran bir
+  anahtar 2 MiB'lık bir zarf olarak, 16.000 karakterlik bir query anahtarı ise üç kez tekrarlanmış
+  hâlde 48.284 baytta geri geldi. `validationExceptionFactory` artık bir adı, multipart retlerinin
+  kullandığı aynı `[+N more]` ile 64 karakterden sonra kesiyor: `field` tek bir yol olarak, böylece
+  iç içe olanı hâlâ tanımlı başlangıcından okunuyor (`items[0].` ve ardından anahtar),
+  `message`'daki ad ise kendi başına. 20 KiB'lık anahtar artık 433 baytlık bir zarf. Query anahtarı
+  `details`'te de kesiliyor ve `path` artık query string'i hiç taşımıyor: aşağıdaki `path` maddesine
+  bakın. 64 karakter ya da daha kısa bir ad, ki bir DTO'nun tanımladığı her ad böyledir, tıpatıp
+  eskisi gibi geri geliyor ve `details` şeklini koruyor. `common/echoed-name.ts` adlı tek bir
+  fonksiyon iki tür adı da kesiyor ve `AllExceptionsFilter` onu paylaşıyor.
+- **Client'ı response bitmeden ayrılan bir request access log'da yer alır.** Satır, response'un
+  `finish` event'inde yazılıyordu; bağlantısı gitmiş bir response bu event'i hiç yaymaz, bu yüzden
+  gövdesinin ortasında terk edilen bir JSON body ya da yükleme, handler'ı hâlâ çalışırken vazgeçen
+  bir client ve yarıda kesilen bir indirme hiç satır bırakmıyordu (`configureApp`'in kurduğu stack
+  üzerinden, yarıda duran ham bir socket ile ölçüldü). `AllExceptionsFilter` da hiçbir kopmayı
+  loglamaz, bu yüzden o request'ler hiçbir logda yoktu. Satır artık bağlantı kapandığında da
+  yazılıyor; alanlar aynı, ek olarak `"aborted": true` var. `status`, client'a gönderilmiş olandır,
+  bu yüzden yarıda kesilen bir indirme yine `200`, hiçbiri gönderilmemişse `null` okunur: o ana
+  kadar `res.statusCode` bir kanıt değildir ve Nest bir rotanın status'ünü handler'ından önce
+  ayarladığı için terk edilmiş bir yüklemede `201` gösteriyordu. Status'ü olmayan bir satır
+  `warn`'dır, API'nin gövdenin ortasında göndermeyi bırakan bir client'a verdiği `400` gibi. Biten
+  bir response da `close` yayar ve yine de tek satır yazar; bu tür request'lerin satırları aynen
+  eskisi gibidir.
+- **Hata zarfının `path` alanı, query string olmadan request path'idir.** `docs/api-conventions.md`
+  içinde `path`, request path'i olarak tanımlanır, ama `AllExceptionsFilter` ile Better Auth mount'u
+  oraya request URL'sinin tamamını yazıyordu ve Nest'in var olmayan bir rotaya verdiği kendi cevabı
+  `Cannot GET <url>`, URL'yi `message` içinde bir kez daha tekrarlıyordu. Bir query string bir
+  linkten gelen token'ı taşıyabilir ve Node'un bir request'in head'ine izin verdiği kadar uzun
+  olabilir: `configureApp`'in kurduğu stack üzerinden ölçüldüğünde, var olmayan bir rotadaki 16.000
+  karakterlik bir query anahtarı 32.174 baytlık bir zarfta iki kez geri geldi ve bir `?token=` iki
+  alanda da geri geldi. `path` artık ilk `?` ya da `#`'de, yani Express'in route ederken durduğu
+  yerde duruyor ve filter Nest'in not-found cümlesini aynı path ile yazıyor, `Cannot GET /nope`:
+  aynı request 172 baytlık bir zarf. 256 karakterin ötesinde, üç id'si doldurulmuş en uzun rotanın
+  153 karakterinin çok üstünde, bir path ilk 256 karakterine kesilir ve ardından `[+N more]` gelir;
+  böylece 16.000 karakterlik bir path, 32.174 bayt olduğu yerde 700 baytlık bir zarf olur. Origin
+  kontrolünün `403`'ü `path`'i aynı şekilde yazar ve hata takibine raporlanan bir `500`, client'ın
+  okuduğu path'in aynısını taşır. Query'yi her zaman atmış olan access log değişmedi ve `requestId`
+  onun satırını hâlâ zarfa bağlar.
+- **Bir validation reddi en fazla 100 problem listeler ve kaç tane daha bulduğunu söyler.**
+  `validationExceptionFactory`, bir değerin geçemediği her kural için bir `details` kaydı yazar ve
+  global `ValidationPipe` DTO'nun tanımlamadığı her anahtarı reddeder; bu yüzden liste, body'nin
+  izin verdiği kadar uzun olabiliyordu: yukarıdaki 64 karakterlik kesme her kaydı sınırlar,
+  kayıtların kaç tane olduğunu değil. `configureApp`'in kurduğu stack üzerinden ölçüldü: 868.891
+  baytlık bir body'deki 80.000 kısa bilinmeyen anahtar 80.001 kayıt listeleyen 7.898.051 baytlık bir
+  zarf olarak, bir hesap silme body'sindeki (120.042 bayt) 40.000 boş `dispositions` ise 9.458.100
+  baytlık bir zarf olarak geri geldi. `AllExceptionsFilter` artık class-validator'ın raporladığı
+  sırayla ilk 100'ü listeliyor ve dışarıda bıraktığı sayıyı `detailsOmitted` olarak ekliyor, ki bu
+  yalnızca o durumda bulunan bir üyedir: iki request de artık 12 KiB'ın altında birer zarf.
+  `details` şeklini koruyor, bu yüzden yalnızca listeyi okuyan bir client ilk yüz problemi görür ve
+  web uygulaması ikisini de okumaz. Hiçbir form üst sınıra yaklaşmaz: en büyük DTO, her alan yanlış
+  olduğunda on iki şekilde reddedilir. `@kurul/shared-types` içindeki `VALIDATION_DETAILS_MAX` bu
+  sayıyı taşır ve OpenAPI dokümanı yeni üyeyi tanımlar.
 
-### Security
+### Güvenlik
 
-- **qs 6.15.3 → 6.16.0**: two moderate advisories, an array-limit bypass through comma-separated
-  bracket keys ([GHSA-x5fp-wj9c-mxmx](https://github.com/advisories/GHSA-x5fp-wj9c-mxmx)) and a
-  denial of service through an attacker-controlled `isBuffer` check
-  ([GHSA-4mjr-xmp4-gh2g](https://github.com/advisories/GHSA-4mjr-xmp4-gh2g)). It arrives through
-  `express`, directly and through the `body-parser` it depends on, into `apps/api`'s tree under
-  `@nestjs/platform-express`. Express asks for `qs@^6.14.0` and body-parser for `qs@^6.15.2`;
-  every range already admits 6.16.0, so this is a lockfile change and nothing more.
-- **next 16.3.3 → 16.3.6**: remote code execution through the Node.js `ImageResponse` of
-  `next/og` when an application renders attacker-controlled values into its SVG
+- **qs 6.15.3 → 6.16.0**: orta şiddette iki advisory, virgülle ayrılmış bracket anahtarları
+  üzerinden bir array limiti atlatma
+  ([GHSA-x5fp-wj9c-mxmx](https://github.com/advisories/GHSA-x5fp-wj9c-mxmx)) ve saldırganın
+  denetimindeki bir `isBuffer` kontrolü üzerinden bir hizmet reddi
+  ([GHSA-4mjr-xmp4-gh2g](https://github.com/advisories/GHSA-4mjr-xmp4-gh2g)). `apps/api`'nin
+  bağımlılık ağacına, `@nestjs/platform-express` altında, `express` üzerinden giriyor: hem doğrudan
+  hem de onun bağlı olduğu `body-parser` üzerinden. Express `qs@^6.14.0`'ı, body-parser ise
+  `qs@^6.15.2`'yi ister; her aralık zaten 6.16.0'ı kabul ettiği için bu bir lockfile değişikliğinden
+  başka bir şey değildir.
+- **next 16.3.3 → 16.3.6**: bir uygulama saldırganın denetimindeki değerleri SVG'sine render
+  ettiğinde, `next/og`'un Node.js `ImageResponse`'u üzerinden uzaktan kod çalıştırma
   ([GHSA-vcvr-r3jv-pc5j](https://github.com/vercel/next.js/security/advisories/GHSA-vcvr-r3jv-pc5j),
-  critical, `>=16.2.0 <16.3.6`). #377 proposes 16.3.5, because 16.3.6 was still inside the
-  seven-day cooldown when Dependabot ran, and `dependabot.yml` has a release an advisory holds
-  bumped by hand. Kurul renders no `ImageResponse`; as with 0.4.1's image advisories, that was
-  not a reason to stay behind.
-- **multer 2.3.0 → 2.4.0**, with the override that keeps it the only multer in the tree moved to
-  `multer@<2.4.0`. 2.4.0 removes the files an upload aborted at the wrong moment could leave in
-  disk storage
+  kritik, `>=16.2.0 <16.3.6`). #377, 16.3.5'i öneriyor, çünkü Dependabot çalıştığında 16.3.6 hâlâ
+  yedi günlük cooldown'ın içindeydi ve `dependabot.yml`, bir advisory'nin beklettiği bir release'in
+  elle yükseltilmesini öngörüyor. Kurul hiçbir `ImageResponse` render etmiyor; 0.4.1'in image
+  advisory'lerinde olduğu gibi, bu geride kalmak için bir sebep değildi.
+- **multer 2.3.0 → 2.4.0**, onu ağaçtaki tek multer olarak tutan override'ın `multer@<2.4.0`'a
+  taşınmasıyla birlikte. 2.4.0, yanlış bir anda iptal edilen bir yüklemenin disk depolamasında
+  bırakabildiği dosyaları kaldırıyor
   ([GHSA-3pph-fpjx-jg34](https://github.com/expressjs/multer/security/advisories/GHSA-3pph-fpjx-jg34),
-  rated medium), which the memory storage both multipart routes use never writes. It also
-  rewords `LIMIT_UNEXPECTED_FILE` from `Unexpected field` to `Unexpected file field`, which the
-  message-keyed translation in `@nestjs/platform-express` 11.2.1 no longer recognises, so that
-  refusal now reaches `AllExceptionsFilter` as the `MulterError` itself and is answered by its
-  code, like the codes in the first entry under Fixed: a file part under a name the route does
-  not take is still a `400`, now reading `Unexpected file field - <name>`. The multipart spec
-  sends one through both routes, and the inclusive `fileSize` ceiling, `fieldArrayIndexLimit`,
-  `fieldNameSize` and `fieldSize` were checked again on 2.4.0.
-- **A JSON body holding more values than any endpoint takes is refused before validation.** The
-  global `ValidationPipe` hands every body to class-transformer before class-validator sees it,
-  and class-transformer 0.5.1 de-duplicates an object's keys in time quadratic in their number,
-  so what a body cost followed its shape, which nothing bounded, rather than its size, which
-  `REQUEST_BODY_MAX_BYTES` did. Measured through the stack `configureApp` installs: 80,000 short
-  keys in an 868,891-byte body took 3 seconds to refuse, during which the process served nothing
-  else, and 131,071 keys filling the 1 MiB default took 8. A value nested 10,000 deep, 20 KB, and
-  349,511 empty `dispositions` in an account deletion body were each a `500`, logged and reported
-  to error tracking, the second after 3.3 seconds. Every such route needs a session or a token,
-  which open sign-up, the default, gives anyone, and the default rate limit lets one address send
-  100 of these requests a minute to each route. A JSON body may now hold at most 1,000 values,
-  every member and every array element at any depth, the number of fields the form-encoded parser
-  has always allowed a form body; over that, the answer is the same `413`
-  (`Request body is too large`), and nothing is validated. All four bodies above are refused in
-  under 100 ms. The largest body any endpoint takes, an account deletion with the most workspace
-  dispositions it accepts, holds 802 values.
+  orta şiddette); iki multipart rotanın kullandığı bellek depolaması böyle dosyaları hiç yazmaz.
+  Ayrıca `LIMIT_UNEXPECTED_FILE`'ın ifadesini `Unexpected field`'den `Unexpected file field`'e
+  değiştiriyor; `@nestjs/platform-express` 11.2.1'deki mesaja göre anahtarlanan çeviri artık bunu
+  tanımıyor, bu yüzden o ret artık `AllExceptionsFilter`'a `MulterError`'ın kendisi olarak ulaşıyor
+  ve Düzeltildi altındaki ilk maddedeki kodlar gibi kendi koduna göre cevaplanıyor: rotanın kabul
+  etmediği bir ad altındaki bir dosya parçası hâlâ bir `400`, artık `Unexpected file field - <name>`
+  yazıyor. Multipart spec'i bunlardan birini iki rotadan da geçiriyor ve sınır değerin kendisini de
+  kabul eden `fileSize` tavanı, `fieldArrayIndexLimit`, `fieldNameSize` ve `fieldSize` 2.4.0'da
+  yeniden kontrol edildi.
+- **Herhangi bir endpoint'in aldığından fazla değer taşıyan bir JSON body, validation'dan önce
+  reddedilir.** Global `ValidationPipe` her body'yi class-validator görmeden önce
+  class-transformer'a verir ve class-transformer 0.5.1 bir objenin anahtarlarını sayılarının
+  karesiyle orantılı sürede tekilleştirir; bu yüzden bir body'nin maliyeti,
+  `REQUEST_BODY_MAX_BYTES`'ın sınırladığı boyutunu değil, hiçbir şeyin sınırlamadığı şeklini
+  izliyordu. `configureApp`'in kurduğu stack üzerinden ölçüldü: 868.891 baytlık bir body'deki 80.000
+  kısa anahtarı reddetmek 3 saniye sürdü ve bu sürede süreç başka hiçbir şey sunmadı, 1 MiB'lık
+  varsayılanı dolduran 131.071 anahtar ise 8 saniye sürdü. 10.000 derinliğinde iç içe, 20 KB'lık bir
+  değer ile bir hesap silme body'sindeki 349.511 boş `dispositions`'ın her biri, loglanan ve hata
+  takibine raporlanan bir `500` oldu; ikincisi 3,3 saniye sonra. Böyle her rota bir session ya da
+  token ister; varsayılan olan açık sign-up bunu herkese verir ve varsayılan rate limit, tek bir
+  adresin her rotaya dakikada bu tür 100 request göndermesine izin verir. Bir JSON body artık en
+  fazla 1.000 değer taşıyabilir, yani her derinlikteki her üye ve her array elemanı: bu sayı,
+  form-encoded parser'ın bir form body'sine her zaman izin verdiği alan sayısıdır; bunun üstünde
+  cevap aynı `413`'tür (`Request body is too large`) ve hiçbir şey doğrulanmaz. Yukarıdaki dört
+  body'nin hepsi 100 ms'nin altında reddedilir. Herhangi bir endpoint'in aldığı en büyük body, kabul
+  ettiği en fazla workspace kararıyla bir hesap silme, 802 değer taşır.
 
 ## [0.4.1] - 2026-09-23
 
@@ -1503,14 +1534,14 @@ require. Nothing to migrate and no new setting.
   the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
   repository admin is a repository ruleset, described in
   [git-strategy.md](docs/git-strategy.md#release-süreci) and listed on the
-  [Launch checklist](ROADMAP.md#launch-checklist).
+  [Launch checklist](ROADMAP.md#lansman-kontrol-listesi).
 
 ## [0.3.0] - 2026-08-22
 
 _Finding IDs such as `SEC-02`, `OPS-04` and `OPS-05` are scoped to the audit wave that
 produced them: the same ID means different things in the 0.1.0 audit, the 0.2.0 audit and
 the 2026-08-18 "atlas" audit. See
-[ROADMAP.md](ROADMAP.md#deferred-with-triggers-from-the-2026-08-13-audit)._
+[ROADMAP.md](ROADMAP.md#tetikleyiciye-bağlı-ertelenenler-2026-08-13-denetiminden)._
 
 ### Added
 
@@ -1587,7 +1618,7 @@ the 2026-08-18 "atlas" audit. See
   ADR 0025 already assumed, including a fractional `lists[].pos`, the `purple_light`
   `_light` colour suffix alongside the already-covered `_dark`, and Trello's own empty-name
   default labels. No importer change was needed. The findings are recorded in
-  `apps/api/test/fixtures/trello/README.md#field-mapping-diffs`.
+  `apps/api/test/fixtures/trello/README.md#alan-eşleme-farkları`.
 
 - **Attachment storage quotas — the total is finally bounded, not just each file** (audit
   finding SEC-02, [ADR 0027](docs/decisions/0027-attachment-quotas.md)). Two new variables cap
@@ -1635,7 +1666,7 @@ the 2026-08-18 "atlas" audit. See
   that asks for feedback owes people the shape of the door before they walk through it.
 
 - **Every Beyond-MVP row now links to a discussion that can be upvoted**
-  ([ROADMAP.md](ROADMAP.md#beyond-mvp), thirteen rows). Votes do not order the list — an
+  ([ROADMAP.md](ROADMAP.md#mvp-ötesi), thirteen rows). Votes do not order the list — an
   unscheduled row stays unscheduled — but a row with people behind it and a concrete use case
   attached is the only thing that moves one off it, and there was previously nowhere for that
   to accumulate.
@@ -3170,7 +3201,7 @@ commit; this is the point it becomes a version.
   View all from the bell) and dashboard created-vs-completed throughput (14 UTC days;
   `task.moved` payloads include column names). See
   deferred notes, `docs/archive/specs/2026-08-09-phase-8-deferred.md` (archived; open items
-  moved to [roadmap.md](ROADMAP.md#beyond-mvp)).
+  moved to [roadmap.md](ROADMAP.md#mvp-ötesi)).
 - Phase 8 activity log and notifications
   (spec, `docs/archive/specs/2026-08-09-phase-8-activity-notifications-design.md`): activity writes
   on task create/update/move/delete/assign/comment; workspace and task feeds; `Notification`
@@ -3260,7 +3291,7 @@ commit; this is the point it becomes a version.
   rule by [ADR 0012](docs/decisions/0012-comment-delete-authorship.md) (author OR OWNER/ADMIN,
   not any MEMBER); `docs/archive/specs/2026-08-09-phase-8-deferred.md` archived to
   `docs/archive/specs/` with its remaining open follow-ups folded into
-  [roadmap Beyond MVP](ROADMAP.md#beyond-mvp); api-conventions, tech-stack, testing, and
+  [roadmap Beyond MVP](ROADMAP.md#mvp-ötesi); api-conventions, tech-stack, testing, and
   architecture docs refreshed to match the shipped activity/dashboard/notification routes, ADRs
   0009–0012, web Vitest in CI, next-intl, and the develop merge-commit practice actually in use.
 - Tooling: type-aware ESLint (floating-promise, React hooks rules), Husky pre-commit, Dependabot,
