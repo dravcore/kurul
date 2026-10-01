@@ -19,14 +19,16 @@ her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (ger
 - Public IP'si olan, Docker Engine 24+ ve Compose eklentisi kurulu bir sunucu. Küçük bir ekip
   için iki CPU ve 2 GB RAM yeterli — bu 2 GB'ın nasıl harcandığı için bkz.
   [Sunucu boyutlandırma](#sunucu-boyutlandırma).
-- Kontrolünüzdeki bir domain ve o sunucuya **açık 80 ve 443 portları**. İkisi de zorunlu:
-  Let's Encrypt doğrulamayı 80 üzerinden yapar, tarayıcılar 443'ü kullanır.
+- Kontrolünüzdeki bir domain ve o sunucuya **açık 80 ve 443 (TCP) portları**. İkisi de zorunlu:
+  Let's Encrypt doğrulamayı 80 üzerinden yapar, tarayıcılar 443'ü kullanır. 443/UDP (HTTP/3)
+  isteğe bağlıdır: kapalıysa tarayıcılar HTTP/2'ye düşer, bir şey bozulmaz.
 - Bir SMTP hesabı. Kurul'da davetlerin kabul edilebilmesi için giden e-posta şart —
   nedeni ve atlarsanız ne olduğu için bkz. [E-posta](#e-posta-smtp).
-- Gelen trafikte SSH, 80 ve 443 dışında hiçbir şeye izin vermeyen bir host firewall'ı. Bu
-  stack'in çalıştırdığı geri kalan her şey zaten kendiliğinden public internetin dışında kalır:
-  `docker-compose.yml` içinde `ports:` tanımı olan tek servis `proxy`, dolayısıyla Postgres,
-  Redis, API ve web uygulamasına yalnızca Docker'ın iç ağı üzerinden erişilebilir. Bunu kendi
+- Gelen trafikte SSH, 80 ve 443 (TCP; isteğe bağlı olarak 443/UDP) dışında hiçbir şeye izin
+  vermeyen bir host firewall'ı. Bu stack'in çalıştırdığı geri kalan her şey zaten kendiliğinden
+  public internetin dışında kalır: `docker-compose.yml` içinde `ports:` tanımı olan tek servis
+  `proxy`, dolayısıyla Postgres, Redis, API ve web uygulamasına yalnızca Docker'ın iç ağı
+  üzerinden erişilebilir. Bunu kendi
   makinenizde `docker compose ps` ile doğrularsınız — `proxy` dışındaki her satır, önünde
   `0.0.0.0:` eşlemesi olmayan çıplak bir container portu (`4000/tcp`, `5432/tcp`, …)
   göstermeli.
@@ -49,15 +51,16 @@ büyüyen container hangisiyse onun yerine Postgres'i esirgemek için hiçbir se
 için öldürülür ve başka bir servisin yaptığı hiçbir şey Postgres'i onunla birlikte
 düşüremez.
 
-| Servis     | `mem_limit` | Bu sayının nedeni                                                                                  |
-| ---------- | ----------- | -------------------------------------------------------------------------------------------------- |
-| `postgres` | 512m        | Küçük bir ekibin board'u için cömert bir taban; `/dev/shm` 256m'ye çıkarıldı, aşağıya bakın        |
-| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) ikisi de heap'ine buffer'lar    |
-| `web`      | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                               |
-| `migrate`  | 512m        | `api` ile aynı: aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                     |
-| `backup`   | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar   |
-| `redis`    | 128m        | Yalnızca cache, session, rate limit, bildirim, asla board verisi; `maxmemory` 100mb, aşağıya bakın |
-| `proxy`    | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer       |
+| Servis       | `mem_limit` | Bu sayının nedeni                                                                                                                                                                                           |
+| ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `postgres`   | 512m        | Küçük bir ekibin board'unun çalışma kümesi (working set) için cömert bir taban; `/dev/shm` 256m'ye çıkarıldı, aşağıya bakın                                                                                 |
+| `api`        | 512m        | `REQUEST_BODY_MAX_BYTES` JSON gövdeyi heap'e, `ATTACHMENT_MAX_BYTES` (`.env.example`) yüklemeyi heap **dışı** bir `Buffer`'a tamponlar; ölçülen tepe yükleme başına `ATTACHMENT_MAX_BYTES`'ın ~1,5–2,2 katı |
+| `web`        | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                                                                                                                                        |
+| `migrate`    | 512m        | `api` ile aynı: aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                                                                                                                              |
+| `backup`     | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar                                                                                                            |
+| `redis`      | 128m        | Yalnızca auth rate-limit ve yükleme bayt sayaçları, BullMQ zamanlayıcıları (due-soon, cleanup) ve Socket.io pub/sub; asla oturum, bildirim ya da board verisi; `maxmemory` 100mb, aşağıya bakın             |
+| `proxy`      | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer                                                                                                                |
+| `demo-reset` | 256m        | Yalnızca `demo` profilinde; birkaç yüz satır yazar ve hiçbirini tutmaz, V8 heap'i `--max-old-space-size=192` ile sabit; aşağıdaki 2048 MB toplamına girmez                                                  |
 
 `api` ve `web`, 512m tavanlarının %75'i olan `NODE_OPTIONS=--max-old-space-size=384`'ü de
 ayarlar — böylece V8'in heap'i, Node'un kendi container-belleği sezgisine bırakılmak yerine
@@ -65,19 +68,23 @@ açıkça sabitlenir. `mem_limit`'in altında kalan 128m'lik boşluk, tek başı
 kapsamadığı şeyler içindir (thread stack'leri, native buffer'lar, code space): V8, cgroup'un
 sert limitine varmadan önce kendi yakalanabilir "JavaScript heap out of memory" hatasına çarpar
 — bu da çıplak bir `SIGKILL` yerine `docker compose logs api` (ya da `web`) içinde bir satır
-olarak görünür.
+olarak görünür. Bu yalnız heap içindeki büyümeyi yakalar: yüklemelerin tamponları heap dışıdır
+ve `--max-old-space-size` onları sınırlamaz; yoğun bir yükleme dalgasında aşılan ilk sınır
+V8'inki değil cgroup'unkidir ve sonuç logda bir satır değil, çıplak bir `SIGKILL`'dir.
+`api`'nin `mem_limit`'ini boyutlandırırken eşzamanlı yükleme sayısı × 2,2 × `ATTACHMENT_MAX_BYTES`
+değerini hesaba katın.
 
-`redis` de 128m'sinin içinde aynı muameleyi görür: komut satırında `--maxmemory 100mb
---maxmemory-policy noeviction` vardır, yani dolan bir Redis, cgroup tarafından öldürülüp
-döngü halinde yeniden başlatılmak yerine yazmalara
-`OOM command not allowed when used memory > 'maxmemory'` ile cevap verir (`docker compose logs
-api` içinde bir satır; API'nin rate limiter'ları Redis hata verirken process belleğine düşer,
-bir cache miss de bir cache miss'tir). `noeviction`, bildirim ve retention kuyrukları bu
-Redis'te yaşayan BullMQ'nun şart koştuğu politikadır: evict edilen bir iş sessizce hiç
-çalışmayan bir iştir, dolayısıyla dolu bir Redis anahtar düşürmek yerine yazmayı reddeder.
-`postgres` `shm_size: 256m` taşır çünkü Docker'ın `/dev/shm`'i varsayılan olarak 64 MB'dır ve
-Postgres paralel worker'lar ile hash join'ler için dinamik paylaşımlı belleği oraya ayırır;
-bitmesi, ağır bir dashboard sorgusunda
+`redis` de 128m'sinin içinde aynı muameleyi görür: komut satırında
+`--maxmemory 100mb --maxmemory-policy noeviction` vardır, yani dolan bir Redis, cgroup tarafından
+öldürülüp döngü halinde yeniden başlatılmak yerine yazmalara
+`OOM command not allowed when used memory > 'maxmemory'` ile cevap verir
+(`docker compose logs api` içinde bir satır; API'nin rate limiter'ları — auth ve yükleme bayt
+bütçesi — Redis hata verirken process belleğine düşer). `noeviction`, due-soon taraması ile saklama
+süpürmesinin (`cleanup`) zamanlayıcılarını bu Redis'te tutan BullMQ'nun şart koştuğu politikadır:
+evict edilen bir zamanlayıcı kaydı sessizce hiç çalışmayan bir iştir, dolayısıyla dolu bir Redis
+anahtar düşürmek yerine yazmayı reddeder. `postgres` `shm_size: 256m` taşır çünkü Docker'ın
+`/dev/shm`'i varsayılan olarak 64 MB'dır ve Postgres paralel worker'lar ile hash join'ler için
+dinamik paylaşımlı belleği oraya ayırır; bitmesi, ağır bir dashboard sorgusunda
 `could not resize shared memory segment ... No space left on device` olarak görünür. İkisi de
 tablodaki tavanların üstüne bellek değildir: bir `/dev/shm` sayfası container'ın cgroup'una
 diğer her sayfa gibi yazılır ve `maxmemory`, Docker'ın Redis'e uyguladığı limitin altında
@@ -86,10 +93,13 @@ Redis'in kendine uyguladığı bir limittir.
 `REDIS_MAXMEMORY`, `.env` içinde bu tavanı `docker-compose.yml`'e dokunmadan yükseltir; `redis`
 `mem_limit`'ini de onunla birlikte yükseltin ki Redis kendi limitine cgroup'unkinden önce
 çarpsın. Zaten çalışan bir instance'ta yükseltmeden önce dataset'in gerçekte nerede durduğunu
-kontrol edin: `docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep
-used_memory_human`. `noeviction` ile tavanın zaten üzerindeki bir dataset kendini geri
-küçültmez: yeterince key kendiliğinden expire olana kadar her yazmayı reddeder, kontrolün
-sayıdan önce gelmesinin nedeni budur.
+kontrol edin:
+`docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" INFO memory' | grep used_memory_human`.
+`REDIS_PASSWORD` host kabuğunda değil `redis` container'ının ortamında tanımlı olduğu için komut
+tek tırnaklı bir `sh -c` içinde çalışır; yoksa host kabuğu değişkeni boş genişletir ve parolalı bir
+Redis `AUTH`'u reddeder. `noeviction` ile tavanın zaten üzerindeki bir dataset kendini geri
+küçültmez: yeterince key kendiliğinden expire olana kadar her yazmayı reddeder, kontrolün sayıdan
+önce gelmesinin nedeni budur.
 
 Bunlar birer tavan, rezervasyon değil — `mem_limit`'inden az kullanan bir container hiçbir ek
 maliyete yol açmaz, ve özellikle `migrate`, `api` ile `web` başlamayı bitirmeden önce (başarıyla)
@@ -100,7 +110,7 @@ toplarsak (diğerleri ayaktayken zaten çıkmış olan `migrate` hariç), bu 512
 Gerçek trafik altında bundan daha az boşluğu olan bir host, bu sayıları yükseltmek için bir
 sebeptir (`docker-compose.yml` düz bir düzenleme, ya da bunları bir
 `docker-compose.override.yml` içinde override edin) veya kutunun kendi RAM'ini artırmak için —
-tavanı kaldırmak için değil; bunun size ne kaybettireceği için yukarıdaki notu görün.
+tavanı kaldırmak için değil; kaldırmanın neyi geri getirdiği için yukarıdaki notu görün.
 
 **Ölçümle doğrulanmadı**: bu sayılar `.env.example`'da zaten belgelenmiş request/attachment
 tavanlarından ve V8'in kendi heap boyutlandırma kurallarından geliyor, stack'in her limitte
@@ -175,7 +185,7 @@ MAIL_FROM=Kurul <kurul@example.com>
 İki gizli değeri de `openssl rand -hex 32` ile üretin. `POSTGRES_PASSWORD` doğrudan bir bağlantı
 URL'inin içine giriyor; `-base64`'ün onun için neden yanlış üretici olduğu tek bir yerde yazılı:
 [development.md](development.md#veritabanı-ve-cache-kimlik-bilgileri).
-`BETTER_AUTH_SECRET` yalnızca byte byte karşılaştırılıyor, yani bu kısıtı taşımıyor, ama onu da
+`BETTER_AUTH_SECRET` bir bağlantı URL'ine girmiyor, yani bu kısıtı taşımıyor, ama onu da
 `-hex` ile üretmek, değişken başına ayrı bir kural yerine tek bir üreticiyi akılda tutmak demek.
 
 `SITE_URL` şemayı taşır, çünkü Caddy'nin düz HTTP mi sunacağına yoksa sertifika mı alacağına
@@ -185,8 +195,9 @@ domain'siz yerel kurulumdur.
 **Attachment'lar için burada bir satır gerekmiyor.** `docker-compose.yml` `STORAGE_PATH`'i
 kendisi, `attachment_data` volume'ünün içindeki bir dizine ayarlar; yani Compose kurulumu kutudan
 çıktığı hâliyle dosya yüklemeyi kabul eder — o değişkenin `.env`'deki kopyası yalnız geliştirme
-döngüsü içindir. Değiştirmek isteyebileceğiniz tek değer `ATTACHMENT_MAX_BYTES` (varsayılan
-`26214400`, 25 MiB) ve değiştirecekseniz önce
+döngüsü içindir. Değiştirmek isteyebileceğiniz ilk değer `ATTACHMENT_MAX_BYTES` (varsayılan
+`26214400`, 25 MiB). Düşürecekseniz yalnız bu değer yeter; yükseltecekseniz ters proxy'nin tavanını
+da yükseltmeniz gerekir, o yüzden önce
 [aşağıdaki proxy sözleşmesini](#kendi-reverse-proxynizi-kullanmak) okuyun: ters proxy, onunla
 birlikte hareket etmesi gereken ayrı ve bilinçli olarak daha yüksek bir tavan taşıyor.
 
@@ -204,8 +215,12 @@ workspace kotası instance kotasının üstüne ayarlanmışsa reddetmek yerine 
 Boyutlandırırken bilin: kotalar **yumuşaktır** (eşzamanlı yüklemeler en fazla birer dosya
 aşabilir; birkaç `ATTACHMENT_MAX_BYTES` kadar pay bırakın) ve silinen dosyalar baytlarını gecelik
 orphan süpürmesinin bekleme süresi geçene kadar tutar; yani disk kullanımı, kota muhasebesini
-kısa süre aşabilir. Bağlantı ekleri bayt saklamaz ve hiç sayılmaz. Reddedilen yükleme, JSON
-gövdesi `error: "Attachment Quota Exceeded"` taşıyan bir `413`'tür, bkz.
+kısa süre aşabilir. Bağlantı ekleri bayt saklamaz ve hiç sayılmaz. Bir workspace'e
+`Workspace.planLimits` kolonunda kendi `storageBytes` tavanı verilmişse o workspace için
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` yerine o sayı geçerlidir
+([ADR 0032](decisions/0032-plan-limits.md)); `GET /workspaces/…/plan` çözümlenmiş tavanı ve güncel
+`usage.storageBytes`'ı döner. Reddedilen yükleme, JSON gövdesi `error: "Attachment Quota Exceeded"`
+taşıyan bir `413`'tür, bkz.
 [413'leri birbirinden ayırmak](#413leri-birbirinden-ayırmak).
 
 **Yüklemelerin dakikada bayt bütçesi de var.** `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (varsayılan
@@ -313,7 +328,7 @@ unhealthy değil `(health: starting)` görünür; zaman tanıyıp `docker compos
 tekrar bakın.
 
 `https://kurul.example.com` adresine ilk istek, Caddy ACME doğrulamasını tamamlarken birkaç
-saniye sürebilir. Sürmezse olan biteni izleyin:
+saniye sürebilir. Bu sürede bitmezse olan biteni izleyin:
 
 ```bash
 docker compose logs -f proxy
@@ -329,7 +344,7 @@ curl -sI https://kurul.example.com | head -1          # 307 → /login
 curl -s  https://kurul.example.com/api/health/ready   # {"status":"ok", …}
 ```
 
-Sonra tarayıcıda bir pano açıp bir kartı sürükleyin. Kart, ikinci bir tarayıcı penceresinde
+Sonra tarayıcıda bir board açıp bir kartı sürükleyin. Kart, ikinci bir tarayıcı penceresinde
 yenileme olmadan yer değiştiriyorsa realtime WebSocket proxy üzerinden bağlanmış demektir —
 ki bu, naif bir reverse-proxy yapılandırmasının sessizce bozduğu tek parçadır.
 
@@ -352,10 +367,11 @@ bağlantı HTTPS değilse çerezi **kabul etmeyi bile** reddedeceği anlamına g
 açtığınız bir ayar değildir: Better Auth her ikisini de kendisine verilen URL'in şemasından
 türetir, `docker-compose.yml` de o URL'i `SITE_URL`'den alır. Yani `SITE_URL`'deki şema, oturum
 token'larının aktarım sırasında korunup korunmadığına karar veren tek anahtardır —
-`SITE_URL=http://…` ile aynı istek `set-cookie: better-auth.session_token=…; HttpOnly;
-SameSite=Lax` döner; ön ek de yok, `Secure` de yok ve oturum token'ı her istekte ağdan açık
-metin olarak geçer. HTTPS olduğunu düşündüğünüz bir domain'de ön eksiz biçimi görüyorsanız
-`SITE_URL` hâlâ `http://` ile başlıyordur; düzeltip `docker compose up -d` çalıştırın.
+`SITE_URL=http://…` ile aynı istek
+`set-cookie: better-auth.session_token=…; HttpOnly; SameSite=Lax` döner; ön ek de yok, `Secure` de
+yok ve oturum token'ı her istekte ağdan açık metin olarak geçer. HTTPS olduğunu düşündüğünüz bir
+domain'de ön eksiz biçimi görüyorsanız `SITE_URL` hâlâ `http://` ile başlıyordur; düzeltip
+`docker compose up -d` çalıştırın.
 
 ### API'yi bir script'ten çağırmak
 
@@ -398,7 +414,7 @@ için kabul edilen durum kodlarını genişletirseniz bu kez bir kesinti sıras�
 üzere sonsuza dek yeşil olur.
 
 **`/health` değil `/health/ready`.** `/health` bir liveness probe'udur: Node ayakta olduğu
-sürece `200` döner, veritabanına ulaşılamadığı süre de buna dahildir — çünkü süreci yeniden
+sürece `200` döner, veritabanına ulaşılamadığı süre de bilerek buna dahildir — çünkü süreci yeniden
 başlatmak bir veritabanını iyileştiremez. Ürünün gerçekten bozulduğunda kırmızıya dönen
 `/health/ready`'dir ve gövdesi hangi bağımlılığın düştüğünü adıyla söyler:
 
@@ -418,9 +434,10 @@ endpoint kesintinin tamamı boyunca yeşil kalır. Bunun yerine sinyal, `backup`
 healthcheck'idir: unhealthy, `/backups/kurul-*.dump` içindeki en yeni dosyanın
 `2 × BACKUP_INTERVAL`'dan (varsayılan 24 saatlik aralıkta 48 saat) daha eski olduğu anlamına
 gelir — bu da API'nin kendi retention süpürmesinin artık yakın zamanlı bir dump'a
-güvenemeyeceği noktadır. Monitör aracınızın container-health kontrolünü (Docker'ı destekleyen
-çoğu uptime aracı, ya da host üzerinde bir cron `docker inspect`) buna yönlendirin, ya da en
-azından zaman zaman elle kontrol edin:
+güvenemeyeceği noktadır. (`BACKUP_REMOTE` ayarlıysa ölçüt bunun yerine en yeni **host dışı**
+kopyadır; bkz. [Host dışı kopyalar](#host-dışı-kopyalar).) Monitör aracınızın container-health
+kontrolünü (Docker'ı destekleyen çoğu uptime aracı, ya da host üzerinde bir cron
+`docker inspect`) buna yönlendirin, ya da en azından zaman zaman elle kontrol edin:
 
 ```bash
 docker compose ps backup                                        # "(healthy)" veya "(unhealthy)"
@@ -464,9 +481,9 @@ aynısını döner, böylece kimse bu uçla hesap listesi çıkaramaz) ve `SMTP_
 tamamı, sıfırlama bağlantısı dahil, kişiye değil API log'una gider:
 
 ```
-Email not sent (no SMTP): from=Kurul <noreply@localhost> to=siz@example.com subject=Reset your Kurul password
+Email not sent (no SMTP): from=Kurul <kurul@example.com> to=siz@example.com subject=Reset your Kurul password
 ...
-http://localhost:4000/auth/reset-password/<token>?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password
+https://kurul.example.com/auth/reset-password/<token>?callbackURL=https%3A%2F%2Fkurul.example.com%2Freset-password
 ```
 
 Tek kişilik bir kurulumda bu iş görür (bağlantıyı geçerli olduğu bir saat içinde
@@ -527,11 +544,11 @@ budar ve bunun başarıldığını kaydeder. **`BACKUP_REMOTE` boş kaldığınd
 healthcheck dahil: bu tamamen isteğe bağlıdır ve hiç ayarlamayan bir kurulum yukarıda anlatılan
 döngüyü aynen çalıştırır.
 
-| Değişken                       | Varsayılan | Amaç                                                                                             |
-| ------------------------------ | ---------- | ------------------------------------------------------------------------------------------------ |
-| `BACKUP_REMOTE`                | boş        | rclone remote yolu, örn. `s3:my-bucket/kurul`. Boş değer host dışı yarıyı tümüyle kapatır        |
-| `RCLONE_CONFIG_<AD>_<ANAHTAR>` | -          | rclone'un kendi env değişkeni yapılandırması, `docker-compose.yml` yanındaki `rclone.env` içinde |
-| `RCLONE_CONFIG`                | -          | Kimlik bilgilerini env yerine dosyada tutmak isterseniz, mount edilmiş `rclone.conf`'un yolu     |
+| Değişken                       | Varsayılan | Amaç                                                                                                                          |
+| ------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP_REMOTE`                | boş        | rclone remote yolu, örn. `s3:my-bucket/kurul`. Boş değer host dışı yarıyı tümüyle kapatır                                     |
+| `RCLONE_CONFIG_<AD>_<ANAHTAR>` | -          | rclone'un kendi env değişkeni yapılandırması, `docker-compose.yml` yanındaki `rclone.env` içinde. `<AD>` remote'unuzun adıdır |
+| `RCLONE_CONFIG`                | -          | Kimlik bilgilerini env yerine dosyada tutmak isterseniz, mount edilmiş `rclone.conf`'un yolu                                  |
 
 Kimlik bilgileri `.env`'e **girmez**: rclone'un env anahtarları remote'un adına göre adlandığı
 için `docker-compose.yml` içinde sabit bir liste tanımlanamaz, bu yüzden `backup` servisi
@@ -599,20 +616,20 @@ yazılmaya ve saklanmaya devam eder: başarısız bir yükleme hiçbirini silmez
 kopyanın byte olarak aynı olmasının anlamı da budur:
 
 ```bash
-docker compose exec backup /backups/.rclone/rclone --config= \
-  lsf "$BACKUP_REMOTE"                 # bir zaman damgası seçin, iki yarısını da
-docker compose exec backup /backups/.rclone/rclone --config= \
-  copy "$BACKUP_REMOTE/kurul-<zaman damgası>.dump" /backups/
-docker compose exec backup /backups/.rclone/rclone --config= \
-  copy "$BACKUP_REMOTE/kurul-<zaman damgası>-files.tar.gz" /backups/
+docker compose exec backup sh -c '/backups/.rclone/rclone --config= lsf "$BACKUP_REMOTE"'   # bir zaman damgası seçin, iki yarısını da
+docker compose exec backup sh -c '/backups/.rclone/rclone --config= copy "$BACKUP_REMOTE/kurul-<zaman damgası>.dump" /backups/'
+docker compose exec backup sh -c '/backups/.rclone/rclone --config= copy "$BACKUP_REMOTE/kurul-<zaman damgası>-files.tar.gz" /backups/'
 ```
 
+`$BACKUP_REMOTE` host'ta değil `backup` container'ının ortamında tanımlıdır; bu yüzden komutlar
+tek tırnaklı `sh -c` içinde çalışır ve değişkeni container'ın kabuğu genişletir.
 `/backups/.rclone/rclone` indirilen kopyadır; kendi rclone'unuzu verdiyseniz o yalnızca
 `rclone` olur ve kimlik bilgileriniz mount edilmiş bir `rclone.conf`'ta yaşıyorsa
 ("yapılandırma yalnızca env değişkenleri" demek olan) `--config=` kalkar.
 
-Host'un kendisi gittiyse o iki `copy` komutunu rclone'u ve aynı kimlik bilgilerini taşıyan
-herhangi bir makinede çalıştırın ve arşivleri taze bir kurulumun restore adımına verin.
+Host'un kendisi gittiyse o iki `copy` komutunun rclone kısmını, rclone'u ve aynı kimlik
+bilgilerini taşıyan herhangi bir makinede çalıştırın ve arşivleri taze bir kurulumun restore
+adımına verin.
 
 ## Demo instance
 
@@ -675,7 +692,9 @@ bir şifresi yoktur.
 birden** doğru değilse çalışmayı reddeder:
 
 1. Kendi ortamında `DEMO_MODE=true` ayarlı olmalı ve
-2. `DATABASE_URL`'in işaret ettiği veritabanının adında `demo` geçmeli.
+2. `DATABASE_URL`'in işaret ettiği veritabanının adında `demo` ya da `test` geçmeli (`test`,
+   e2e suite'inin kendi `kurul_test` veritabanında gerçek reset'i koşturabilmesi için var; demo
+   host'unuzda `kurul_demo` kullanın).
 
 Yukarıdaki örnekte `POSTGRES_DB=kurul_demo` bu yüzden var. İki farklı kaynaktan gelen iki
 bağımsız kontrol; böylece bunu gerçek bir kuruluma çevirmek bir değil iki hata gerektirir.
@@ -696,7 +715,7 @@ saati dolarken son bir dakikada yazdığı şeydir.
 ### İzleme
 
 Asıl kontrol `docker compose ps`. Aralığın iki katı boyunca başarılı bir reset olmazsa
-`demo-reset` **unhealthy** raporlar; yani üst üste iki kaçırılmış döngü, yani yavaş ya da
+`demo-reset` **unhealthy** raporlar; yani üst üste iki kaçırılmış döngü, böylece yavaş ya da
 atlanmış tek bir çalıştırma onu oynatmaz. Bu olmasa, reset üretmeyi bırakmış bir döngü sadece "Up"
 görünürken lansman günü bağlantısı son ziyaretçinin bıraktığı şeyi servis ederdi.
 
@@ -713,9 +732,13 @@ aldığı aynı tavsiye ve demonun düştüğünü internetteki birinden önce s
 - **`REDIS_PASSWORD` ayarlayın.** Redis compose ağının dışına açılmadığı için başka her yerde
   isteğe bağlı. Yabancıların yönlendirildiği bir host, bu tek satırlık ek savunmanın değdiği
   yerdir.
-- **Attachment kotalarını düşük tutun.** `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve
-  `ATTACHMENT_INSTANCE_QUOTA_BYTES`, iki reset arasında bir demoya ne kadar veri
-  depolatılabileceğini sınırlar; reset satırları siler, gecelik süpürme baytları geri kazanır.
+- **Attachment kotalarını düşük tutun, ama diski sınırladıklarını sanmayın.**
+  `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`, iki reset arasında bir
+  demoya ne kadar veri depolatılabileceğini sınırlar; reset satırları siler ve kotalar canlı
+  satırları saydığı için her reset'te boşalır. Baytlar ise gecelik süpürmenin bekleme süresi
+  (`BACKUP_KEEP × BACKUP_INTERVAL`, en az 24 saat, varsayılan 7 gün) dolana kadar diskte kalır;
+  yani demo host'unun disk kullanımını kotalar değil, o süre içinde yüklenebilecek bayt miktarı
+  belirler. Diski izleyin.
 - **İçine gerçek hiçbir şey koymayın.** Burası bir staging ortamı değil. Boşaltmak üzere
   tasarlanmış bir container tarafından her saat boşaltılan bir veritabanı.
 
@@ -838,7 +861,9 @@ docker compose exec postgres psql -U kurul -d kurul -c \
   "SELECT w.slug, SUM(a.size) AS bytes FROM \"Attachment\" a JOIN \"Task\" t ON t.id = a.\"taskId\" JOIN \"Board\" b ON b.id = t.\"boardId\" JOIN \"Workspace\" w ON w.id = b.\"workspaceId\" WHERE a.kind = 'FILE' GROUP BY w.slug ORDER BY bytes DESC;"
 ```
 
-Sayıları `2147483648` ve `21474836480` ile karşılaştırın. Aynı upgrade, IP başına bir yükleme
+Komutlar varsayılan `POSTGRES_USER=kurul` ve `POSTGRES_DB=kurul` değerlerini varsayar; `.env`'de
+farklı bir şey kullanıyorsanız `-U` ve `-d` değerlerini ona göre değiştirin. Sayıları
+`2147483648` ve `21474836480` ile karşılaştırın. Aynı upgrade, IP başına bir yükleme
 bayt bütçesi de getiriyor (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, varsayılan dakikada 256 MiB);
 bu yalnızca tek adresten dakikada ondan fazla tam boy dosya yükleyen bir istemciyi ilgilendirir.
 
@@ -945,10 +970,10 @@ The following checks were performed on each of these signatures:
   - The code-signing certificate was verified using trusted certificate authority certificates
 ```
 
-Bunun dışındaki her şey bir hatadır ve birbirinden ayırmaya değer iki hata şunlar: `no
-signatures found` (bu imaj hiç imzalanmamış — bu özellikten eski, ya da sandığınız imaj değil)
-ve `no matching CertificateIdentity found` (imzalanmış, ama sorduğunuz kimlikten başka biri ya
-da başka bir şey tarafından; hata mesajı bulduğu kimliği yazdırır).
+Bunun dışındaki her şey bir hatadır ve birbirinden ayırmaya değer iki hata şunlar:
+`no signatures found` (bu imaj hiç imzalanmamış — bu özellikten eski, ya da sandığınız imaj
+değil) ve `no matching CertificateIdentity found` (imzalanmış, ama sorduğunuz kimlikten başka
+biri ya da başka bir şey tarafından; hata mesajı bulduğu kimliği yazdırır).
 
 Doğrulama, güven kökü ve transparency log için Sigstore'un genel altyapısına çıkar, yani dışarı
 HTTPS ister. Sunucunun interneti yoksa deploy etmeden önce kendi makinenizden çalıştırın.
@@ -1005,7 +1030,7 @@ kural:
 | `/api/*`       | api:4000 | `/api` **kaldırılır** | **26 MiB** (`27262976` bayt) |
 | geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
-`/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime pano akışı odur.
+`/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime board akışı odur.
 
 **Bir route sırrını yolunda taşır, onu proxy'nin access log'undan uzak tutun.**
 `GET /auth/reset-password/<token>`, gerçek bir tarayıcının izlediği bir URL'dir ve içindeki
@@ -1027,9 +1052,10 @@ neye mal olduğu ve nginx open source'ta neden birebir karşılığı olmadığ�
 #### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 
 **Bu bir yazım hatası değil ve ikisi eşitlenmemeli.** Bu instance'ın kabul ettiği en büyük _ek_
-`ATTACHMENT_MAX_BYTES`, yani 25 MiB — kullanıcıya söylenecek sayı budur ve limiti değiştirmek
-istediğinizde değiştireceğiniz tek sayı da budur. Proxy'nin 26 MiB'ı onun **üstünde** bir
-tavandır, ikinci bir kopyası değil.
+`ATTACHMENT_MAX_BYTES`, yani 25 MiB — kullanıcıya söylenecek sayı budur ve limiti **düşürmek**
+istediğinizde değiştireceğiniz tek sayı da budur. Yükseltmek istiyorsanız proxy'nin tavanını da
+değiştirmeniz gerekir (aşağıya bakın). Proxy'nin 26 MiB'ı onun **üstünde** bir tavandır, ikinci
+bir kopyası değil.
 
 Farklı olmalarının sebebi farklı şeyleri saymaları. `client_max_body_size` (ve Caddy'nin
 `request_body max_size`'ı) **istek gövdesinin tamamını** sayar; `ATTACHMENT_MAX_BYTES` ise
@@ -1121,7 +1147,7 @@ fazla JSON göndermiştir.
 
 Dördüncü satır ise başka bir başarısızlıktır: dosya `ATTACHMENT_MAX_BYTES`'ın altındadır, ama onu
 saklamak bir workspace'i ya da instance'ı kendi kotasının üzerine çıkarır. Boyutlandırma için
-yukarıdaki "Attachment depolaması siz sınırlamadıkça sınırsızdır ve Postgres'in diskini paylaşır"
+yukarıdaki "Attachment depolaması varsayılan olarak sınırlıdır ve Postgres'in diskini paylaşır"
 bölümüne bakın: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`.
 
 Bir beşincisi daha var ve onu yalnızca tek bir uç üretebilir:
@@ -1156,23 +1182,56 @@ limitine ulaşmadan biter ve limit yokmuş gibi görünen bir `404` alırsınız
 İki API kuralı bilinçli olarak farklıdır. Better Auth, mount yolunu kendisine verilen URL'den
 türetir ve gelen istekleri ona göre eşleştirir; dolayısıyla `/auth` sunucuda, tarayıcıda ve
 gönderdiği doğrulama linklerinde aynı dize olmak zorundadır. API'nin geri kalanı kendi kökünde
-mount edilmiştir ve prefix girişte kaldırılır. nginx'te:
+mount edilmiştir ve prefix girişte kaldırılır. nginx'te, Caddy'nin kendiliğinden yaptığı başlık
+işleriyle birlikte:
 
 ```nginx
+# http bağlamında (server'ın dışında): Connection başlığını Upgrade'e göre türetir
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      close;
+}
+
+# server bağlamında
 location /auth/ {
   proxy_pass http://api:4000;                      # sondaki slash yok → yol korunur
   client_max_body_size 64k;                        # AUTH_BODY_MAX_BYTES'a (64 KiB) EŞİT: auth
                                                    # gövdesinin multipart zarfı yok, iki katman
                                                    # aynı baytları sayar.
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
 }
 location /api/  {
   proxy_pass http://api:4000/;                     # sondaki slash var → /api kaldırılır
   client_max_body_size 26m;                        # ATTACHMENT_MAX_BYTES'ın (25 MiB) ÜSTÜNDE,
                                                    # eşiti değil — multipart zarfı dosyanın
                                                    # üstüne biner. Yukarıdaki bölüme bakın.
+  proxy_http_version 1.1;                          # WebSocket (realtime board akışı) için
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection $connection_upgrade;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
 }
-location /      { proxy_pass http://web:3000;  }
+location /      {
+  proxy_pass http://web:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
+
+Paketlenmiş Caddy bu üç şeyi kendiliğinden yapar, nginx yapmaz: `/api/` için WebSocket upgrade
+başlıkları (`Upgrade`, `Connection`, `proxy_http_version 1.1`; ilk ikisi hop-by-hop başlıklardır,
+nginx onları açıkça yazmadıkça upstream'e geçirmez), `Host`'un korunması ve istemcinin adresiyle
+şemasının iletilmesi (`X-Forwarded-For`, `X-Forwarded-Proto`). Sonuncusu yoksa `TRUST_PROXY=1`
+(varsayılan) istemciyi bulamaz: başlık hiç yoksa bütün istekler nginx'in adresinden gelmiş sayılır
+ve her rate-limit kovası tek adreste toplanır; istemci kendi `X-Forwarded-For`'unu gönderirse onun
+en sağdaki girdisi kullanılır, yani taklit edilebilir. `$proxy_add_x_forwarded_for` gelen başlığın
+sağına nginx'in gördüğü adresi ekler ve `TRUST_PROXY=1` en sağdaki girdiyi aldığı için başa
+yazılan sahte adresler etkisiz kalır. Başlıklar her `location`'da yinelenir, çünkü bir blokta tek
+bir `proxy_set_header` bile varsa nginx üst düzeydekileri miras almaz.
 
 Proxy'niz Kurul'un kendi `proxy` servisini değiştirmek yerine onun önünde duruyorsa,
 `.env`'de `TRUST_PROXY`'yi hop sayısına ayarlayın (Caddy'nin önündeki bir CDN bunu `2` yapar).
@@ -1269,16 +1328,17 @@ docker compose up -d --build
 ```
 
 Tek fark bunun daha yavaş olmasıdır — api imajı bir dakika kadar build alır.
-`docker-compose.yml` üç servisin üçü için de bilinçli olarak hem `image:` hem `build:` taşır;
-böylece aynı dosya, çözülebilen bir yayınlanmış imaj varsa ondan, yoksa kaynaktan kurar.
+`docker-compose.yml`, `api`, `web`, `migrate` ve (`demo` profilinde) `demo-reset` için bilinçli
+olarak hem `image:` hem `build:` taşır; böylece aynı dosya, çözülebilen bir yayınlanmış imaj
+varsa ondan, yoksa kaynaktan kurar.
 
 **Sertifika bir türlü alınmıyor.** 80 ve 443 portlarının ikisi de public internetten sunucuya
 ulaşabilmeli ve DNS çoktan çözülüyor olmalı. `docker compose logs proxy` hatanın adını verir.
-Let's Encrypt'in rate limit'ine (domain başına haftada 5 sertifika) takıldıysanız beklemekten
-başka çare yok — `caddy_data` volume'ü tam olarak, yeniden başlatmanın zaten sahip olduğu bir
-sertifikayı tekrar istememesi için var.
+Let's Encrypt'in rate limit'ine (aynı hostname kümesi için haftada 5 sertifika; kayıtlı domain
+başına haftada 50) takıldıysanız beklemekten başka çare yok — `caddy_data` volume'ü tam olarak,
+yeniden başlatmanın zaten sahip olduğu bir sertifikayı tekrar istememesi için var.
 
-**Panolar yükleniyor ama kendi kendine güncellenmiyor.** WebSocket geçmiyor demektir. Pakete
+**Board'lar yükleniyor ama kendi kendine güncellenmiyor.** WebSocket geçmiyor demektir. Pakete
 dahil `proxy` ile bu yaşanmamalı; kendi proxy'nizle `/api/*` kuralınızın
 `Upgrade`/`Connection` başlıklarını ilettiğinden emin olun.
 

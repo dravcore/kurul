@@ -8,10 +8,10 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ## Durum
 
-Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı): auth/workspace’ler, board ve
+Kurul'un **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı): auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Kritik tarayıcı
 akışlarını sekiz senaryoluk bir Playwright smoke paketi kapsıyor
-([docs/tr/testing.md](docs/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
+([docs/testing.md](docs/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
 neyin üzerinde çalışıldığı ve neyin bilinçli olarak programa alınmadığı tek bir yerde,
 [ROADMAP.md](ROADMAP.md) içinde; burada ikinci kez listelenip eskimesin diye.
 
@@ -56,7 +56,7 @@ Kurul'un cevabı bilinçli olarak dar:
   scope'lanmış sorgular sonradan eklenmedi, baştan tasarlandı.
 
 Ve `v0.4.1` itibarıyla olmayanlar: subtask yok, zaman takibi yok, webhook yok. Personal access
-token'lar bu sürümle çıkıyor: workspace'e scope'lanıyor ve `Authorization: Bearer` ile
+token'lar `v0.4.0` ile geldi: workspace'e scope'lanıyor ve `Authorization: Bearer` ile
 gönderiliyor, yani bir script ya da bir CI job'ı bir board'u sürebiliyor; bunu stabil bir API'ye
 çeviren `/v1` öneki ise 1.0'da geliyor, öncesinde değil
 ([ADR 0031](docs/decisions/0031-api-versioning.md)). Webhook'ların ise tasarımı var
@@ -64,7 +64,7 @@ gönderiliyor, yani bir script ya da bir CI job'ı bir board'u sürebiliyor; bun
 uygulaması yok. UI hem İngilizce hem Türkçe konuşuyor (her arayüz metni, yeni bir board'un
 başladığı column adları ve size gönderdiğimiz e-posta dahil) ve üçüncü bir dil bir katalog
 uzakta. Webhook'lar ve ek dil paketleri
-[MVP ötesi](ROADMAP.md#beyond-mvp) altında, her biri kendisini bekleten açık soruyla
+[MVP ötesi](ROADMAP.md#mvp-ötesi) altında, her biri kendisini bekleten açık soruyla
 listeli; subtask ve zaman takibi ise o listede hiç yok. Bunlara bugün ihtiyacınız varsa
 yukarıdaki daha olgun projelerden biri daha iyi bir seçim.
 
@@ -155,7 +155,7 @@ sunar; `api` ve `web` kendi host portlarını yayınlamaz. İkisini tek origin'd
 **aynı yayınlanmış imaj her domain'de yeniden build edilmeden çalışır** — kendi domain'inize
 taşımak için `.env`'de `SITE_URL=https://kurul.example.com` ayarlamanız yeterli, bu aynı
 zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
-[docs/tr/self-hosting.md](docs/self-hosting.md).
+[docs/self-hosting.md](docs/self-hosting.md).
 
 Her etiketli release, servis imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurul-api`,
 `ghcr.io/dravcore/kurul-web` ve — v0.2.0'dan sonraki ilk sürümden itibaren — tek seferlik
@@ -187,7 +187,8 @@ pnpm dev
 
 - Web: http://localhost:3000
 - API health: http://localhost:4000/health
-- Mailpit (API'nin gönderdiği her mesaj): http://localhost:8025
+- Mailpit (`.env`'de `SMTP_HOST=localhost` ve `SMTP_PORT=1025` ayarlandıktan sonra API'nin
+  gönderdiği her mesaj): http://localhost:8025
 
 `pnpm bootstrap` ([`scripts/bootstrap.mjs`](scripts/bootstrap.mjs)), dev loop'un eskiden
 istediği beş komutun ta kendisi — aynı sırayla — artı `.env` üzerinde bir ön kontrol ve
@@ -214,16 +215,16 @@ veritabanına hiç ulaşmadan `@kurul/auth-access/dist/cjs/index.js` üzerinde �
 Test suite'leri paketlerin `src` dizinini doğrudan okur ve build olmadan da koşar.
 `pnpm db:generate` olmadan ise Prisma türevli bir tür import eden hiçbir şey typecheck'ten
 geçmez ve build olmaz — client git-ignored'dır ve onu üreten bir `postinstall` hook'u yoktur.
-O adımın başkasının migration'larını çektikten sonra da yeniden koşması gerekir:
-`pnpm db:migrate` onları uygular ama client'ı yeniden üretmez (_kendi_ şema düzenlemeleriniz
-için olan `pnpm db:migrate:dev` ikisini birden yapar).
+O adımın başkasının migration'larını çektikten sonra da — ve kendi şema düzenlemeleriniz için
+`pnpm db:migrate:dev` çalıştırdıktan sonra da — yeniden koşması gerekir: `pnpm db:migrate` ve
+`pnpm db:migrate:dev` client'ı yeniden üretmez.
 
 ### Her iki yol için
 
 `POSTGRES_PASSWORD`'ün varsayılanı yoktur: ayarlanmadan compose başlamayı reddeder. Doğrudan bir
 bağlantı URL'ine gömüldüğü için `-base64` ile değil `openssl rand -hex 32` ile üretin. Bunun neden
 önemli olduğu tek bir yerde yazılı:
-[docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/development.md#veritabanı-ve-cache-kimlik-bilgileri).
+[docs/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 Dev loop'ta `.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
 eşleştirilmelidir — o host tarafındaki string, `pnpm dev`'in `localhost:5432`'ye ulaşmak için
 kullandığı şeydir ve compose ikisini senkronize tutmaz. `docker compose up` kendi bağlantı
@@ -233,9 +234,9 @@ Uygulama SMTP yapılandırılmadan da ayağa kalkar, ama davetler yapılandırı
 edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.org/)'i zaten
 başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz
 (`SMTP_HOST=localhost`, `SMTP_PORT=1025`); bkz.
-[docs/tr/development.md#smtp-ve-mailpit](docs/development.md#smtp-ve-mailpit).
+[docs/development.md#smtp-ve-mailpit](docs/development.md#smtp-ve-mailpit).
 
-Günlük detaylar: [docs/tr/development.md](docs/development.md).
+Günlük detaylar: [docs/development.md](docs/development.md).
 
 ## Stack
 
@@ -249,29 +250,29 @@ Günlük detaylar: [docs/tr/development.md](docs/development.md).
 | Deployment        | Docker Compose                                                                 |
 | Mimari            | Monorepo, modüler monolit — mikroservis yok                                    |
 
-Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tech-stack.md) ve
-[docs/tr/decisions/](docs/decisions/).
+Her seçimin tam gerekçesi: [docs/tech-stack.md](docs/tech-stack.md) ve
+[docs/decisions/](docs/decisions/).
 
 ## Dokümantasyon
 
-Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe harita:
-**[docs/tr/README.md](docs/README.md)**.
+Beş dakikalık haritayla başlayın: **[docs/README.md](docs/README.md)** (ürün, kodlama, API,
+release'ler ve yol haritası için neyin okunacağı).
 
-| Doküman                                               | Kapsam                                                 |
-| ----------------------------------------------------- | ------------------------------------------------------ |
-| [docs/tr/architecture.md](docs/architecture.md)       | Modül haritası, veri modeli                            |
-| [docs/tr/design.md](docs/design.md)                   | UI/UX dili                                             |
-| [docs/tr/development.md](docs/development.md)         | Yerel kurulum ve günlük komutlar                       |
-| [docs/tr/api-conventions.md](docs/api-conventions.md) | REST, hatalar, pagination                              |
-| [ROADMAP.md](ROADMAP.md) (İngilizce)                  | Sağlamlaştırma + özellik hatları, beyond-MVP backlog'u |
-| [docs/tr/decisions/](docs/decisions/)                 | ADR’ler                                                |
+| Doküman                                            | Kapsam                                                 |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| [docs/architecture.md](docs/architecture.md)       | Modül haritası, veri modeli                            |
+| [docs/design.md](docs/design.md)                   | UI/UX dili                                             |
+| [docs/development.md](docs/development.md)         | Yerel kurulum ve günlük komutlar                       |
+| [docs/api-conventions.md](docs/api-conventions.md) | REST, hatalar, pagination                              |
+| [ROADMAP.md](ROADMAP.md)                           | Sağlamlaştırma + özellik hatları, beyond-MVP backlog'u |
+| [docs/decisions/](docs/decisions/)                 | ADR’ler                                                |
 
 ## Katkıda bulunma
 
 Hata bildirimleri, özellik fikirleri ve pull request'ler hoş karşılanıyor: kod, doküman ve
 çeviri, hepsi. Kurul issue-first çalışıyor; önemsiz olmayan bir işe başlamadan önce bir issue
 açın ya da mevcut olanı bulun ve onaylanmasını bekleyin. Süreç için
-[CONTRIBUTING.md](CONTRIBUTING.md)'ye (İngilizce), birlikte nasıl çalıştığımız için ise
+[CONTRIBUTING.md](CONTRIBUTING.md)'ye, birlikte nasıl çalıştığımız için ise
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)'ye bakın.
 
 ## Topluluk
@@ -279,11 +280,11 @@ açın ya da mevcut olanı bulun ve onaylanmasını bekleyin. Süreç için
 **Resmî kanal [GitHub Discussions](https://github.com/dravcore/kurul/discussions).**
 Trafiği üç kategori taşıyor:
 
-| Kategori                                                                                | Ne için                                                                                                                                              |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                          |
-| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](ROADMAP.md#beyond-mvp) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
-| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                  |
+| Kategori                                                                                | Ne için                                                                                                                                             |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Q&A](https://github.com/dravcore/kurul/discussions/categories/q-a)                     | Kurulum, self-hosting ve kullanım soruları — hata bildirimi olmayan her şey                                                                         |
+| [Ideas](https://github.com/dravcore/kurul/discussions/categories/ideas)                 | Yol haritası geri bildirimi. Her [MVP ötesi](ROADMAP.md#mvp-ötesi) satırının burada bir discussion'ı var — istediğinizi oylayın ya da yenisini açın |
+| [Show and tell](https://github.com/dravcore/kurul/discussions/categories/show-and-tell) | Onunla ne kurduğunuz ve board'unuzun neye benzediği                                                                                                 |
 
 Tekrarlanabilir hatalar yine [issue](https://github.com/dravcore/kurul/issues), güvenlik
 açıkları ise ikisi yerine [SECURITY.md](SECURITY.md).

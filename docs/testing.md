@@ -16,7 +16,7 @@ Kurul'un neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldığı.
 
 ## Strateji
 
-Kurul’ın MVP özellik seti tamamlandı; test stratejisi bilinçli olarak **kapsamlı değil,
+Kurul'un MVP özellik seti tamamlandı; test stratejisi bilinçli olarak **kapsamlı değil,
 pragmatik** kalır:
 
 - **Doğru yapması zor** ve **yanlış yapması pahalı** olan mantığı test edin — sıralama,
@@ -47,11 +47,12 @@ Testler, bu maliyetin gerçek güven satın aldığı yerlerde yazılır.
     /────────\    unit — servisler, guard'lar, saf logic (Jest), web logic/hook'ları (Vitest)
 ```
 
-Tam component-tree render testleri MVP'nin parçası değil. Web unit testleri saf logic'i
-(`lib/*.test.ts` — izinler, position matematiği, mention'lar, query parametreleri) ve board
-drag-and-drop hook'unu izole şekilde kapsar; geri kalan her şey için yapılan takas tip
-güvenliği artı API'nin integration coverage'ı; board'un kendi davranışını ise parça parça
-component testleri değil, aşağıdaki sekiz browser senaryosu uçtan uca kapsar.
+Web unit testleri (Vitest + jsdom + Testing Library) saf logic'i (`lib/*.test.ts` — izinler,
+position matematiği, mention'lar, query parametreleri), route girişlerini (`app/**`) ve
+etkileşimli component ile hook'ları (board, task, layout, notification, auth, settings,
+dashboard) kapsar; klasör bazlı taban değerleri [Coverage](#coverage) bölümündedir. jsdom'un
+üretemediği şeyler (layout, dokunmatik girdi, gerçek form submit, CSP) ve stack'in bütünü ise
+aşağıdaki sekiz browser senaryosundadır.
 
 ## Neler test edilmeli
 
@@ -90,8 +91,8 @@ sınırıdır, dolayısıyla öyle test edilir:
 - Rol kontrolleri: `OWNER`/`ADMIN`/`MEMBER`/`GUEST`'in her biri en az bir izin verilen ve
   bir reddedilen durumu hit eder.
 
-İzolasyon kuralı tip sistemi yerine bir guard tarafından zorlandığından, bu testler onun
-tek mekanik zorlaması olur.
+İzolasyon kuralı tip sistemi yerine `WorkspaceGuard` (üyelik) ile servis seviyesindeki
+`workspaceId` yüklemleri tarafından zorlandığından, bu testler onun tek mekanik zorlaması olur.
 
 ### 3. Auth akışları
 
@@ -105,7 +106,7 @@ tek mekanik zorlaması olur.
 Browser e2e MVP boyunca ertelendi ve gerekçesi geçerliydi: board UI'ı haftalık şekil
 değiştiriyordu, o dönemde yazılmış bir suite üç kez yeniden yazılırdı. Ertelemenin geride
 bıraktığı şey başka hiçbir katmanın kapatamayacağı bir boşluktu — bu ürünü ürün yapan
-akışlar binden fazla unit testi ve her endpoint için bir integration testiyle doğrulanıyordu
+akışlar binin çok üzerinde unit testi ve her endpoint için bir integration testiyle doğrulanıyordu
 ve **bir kez bile gerçek bir tarayıcıda değil**. İki suite de hiç render olmayan bir board
 ile yeşil kalır.
 
@@ -189,12 +190,13 @@ noktadan sonra hiçbir şey ölçmez.
 Suite, halihazırda çalışan neyse onun yanına uygulamanın ikinci bir kopyasını açar ve ona
 asla dokunmaz:
 
-| Şey                | Değer                   | Neden                                                                            |
-| ------------------ | ----------------------- | -------------------------------------------------------------------------------- |
-| Web / API portları | 3110 / 4110             | 3000/4000 `pnpm dev`'in                                                          |
-| Veritabanı         | `kurul_test_playwright` | `kurul_test` değil — Jest integration suite'i onu testler arasında truncate eder |
-| Redis              | yok — `REDIS_URL` boş   | Aşağıya bakın; Redis'siz koşmak desteklenen bir yapılandırmadır                  |
-| Posta              | paylaşılan Mailpit      | Hiçbir şey silinmez; her arama suite'in ürettiği bir adrese göre daraltılır      |
+| Şey                | Değer                               | Neden                                                                                                                   |
+| ------------------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Web / API portları | 3110 / 4110                         | 3000/4000 `pnpm dev`'in                                                                                                 |
+| Veritabanı         | `kurul_test_playwright`             | `kurul_test` değil — Jest integration suite'i onu testler arasında truncate eder                                        |
+| Redis              | yok — `REDIS_URL` boş               | Aşağıya bakın; Redis'siz koşmak desteklenen bir yapılandırmadır                                                         |
+| Posta              | paylaşılan Mailpit                  | Hiçbir şey silinmez; her arama suite'in ürettiği bir adrese göre daraltılır                                             |
+| Ek dizini          | `os.tmpdir()/kurul-e2e-attachments` | Repo'nun dışında; `pnpm test:browser`'ın build adımı her koşuda boşaltır, `.env`'deki bir `STORAGE_PATH` suite'e geçmez |
 
 Bunların hiçbiri `.env` üzerinden ayarlanabilir değil ve hiç yeni environment değişkeni
 eklemiyor: Postgres _bağlantısı_ `DATABASE_URL`'den, yalnızca veritabanı adı değiştirilerek
@@ -230,8 +232,12 @@ içinde kapsanıyor.
   eklemiyor. Kolonlar `<section aria-label>`, kartların tutamağında
   `aria-label="Reorder <title>"` var — erişilebilir yüzey üzerinden assert etmek, ekran
   okuyucu kullanıcısını kıran bir değişikliğin bu suite'i de kırması demektir.
-- **Hiçbir yerde sabit bekleme yok.** Sadece `expect.poll` ve web-first assertion'lar. Bir
-  `sleep` ya en meşgul makinede çok kısadır ya da diğer her koşuda boşa harcanan zamandır.
+- **Sabit bekleme yok, tek bir istisna dışında.** Sadece `expect.poll` ve web-first
+  assertion'lar. Bir `sleep` ya en meşgul makinede çok kısadır ya da diğer her koşuda boşa
+  harcanan zamandır. İstisna, dokunmatik sürüklemedeki uzun basma beklemesidir
+  (`e2e/support/board-page.ts`, `waitForTimeout(300)`): dokunma sensörü 250 ms'lik bir basılı
+  tutmayla aktifleşir ve parmak o süre dolana kadar yerinde durmak zorundadır; erken gönderilen
+  bir hareket sürükleme değil kaydırma sayılır.
 - **CI dahil, retry yok.** Retry bir flake'i yeşil koşuya çevirir; bir suite'in anlamını
   yitirmesinin en hızlı yolu budur.
 - **`Task.position`'a asla assert etmeyin.** O, fractional indexing'in ürettiği bir Float'tır
@@ -264,19 +270,19 @@ listesinin boş durumu yüklemeden önce assert ediliyor ve kart rozeti var oldu
 önce yok olduğu assert ediliyor; board listesinin boş durumu import'tan önce assert ediliyor ve
 rapor bölgesi görünür olduğu assert edilmeden önce gizli olduğu assert ediliyor. Özellik tamamen
 sökülse bile geçmeye devam edecek bir senaryo, bu bölümün önlemek için var olduğu şeydir; bir
-yokluğu assert etmek de bunu olası değil, imkânsız kılar.
+yokluğu assert etmek de bunu düşük olasılıklı olmaktan çıkarıp imkânsız kılar.
 
 ## Dosya konvansiyonları
 
-| Tür                          | Konum                               | Desen                                                                                                                                                                                                                                                                                            |
-| ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit                         | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                                                                                         |
-| Integration                  | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                                                                                 |
-| Test helper'ları/factory'ler | Test kökü altında paylaşılır        | `apps/api/test/helpers/`, `apps/api/test/factories/`                                                                                                                                                                                                                                             |
-| Geçici depolama kökü         | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                                                                               |
-| Girdi fixture'ları           | Test kökünde, kaynağına göre        | `apps/api/test/fixtures/trello/` — elle yazılmış Trello export'ları; hem unit hem entegrasyon testleri okur, ayrıca `real/` altında iki anonimleştirilmiş gerçek export; dizinin kendi README'si hangisinin hangisi olduğunu kayda geçirir ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
-| Browser e2e                  | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                                                                               |
-| Browser e2e helper'ları      | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                                                                               |
+| Tür                     | Konum                               | Desen                                                                                                                                                                                                                                                                                            |
+| ----------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit                    | Kaynak dosyayla yerinde (colocated) | `apps/api/src/task/task.service.spec.ts`                                                                                                                                                                                                                                                         |
+| Integration             | Ayrı bir test kökü                  | `apps/api/test/task.e2e-spec.ts`                                                                                                                                                                                                                                                                 |
+| Test helper'ları        | Test kökü altında paylaşılır        | `apps/api/test/helpers/` (`createTestApp`, `signUp`, `createWorkspace`, `resetDatabase`, `createTempStorageDir`, ...)                                                                                                                                                                            |
+| Geçici depolama kökü    | Veritabanı helper'ının yanında      | `apps/api/test/helpers/storage.ts`                                                                                                                                                                                                                                                               |
+| Girdi fixture'ları      | Test kökünde, kaynağına göre        | `apps/api/test/fixtures/trello/` — elle yazılmış Trello export'ları; hem unit hem entegrasyon testleri okur, ayrıca `real/` altında iki anonimleştirilmiş gerçek export; dizinin kendi README'si hangisinin hangisi olduğunu kayda geçirir ([ADR 0025](decisions/0025-trello-import-mapping.md)) |
+| Browser e2e             | Repository seviyesinde paket        | `e2e/tests/board-realtime.spec.ts`                                                                                                                                                                                                                                                               |
+| Browser e2e helper'ları | Onların yanında                     | `e2e/support/`, `e2e/stack-env.ts`                                                                                                                                                                                                                                                               |
 
 Nest'in generator'ı integration testlerini `*.e2e-spec.ts` olarak adlandırıyor; bunlar
 browser e2e değil API integration testleri olsa da bu isim tooling uyumluluğu için
@@ -285,11 +291,11 @@ korunuyor.
 **Gerçek Trello export'ları.** `apps/api/test/fixtures/trello/real/` dizininde
 `scripts/anonymise-trello-export.mjs` betiğinden geçmiş gerçek export'lar durur (yapı bayt bayt
 korunur, her metin parçası aynı uzunlukta bir takma adla değiştirilir) — 2026-08-22 itibarıyla iki
-tane: Trello'nun kendi varsayılan "Starter Guide" panosu ve on bir listeli bir pano.
+tane: Trello'nun kendi varsayılan "Starter Guide" board'u ve on bir listeli bir board.
 `trello-import-real.e2e-spec.ts` oradaki her `*.json` dosyasını gerçek endpoint üzerinden import
 eder ve raporu ile veritabanını dosyadan türetilen sayılarla karşılaştırır; ikisi de temiz şekilde
 import ediliyor, okuyucunun kullandığı hiçbir alanda sentetik fixture'larla fark çıkmadı
-([`fixtures/trello/README.md#field-mapping-diffs`](../apps/api/test/fixtures/trello/README.md#field-mapping-diffs)).
+([`fixtures/trello/README.md#alan-eşleme-farkları`](../apps/api/test/fixtures/trello/README.md#alan-eşleme-farkları)).
 Dizin bir gün yeniden boşalırsa spec tam olarak bir atlanmış test bildirir,
 `no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, böylece açık kapı
 CI'da görünür kalır. Anonimleştiricinin kendi unit testleri `pnpm test:scripts` ile `node:test`
@@ -309,15 +315,22 @@ pnpm --filter @kurul/api test:cov      # api coverage raporu
 
 pnpm --filter @kurul/web test          # web unit (Vitest)
 pnpm --filter @kurul/web test:watch    # web unit, watch modu
+pnpm --filter @kurul/web test:cov      # web coverage raporu
 
 pnpm test:scripts                         # scripts/ (node:test, bağımlılık yok)
 
 pnpm test:browser                         # browser e2e (Mailpit de gerekir)
 ```
 
-Integration testler, test setup'ı tarafından oluşturulan ve migrate edilen **ayrı bir
-veritabanına** (`kurul_test`) karşı çalışır. Geliştirme veritabanına asla dokunmazlar.
-Browser suite'i üçüncü bir veritabanı kullanır — bkz. [İzolasyon](#i̇zolasyon).
+Integration testler **ayrı bir veritabanına** (`kurul_test`) karşı çalışır; geliştirme
+veritabanına asla dokunmazlar. Test setup'ı bu veritabanını oluşturmaz ya da migrate etmez:
+`apps/api/test/setup-e2e.ts`, adında `kurul_test` geçmeyen bir `DATABASE_URL`'i reddeder
+(`.env`'deki değer geliştirme veritabanını gösterdiğinden kabuktan geçersiz kılın;
+`DATABASE_URL` boşsa `postgresql://kurul:kurul@localhost:5432/kurul_test`'e düşer). Veritabanını,
+`DATABASE_URL` ona yönlendirilmişken `pnpm db:migrate` ile hazırlayın (`migrate deploy`
+veritabanı yoksa yaratır); CI'da `test-integration` işi bunu `POSTGRES_DB: kurul_test` ile açılan
+Postgres service container'ında yapar. Browser suite'i üçüncü bir veritabanı kullanır — bkz.
+[İzolasyon](#i̇zolasyon).
 
 Bu komutların hiçbiri `packages/*/dist` gerektirmez. İki Jest config'i ve Vitest config'leri
 `@kurul/shared-types` ile `@kurul/auth-access` paketlerini `src/index.ts` dosyalarına eşler;
@@ -328,7 +341,7 @@ geçemez. `apps/api/src/workspace-packages.spec.ts`, `apps/api/test/harness.e2e-
 [development.md](development.md#klonlama-ve-kurulum).
 
 `apps/web/workspace-packages.test.ts`, bir component'in yanında değil `apps/web` kökünde (ya da
-`globals.css`'in yanında) duran beş **yapısal koruma** testinden biridir; konuları tek bir modül
+`globals.css`'in yanında) duran altı **yapısal koruma** testinden biridir; konuları tek bir modül
 değil uygulamanın bütünü olduğu için oradalar. İkisi cascade katman onarımıyla geldi:
 `apps/web/app/globals-css-layers.test.ts`, `app/globals.css`'i kurulu Tailwind üzerinden derler ve
 cascade'i bir tarayıcının çözdüğü gibi çözer, böylece joker `border-color` kuralı fark edilmeden
@@ -349,8 +362,13 @@ taşır), `theme-classes.test.ts` ise Tailwind'in kendi text-size ve font-weight
 sabitlenmiş `text-base` iOS-zoom istisnası dışında yasaklar ve `font-display`'i incelenmiş çağrı
 yerlerinden oluşan kapalı bir allowlist'e hapseder. Yasaklanan bir class temiz derlenir, yani
 yukarıdaki çözülme gate'i onu asla yakalayamaz; geri gelen bir varsayılanı bir sonraki denetim
-yerine build'de kıran şey bu listelerdir. Beşincisi, `apps/web/app/globals.contrast.test.ts`, kontrast gate'idir: her renk token'ını derlenmiş
-`:root` ve `.dark` bloklarından okur ve her metin token'ını altı gerçek surface'e karşı 4.5:1'de,
+yerine build'de kıran şey bu listelerdir. `apps/web/text-read-utilities.test.ts`,
+`border-utilities.test.ts` ile aynı tarama tekniğiyle `text-read` utility'sinin çağrı yerlerini
+kapalı bir dosya listesine (`import-report-panel.tsx`, `comment-body.tsx`,
+`task-panel-fields.tsx`) sabitler; yeni bir çağrı yeri sessizce giremez
+([design.md](design.md)). Altıncısı, `apps/web/app/globals.contrast.test.ts`, kontrast
+gate'idir: her renk token'ını derlenmiş `:root` ve `.dark` bloklarından okur ve her metin
+token'ını altı gerçek surface'e karşı 4.5:1'de,
 her boundary ve state token'ını aynı altısına karşı 3:1'de ölçer; buna ek olarak her run'da
 render edilmiş ağacı bir token adına güvenmek yerine yeniden tarayan üç scanner taşır (gerçek
 ground'u üzerine composite edilmiş her alpha derivative, riskli bir metin rengini riskli bir
@@ -369,11 +387,12 @@ yazılıdır.
   `it('returns 404 when the board belongs to another workspace')`, `it('findOne works')`
   değil.
 - Test başına bir davranış. İsim "ve" gerektiriyorsa, bölün.
-- Entity'ler için factory/builder kullanın; aynı 15 alanlı task literal'ini yirmi testte
-  elle yazmayın.
-- **Her integration testi kendinden sonra temizlik yapar** — etkilenen tabloları
-  `afterEach`'te truncate edin ya da testi geri alınan (rolled back) bir transaction
-  içine sarın. Sıraya bağımlı test suite'leri bir bug'dır. **Geçici dizin de state sayılır**:
+- Tekrarlanan kurulumu spec içinde küçük bir yardımcıya ya da `test/helpers/` altına alın;
+  aynı 15 alanlı task literal'ini yirmi testte elle yazmayın.
+- **Her integration testi temiz bir veritabanıyla başlar**: spec `beforeEach`'te
+  `resetDatabase(prisma)` çağırır (`test/helpers/db.ts`; 21 modelin hepsini FK sırasıyla
+  `deleteMany` ile siler). Suite aynı veritabanını paylaştığı için `--runInBand` ile seri koşar.
+  Sıraya bağımlı test suite'leri bir bug'dır. **Geçici dizin de state sayılır**:
   depolamaya dokunan bir spec kendi kökünü `createTempStorageDir()` ile açar ve `afterEach`'te
   `removeTempStorageDir()` ile siler (`test/helpers/storage.ts`) — `helpers/db.ts`'in satırlar
   için cevapladığı aynı sorunun cevabı.
@@ -408,9 +427,10 @@ yükseltme arzusu da yoktur.
 Bu repodaki her taban değeri (hem `apps/api` hem `apps/web`) aynı iki kural yönetir:
 
 - **Ölçüm yukarı çıkarsa taban değer de yukarı çıkar.** Yeniden ölçün, sonra taban değeri eski
-  sayının değil yeni sayının altına çekin. Kendi testleriyle gelen yeni bir modül, ona dokunmayan
-  bir taban değeri yükseltmek için tek başına bir gerekçe değildir; bir bölgenin taban değerini
-  o bölge gerçekten ısındığında yükseltin, ortalamayı ilgisiz bir şey çektiği için değil.
+  sayıda bırakmak yerine yeni sayıyı yansıtacak şekilde yükseltin. Kendi testleriyle gelen yeni
+  bir modül, ona dokunmayan bir taban değeri yükseltmek için tek başına bir gerekçe değildir;
+  bir bölgenin taban değerini o bölge gerçekten ısındığında yükseltin, ortalamayı ilgisiz bir
+  şey çektiği için değil.
 - **Ölçüm aşağı inerse düşüş gizlenmez, kaydedilir.** Yeniden ölçün ve sayıyı yazın
   (`apps/api/jest.config.cjs`'in tarihli geçmişine, `apps/web` için de burada). Eski payı geri
   getirmek için taban değeri düşürmeyin: payın daralması sinyalin ta kendisidir, taban değeri
@@ -425,7 +445,9 @@ testlerin kendisini bırakır.
 
 ### Taban değerlerin bulunduğu yerler
 
-Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
+Zaten kapsanmış kodun geri kaymasını mandallar engeller; sıfırdan büyük her taban değer CI'ı
+kırar. `src/account/` satırı bir mandal değil kayıttır: dört değeri de 0 olduğundan yüzde ne olursa
+olsun kırmaz.
 
 | Kapsam                                  | Taban değer                                                      | Nerede tanımlı              |
 | --------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
@@ -447,7 +469,7 @@ Zaten kapsanmış kodun geri kaymasını mandallar engeller. Hepsi CI'ı kırar.
 branch'inde; en güncel `develop` koşusunun CI `api-coverage` artifact'ı doğruluk kaynağıdır.
 2026-08-26 itibarıyla (`develop`, `017838a`), ölçüm 75 / 66 / 77 / 76 taban değerine karşı
 77.06 / 69.96 / 78.95 / 77.91, yani 2.06 / 3.96 / 1.95 / 1.91 pay. Yukarıdaki üç `apps/api`
-klasör taban değeri aynı ölçümün altında değil, tam üzerinde konur: `src/common/guards/` ve
+klasör taban değeri aynı ölçümün altına değil, ölçümün tam kendisine konur: `src/common/guards/` ve
 `src/common/rate-limit/` zaten gerçek unit testleri olan bölgeleri mandallar, `src/account/` ise
 GDPR silme akışının bilinçli olarak unit testsiz olduğunu ve bunun yerine uçtan uca kapsandığını
 gizlemez, kaydeder (`apps/api/jest.config.cjs` dosyayı ve e2e spec'ini adıyla anar). `apps/web`
@@ -463,8 +485,10 @@ etkileşimli board / task / layout / notification / auth / settings / dashboard 
 onların arkasındaki `lib/**` yardımcıları. `apps/web/vitest.config.ts` tam gerekçeyi satır
 içinde taşır.
 
-**Bir klasör tabanının yakalamadığı şey.** Coverage, diskteki her dosya için değil, bir testin
-_import ettiği_ dosyalar için raporlanır. Bir modülü import eden son testi silmek bu yüzden
+**Bir klasör tabanının yakalamadığı şey.** `apps/web`'te coverage, diskteki her dosya için değil,
+bir testin _import ettiği_ dosyalar için raporlanır (`apps/api`'de `collectCoverageFrom` bütün
+`src/`'yi saydığı için import edilmeyen dosya %0 görünür, bu boşluk yoktur). Bir modülü import
+eden son testi silmek bu yüzden
 yüzdeyi düşürmez, modülü paydadan çıkarır ve taban yeşil kalır. Tabanlar bir testin
 zayıflatılmasını yakalar, bir modülün terk edilmesini değil; ikincisi code review'ın işidir.
 `components/notification/**` tabanında ölçüldü: `notifications-list.test.tsx` içindeki
@@ -475,8 +499,9 @@ geçiyor.
 Global duruş, API'nin repo genelinde bir taban değerin anlamlı olacağı kadar kararlı olduğu
 1.0'da yeniden gözden geçirilir.
 
-Her iki suite de HTML/JSON raporlarını her koşuda — geçse de kalsa da — CI artifact'ı olarak
-yayımlar (`api-coverage`, `web-coverage`).
+Her iki suite de raporlarını her koşuda — geçse de kalsa da — CI artifact'ı olarak yayımlar:
+`api-coverage` (Jest'in varsayılan raporları, HTML dahil) ve `web-coverage` (yalnız
+`coverage-summary.json`: Vitest `text` ve `json-summary` reporter'larıyla koşar, HTML üretmez).
 
 ## CI
 
@@ -496,6 +521,7 @@ Her pull request, `develop` ve `main` üzerinde de olduğu gibi şunları çalı
 | Migrasyon drift'i      | `test-integration` | `pnpm db:migrate`, ardından Postgres service container'ına karşı `pnpm db:drift`                                                                              |
 | Integration testler    | `test-integration` | Postgres ve Redis service container'larına karşı `pnpm --filter @kurul/api test:e2e`                                                                          |
 | Build                  | `build`            | `pnpm build`                                                                                                                                                  |
+| OpenAPI drift'i        | `build`            | `pnpm openapi:check` — `apps/api/openapi.json`, derlenmiş uygulamadan üretilen belgeyle byte byte aynı değilse düşer                                          |
 | Imaj build + tarama    | `image-scan`       | Yayımlanan üç imaj, ardından her birine Trivy (aşağıya bakın)                                                                                                 |
 | Compose + Caddy parse  | `compose-config`   | İki compose dosyası üzerinde, `demo` profile'ı ile ve profile'sız `docker compose config -q`, ve `docker/Caddyfile` üzerinde `caddy validate` (aşağıya bakın) |
 | **Kapı** (zorunlu)     | `ci-ok`            | Yalnızca `lint`, `test-unit`, `test-integration`, `build`, `image-scan` ve `compose-config` job'larının tümü başarıysa geçer (atlanmamış/iptal edilmemiş)     |
@@ -505,7 +531,7 @@ Kapının üstündeki altı job paralel koşar ve hiçbiri bir diğerine `needs`
 container'ı olan tek job `test-integration`'dır, bu yüzden `test-unit` içindeki unit suite'ler
 container çekmeden başlar. Pipeline'ın duvar saati süresi dolayısıyla job'ların toplamı değil
 en uzun job'ıdır ve
-[ROADMAP.md](../ROADMAP.md#hardening-track) içindeki
+[ROADMAP.md](../ROADMAP.md#sağlamlaştırma-hattı) içindeki
 OPS-10 satırına karşı izlenir.
 
 **Merge öncesi tüm adımlar geçmelidir.** `main` ve `develop` üzerindeki branch koruması iki
@@ -528,8 +554,8 @@ koruma sağlar:
    bırakıyordu. `CodeQL` bilinçli olarak istisna: kendi takvimi olan ayrı bir workflow,
    dolayısıyla bu kapının altına toplamak onu gizlerdi.
 
-CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a yapılan pull
-request'lerde çalışır. Bkz.
+CI, herhangi bir branch'a yapılan pull request'lerde (`pull_request.branches: ['**']`) ve
+`develop` ile `main`'e yapılan push'larda çalışır. Bkz.
 [git-strategy.md](git-strategy.md#pull-request-süreci).
 
 Workflow dosyası: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
@@ -541,6 +567,11 @@ ile `kurul-web`) build eder ve her birini Trivy'den geçirir. **Düzeltmesi mevc
 HIGH ya da CRITICAL zafiyet o bacağı, dolayısıyla kapıyı düşürür. Bu job'dan önce bir
 Dockerfile'ı build eden tek şey tag push'unda koşan `release-images.yml` idi; yani bozuk bir
 imajı ya da zafiyetli bir base'i, işi onu yayımlamak olan workflow keşfediyordu.
+
+Web bacağı ayrıca imajı bir kez ayağa kaldırıp `/`'e istek atar (`curl -f`, en fazla 20 kez
+dener): `next build` bir çalışma zamanı bağımlılığını izlemeden çıkarırsa imaj build edilir ama
+`node server.js`'te `MODULE_NOT_FOUND` ile ölür; build ve Trivy bunu göremez. Yalnız web
+bacağında, çünkü API imajının cevap verebilmesi için Postgres ve Redis gerekir.
 
 Bilinmeye değer iki tercih:
 
@@ -581,22 +612,27 @@ Browser suite'i kendi workflow'unda,
 [`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml), farklı bir takvimle ve
 **`ci-ok` kapısının dışında** koşar:
 
-| Tetikleyici                            | Neden                                                                                                                |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Her gece 03:00 UTC, `develop` üzerinde | Günün merge'lerinin indiği dal: onları içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken |
-| `main`'e açılan pull request'ler       | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez                 |
-| `workflow_dispatch`                    | İhtiyaç oldukça                                                                                                      |
+| Tetikleyici                            | Neden                                                                                                                      |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Her gece 03:00 UTC, `develop` üzerinde | Günün merge'lerinin indiği dal: onları içerecek kadar geç, kırmızı bir koşu sabah sizi beklesin diye yeterince erken       |
+| `main`'e açılan pull request'ler       | Onları yalnızca `release/*` ve `hotfix/*` açar, yani tam olarak sürüm adayı ve hotfix başına bir kez (tek istisna aşağıda) |
+| `workflow_dispatch`                    | İhtiyaç oldukça                                                                                                            |
+
+Tek istisna: Dependabot'un güvenlik güncelleme PR'ları `target-branch` ayarını yok sayıp
+`main`'e açılır ve bu suite'i de tetikler; bunlar `main`'e merge edilmez
+([git-strategy.md](git-strategy.md#dependabot-ve-main)).
 
 GitHub zamanlanmış bir workflow'u varsayılan dalda çalıştırır; bu yüzden takvim workflow'un
 `main`'deki kopyasında tanımlıdır ve checkout adımı `develop`'ı çeker; koşu logu gerçekte hangi
 dalın ve commit'in koştuğunu yazar. `main` bilerek her gece test edilmez: sürümler arasında
 değişmez ve onu değiştiren pull request'ler suite'i zaten koşturur.
 
-Zorunlu kontrol olmaması bilinçli. Bu suite Postgres, Redis, Mailpit, derlenmiş bir API ve
-production web build'i başlatır, sonra Chromium'u hepsinin içinden geçirir — projenin en
-değerli sinyali ve aynı zamanda hakkında yanılması en pahalı olanı. Zorunlu kapıya bağlansa,
-tek bir altyapı aksaklığı depodaki her merge'i bloke ederdi. Hızlı ve zorunlu döngü `ci.yml`
-olarak kalır; buradaki bir hata "dur" değil, "sürümden önce buna bak" demektir.
+Zorunlu kontrol olmaması bilinçli. Bu suite Postgres, Mailpit, derlenmiş bir API ve
+production web build'i başlatır (Redis'siz koşar, bkz. [İzolasyon](#i̇zolasyon)), sonra
+Chromium'u hepsinin içinden geçirir — projenin en değerli sinyali ve aynı zamanda hakkında
+yanılması en pahalı olanı. Zorunlu kapıya bağlansa, tek bir altyapı aksaklığı depodaki her
+merge'i bloke ederdi. Hızlı ve zorunlu döngü `ci.yml` olarak kalır; buradaki bir hata "dur"
+değil, "sürümden önce buna bak" demektir.
 
 Suite'in tamamı `e2e/playwright.config.ts` içindeki `globalTimeout` ile **beş dakikayla**
 sınırlıdır — temenni değil, zorlanan bir sınır, ve CI'da olduğu kadar yerelde de geçerli;
@@ -610,4 +646,4 @@ edilebilir kılan da budur.
 - [coding-standards.md](coding-standards.md) — testlerin varsaydığı kod konvansiyonları
 - [api-conventions.md](api-conventions.md) — assert edilecek status kodları ve hata şekilleri
 - [git-strategy.md](git-strategy.md) — PR gereksinimleri
-- [../../ROADMAP.md](../ROADMAP.md) — MVP durumu ve Beyond MVP
+- [../ROADMAP.md](../ROADMAP.md) — MVP durumu ve MVP ötesi

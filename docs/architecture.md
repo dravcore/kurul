@@ -75,7 +75,12 @@ kurul/
 ├── packages/
 │   ├── shared-types/      # api ve web tarafından paylaşılan TS tipleri / DTO'lar
 │   └── auth-access/       # Better Auth organization AC rolleri (api + web)
+├── e2e/                   # Playwright tarayıcı suite'i (stack'i sürer; kendi workspace paketi)
+├── docker/                # Caddyfile: Docker dağıtımının reverse proxy'si
+├── scripts/               # backup, bootstrap ve bakım betikleri
+├── docs/                  # dokümantasyon
 ├── pnpm-workspace.yaml
+├── prisma.config.ts
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
 └── .env.example
@@ -88,71 +93,82 @@ Canlı yerleşim bu doküman ve repo ağacıdır. Teknoloji seçimleri:
 
 ## 3. apps/api — modül haritası
 
-Her modül aynı iskelete sahip: `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/`.
+Bir özellik modülünün olağan iskeleti `*.module.ts`, `*.controller.ts`, `*.service.ts` ve
+`dto/`'dur. Bunun bir kısmını taşımayan modüller var: `locale`, `mail`, `plan` ve `telemetry`
+yalnız modül ve servistir, `realtime` controller yerine bir gateway taşır, `retention` tek bir
+worker'dır; `activation`, `config`, `health` ve `import`'un `dto/`'su, `config`'in servisi yoktur.
 Modül sınırları en baştan temiz tutulur — process rollerini daha sonra bölme imkânı tamamen
 buna bağlıdır.
 
 **Mevcut vs planlanan:** Faz 9 sonrası `realtime` dahil özellik modülleri uygulanmıştır.
 Aşağıdaki tabloyu modül haritası olarak okuyun.
 
-| Modül          | Sorumluluk                                                                                                                                                                                                                                                                                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi                                                                                                                                                                                                                                                                                                  |
-| `account`      | Hesap silme: `DELETE /me` ve instance operatörünün `DELETE /instance/users/:userId`'i; ikisi de `User` satırını silmek yerine anonimleştiren tek bir motorun üzerinde ([ADR 0026](decisions/0026-account-deletion-anonymisation.md))                                                                                                                                  |
-| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                                                                                                                                                                                                                                                                                                             |
-| `board`        | Board ve column yönetimi, column sıralaması                                                                                                                                                                                                                                                                                                                           |
-| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama                                                                                                                                                                                                                                                                                             |
-| `label`        | Board-scoped label'lar ve task-label ataması                                                                                                                                                                                                                                                                                                                          |
-| `comment`      | Task yorumları                                                                                                                                                                                                                                                                                                                                                        |
-| `attachment`   | Task'taki dosya ve bağlantılar: yükleme, listeleme, indirme akışı, silme                                                                                                                                                                                                                                                                                              |
-| `import`       | Tek yönlü Trello board import'u: export'u oku, satırları planla, bir kez yaz                                                                                                                                                                                                                                                                                          |
-| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)                                                                                                                                                                                                                                                                                                         |
-| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                                                                                                                                                                                                                                                                                                              |
-| `notification` | Bildirim dağıtımı, Redis destekli kuyruk; `NotificationMailer` her kaydedilen satır için commit'ten sonra `mail` üzerinden bir e-posta gönderir, alıcı kapatmadıysa                                                                                                                                                                                                   |
-| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                                                                                                                                                                        |
-| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok                                                                                                                                                                                                                                                                                              |
-| `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar                                                                                                                                                                                                                                                                                             |
-| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler                                                                                                                                                                                                                                                                                                   |
-| `config`       | `GET /config` — UI'ın dallandığı yetenek bayrakları (`mailEnabled`, `attachmentsEnabled`, `demo`), kimlik doğrulamasız                                                                                                                                                                                                                                                |
-| `activation`   | Instance'a özel aktivasyon hunisi ve North Star; mevcut satırlardan istek anında hesaplanır, yalnız `INSTANCE_ADMIN_EMAILS` (bu hesapların e-postaları doğrulanmışsa) okuyabilir ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                                                                                               |
-| `telemetry`    | Opt-in, varsayılan kapalı açılış ping'i; `TELEMETRY_ENABLED` ve `TELEMETRY_ENDPOINT` birlikte tanımlı değilse hiçbir şey göndermez ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                                                                                                                                             |
-| `health`       | Canlılık probe'u (`GET /health`) ve hazırlık probe'u (`GET /health/ready` — DB ve Redis'i yoklar, teşhis gövdesiyle `503` döner); ikisi de kimlik doğrulamasız                                                                                                                                                                                                        |
-| `plan`         | Instance ve workspace'in dayattığı her tavan için tek çözümleyici: koltuk, board, workspace, hesap ve ek dosya byte kotaları. Ayarlanmamış olan sınırsızdır ve hiçbir sayma sorgusu çalıştırmaz; `Workspace.planLimits` (JSON) instance anahtarını anahtar bazında ezer, faturalamanın bir planı yazdığı yer de burasıdır ([ADR 0032](decisions/0032-plan-limits.md)) |
-| `token`        | Personal access token'lar: üretme, listeleme ve iptal (`POST/GET/DELETE /workspaces/:id/tokens`), depoda hash'li, `SessionAuthGuard` tarafından session cookie'nin yanındaki ikinci kimlik doğrulama yolu olarak çözülür ([api-conventions.md](api-conventions.md#kimlik-doğrulama))                                                                                  |
+| Modül          | Sorumluluk                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`         | Better Auth entegrasyonu, session yönetimi, request user çözümlemesi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `account`      | Hesap silme: `DELETE /me` ve instance operatörünün `DELETE /instance/users/:userId`'i; ikisi de `User` satırını silmek yerine anonimleştiren tek bir motorun üzerinde ([ADR 0026](decisions/0026-account-deletion-anonymisation.md))                                                                                                                                                                                                                                                                                                                |
+| `workspace`    | Workspace CRUD, üyelik, davetler, rol'ler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `board`        | Board ve column yönetimi, column sıralaması                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `task`         | Task CRUD, column'lar arası taşıma, fractional-index ile yeniden sıralama                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `label`        | Board-scoped label'lar ve task-label ataması                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `comment`      | Task yorumları                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `attachment`   | Task'taki dosya ve bağlantılar: yükleme, listeleme, indirme akışı, silme                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `import`       | Tek yönlü Trello board import'u: export'u oku, satırları planla, bir kez yaz                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `activity`     | Yalnızca-ekleme (append-only) aktivite log'u (`payload` Json)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `dashboard`    | Grafikleri besleyen agregasyon sorguları                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `notification` | Bildirim dağıtımı: atama ve mention satırları tetikleyen isteğin transaction'ında yazılır, due-soon satırlarını Redis'e bağlı tek parça olan 15 dakikalık BullMQ taraması yazar; `NotificationMailer` her kaydedilen satır için commit'ten sonra `mail` üzerinden bir e-posta gönderir, alıcı kapatmadıysa (atama ve mention e-postaları isteğin içinde beklenerek gider)                                                                                                                                                                           |
+| `realtime`     | Socket.io gateway + `@socket.io/redis-adapter`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `retention`    | Gecelik veri saklama süpürmesi; controller yok, dışa açılan provider yok                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `mail`         | SMTP gönderimi (`nodemailer`); yapılandırılmamışsa gönderim yerine loglar                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `locale`       | Saklanan arayüz dili: `User.locale` okur/yazar, istek için çözümler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `config`       | `GET /config` — UI'ın dallandığı yetenek belgesi (`mailEnabled`, `attachmentsEnabled`, `signUpEnabled`, `demo`, `planLimits`); oturum ister, rol istemez                                                                                                                                                                                                                                                                                                                                                                                            |
+| `activation`   | Instance'a özel aktivasyon hunisi ve North Star; mevcut satırlardan istek anında hesaplanır, yalnız `INSTANCE_ADMIN_EMAILS` (bu hesapların e-postaları doğrulanmışsa) okuyabilir ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                                                                                                                                                                                                                                                                             |
+| `telemetry`    | Opt-in, varsayılan kapalı açılış ping'i; `TELEMETRY_ENABLED` ve `TELEMETRY_ENDPOINT` birlikte tanımlı değilse hiçbir şey göndermez ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                                                                                                                                                                                                                                                                                                                           |
+| `health`       | Canlılık probe'u (`GET /health`) ve hazırlık probe'u (`GET /health/ready` — DB ve Redis'i yoklar, teşhis gövdesiyle `503` döner); ikisi de kimlik doğrulamasız                                                                                                                                                                                                                                                                                                                                                                                      |
+| `plan`         | Instance ve workspace'in dayattığı her tavan için tek çözümleyici: koltuk, board, workspace, hesap ve ek dosya byte kotaları. Sayı tavanları ayarlanmadıkça sınırsızdır ve hiçbir sayma sorgusu çalıştırmaz; byte kotalarının ise varsayılanı vardır (workspace başına 2 GiB, instance geneli 20 GiB; `0` sınırsız demektir, [ADR 0027](decisions/0027-attachment-quotas.md)); `Workspace.planLimits` (JSON) instance anahtarını anahtar bazında ezer, faturalamanın bir planı yazdığı yer de burasıdır ([ADR 0032](decisions/0032-plan-limits.md)) |
+| `token`        | Personal access token'lar: üretme, listeleme ve iptal (`POST/GET/DELETE /workspaces/:id/tokens`), depoda hash'li, `SessionAuthGuard` tarafından session cookie'nin yanındaki ikinci kimlik doğrulama yolu olarak çözülür ([api-conventions.md](api-conventions.md#kimlik-doğrulama))                                                                                                                                                                                                                                                                |
 
-Cross-cutting altyapı. Her birinin bir `*.module.ts`'i yok, hiçbirinin controller'ı ya da `dto/`'su
-yok: her biri kendine özgü, daha küçük bir şekildir.
+Cross-cutting altyapı. Bunların hepsinin bir `*.module.ts`'i yok (`prisma` ve `storage`'ın var,
+`common`, `openapi` ve `demo`'nun yok), hiçbirinin controller'ı ya da `dto/`'su yok: her biri
+kendine özgü, daha küçük bir şekildir.
 
 | Modül     | Sorumluluk                                                                                                                                                                                                                                                                                                                                                                   |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `common`  | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping (bugün guard ile; request-scoped Prisma Client Extensions ertelendi)                                                                                                                                                                                                           |
+| `common`  | Guard'lar, exception filter'lar, decorator'lar, paylaşılan Nest bootstrap — workspace scoping (`WorkspaceGuard` üyeliği çözer, `workspaceId` koşulunu servis sorguları ekler; request-scoped Prisma Client Extensions ertelendi)                                                                                                                                             |
 | `prisma`  | Paylaşılan `pg` pool + Nest `PrismaService`; Better Auth aynı pool'u kullanır                                                                                                                                                                                                                                                                                                |
 | `storage` | `StorageBackend` port'u ve tek uygulaması olan yerel disk. `mail` örnek alınmıştır — özelliği etkinleştiren şey `STORAGE_PATH`'in tanımlı olmasıdır ve çağıranlar backend'in kimliği üzerinden değil, yetenek üzerinden dallanır ([ADR 0022](decisions/0022-attachment-storage.md))                                                                                          |
 | `openapi` | OpenAPI dokümanını derlenmiş uygulamadan kurar, `API_DOCS_ENABLED` arkasında `/docs` ve `/openapi.json` üzerinden sunar ve commit'lenmiş `apps/api/openapi.json`'a karşı `pnpm openapi:check` drift kapısını besler. Sürümü `apps/api/package.json`'dan gelir, böylece doküman ile sürüm çelişemez. Kendine ait bir `*.module.ts`'i yok, doğrudan Nest bootstrap'ına takılır |
-| `demo`    | Herkese açık demo anahtarı: `DEMO_MODE` ve yayınladığı takvim, demonun reddettiği iki eylemin guard'ı ve `demo` compose profile'ının API imajından döngüyle çalıştırdığı sil-ve-yeniden-doldur betiği `dist/demo/reset.js`                                                                                                                                                   |
+| `demo`    | Herkese açık demo anahtarı: `DEMO_MODE` ve yayınladığı takvim, demonun reddettiği üç eylemin (hesap silme, workspace silme, parola değiştirme) guard'ı (parola değiştirme Better Auth mount'unda reddedilir) ve `demo` compose profile'ının API imajından döngüyle çalıştırdığı sil-ve-yeniden-doldur betiği `dist/demo/reset.js`                                            |
 
-Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, asla tersi değil.
+Bağımlılık yönü: özellik modülleri `common` ve `prisma`'ya bağımlıdır, tersi kural olarak yoktur.
+Bilinen üç istisna: global `SessionAuthGuard` (`common/guards/session-auth.guard.ts`) `auth` ve
+`token`'a, paylaşılan bootstrap (`common/configure-app.ts`) Better Auth mount'una,
+`WorkspaceRoles` decorator'ı (`common/decorators/workspace-roles.decorator.ts`) `openapi`
+şemalarına bağlıdır.
 `realtime`, domain event'lerinin tüketicisidir, domain logic'in yaşadığı bir yer değil —
 böylece iş kurallarını beraberinde sürüklemeden kendi process rolüne çıkarılabilir.
 
 **Zamanlanmış işler.** İki tane; ikisi de `REDIS_URL` üzerinde BullMQ job scheduler'ı, ikisi de
 sahibi olan modülden kaydedilir ve sınırlı bir beklemeyle `onApplicationShutdown`'da kapatılır
-(`api/src/common/close-worker.ts`); böylece hâlâ süren bir koşu, konteyneri durdurma süresinin
+(`apps/api/src/common/close-worker.ts`); böylece hâlâ süren bir koşu, konteyneri durdurma süresinin
 ötesinde açık tutamaz ([§9.1](#91-kapanış-sırası-fazı-nest-seçer-havuzun-sahibi-tek-modüldür)).
-`notification/due-soon.worker.ts` yaklaşan due date'leri 15 dakikada bir tarar ve yalnızca
-INSERT üretir. `retention/cleanup.worker.ts` saklama penceresini aşmış satırları günde bir kez
+`notification/due-soon.worker.ts` yaklaşan due date'leri 15 dakikada bir tarar; veritabanına
+yalnızca INSERT yazar, ardından alıcılara realtime sinyal yollar ve (SMTP varsa) e-posta
+gönderir. `retention/cleanup.worker.ts` saklama penceresini aşmış satırları günde bir kez
 siler ([ADR 0020](decisions/0020-data-retention.md)). `REDIS_URL` boşsa ikisi de başlamaz; bu,
-ilki için desteklenen tek-instance yapılandırması, ikincisi için kapatılmış bir saklama
-politikasıdır. İkisi de [§8](#8-runtime-evrimi)'in 2. aşamasında ayrılan `worker` rolüdür;
-API'de bir isteğin dışında koşan başka hiçbir şey yok.
+ilki için due-soon hatırlatmalarının hiç üretilmediği desteklenen bir tek-instance
+yapılandırması, ikincisi için kapatılmış bir saklama politikasıdır. İkisi de
+[§8](#8-runtime-evrimi)'in 2. aşamasında ayrılan `worker` rolüdür; API'de bir isteğin dışında
+koşan başka bir iş yok, tek istisna açılışta bir kez ve yalnız opt-in ile giden telemetri
+ping'idir (`telemetry/telemetry.service.ts`).
 
 **`import`, diğer bütün yazma modüllerinin tersi bir biçimde kurulmuş, bilinçli olarak.** Bütün
 karar verme işi iki saf fonksiyonda: ham JSON'u bu kodun anladığı bir şekle daraltan bir okuyucu
 (`trello-export.ts`) ve onu yazılacak tam satırlara artı reddettiklerinin raporuna çeviren bir
 planlayıcı (`trello-import-planner.ts`). İkisi de veritabanına dokunmaz. Servis sonra içinde hiç
 dal olmayan **tek** bir transaction açar: ona ulaşan her satırın yazılabilir olduğu zaten
-bilinmektedir. Board'u atomik, kapsamını kısmi yapan şey budur; bozuk bir export'un `400`'e mal
-olup hiçbir şey yazmamasının sebebi de. Modül **tek bir tablo ve tek bir kolon eklemiyor** —
+bilinmektedir. Kapsamı kısmi olsa da board'u atomik yapan şey budur; bozuk bir export'un `400`'e
+mal olup hiçbir şey yazmamasının sebebi de. Modül **tek bir tablo ve tek bir kolon eklemiyor** —
 import, `Board`, `Column`, `Task`, `Label`, `Checklist`, `ChecklistItem` ve `Attachment`'ı zaten
 oldukları hâlleriyle kullanıyor — ve `attachment`'ınkini paylaşmak yerine kendi `MulterModule`'ünü
 taşıyor, çünkü iki tavan farklı kaynakları ölçüyor ve import hiç bayt saklamadığı için
@@ -160,9 +176,12 @@ taşıyor, çünkü iki tavan farklı kaynakları ölçüyor ve import hiç bayt
 ([ADR 0025](decisions/0025-trello-import-mapping.md)).
 
 `retention`, `notification` içinde bir provider yerine kendi modülüdür: tasarım gereği modül ve
-tenant sınırlarının ötesinde silen tek bileşen o — `Session`, `Verification`, `Notification` ve
-`Activity` üç ayrı modüle ve hiçbir workspace'e ait değil. Aynı zamanda §7'nin tek onaylı
-istisnasıdır: arkasında çağıran olmadığı için izole edilecek bir şey yok. Bkz. ADR.
+tenant sınırlarının ötesinde, çağıran olmadan silen tek bileşen o — `Session`, `Verification`,
+`Notification`, `Activity`, `UsagePing` ve `WorkspaceInvitation` tablolarından ve
+[ADR 0022](decisions/0022-attachment-storage.md)'nin yetim dosya taramasıyla diskten siler; bu
+tablolar farklı modüllere aittir ve süpürme hiçbir workspace'e göre scope'lanmaz. Aynı zamanda
+§7'nin onaylı istisnalarından biridir: arkasında çağıran olmadığı için izole edilecek bir şey yok.
+Bkz. ADR.
 
 `locale`, `common/` altında bir yardımcı değil bir modüldür: hem `auth` hem `board` ona ihtiyaç
 duyar ve sınır kuralı, birbirlerine değil modüle bağımlı olmalarını söyler. API'nin sahip olduğu
@@ -189,17 +208,23 @@ kolonlarla ve etiketsiz tohumlanır, yani şablonlardan önceki davranışla.
 ```
 apps/web/
 ├── app/
-│   ├── (auth)/            # login, register, invite — kimliksiz kabuk
+│   ├── (auth)/            # login, register, invite, verify-email, forgot-password, reset-password — kimliksiz kabuk
 │   ├── (app)/             # kimlikli kabuk: sidebar + workspace switcher
+│   │   ├── error.tsx      # kimlikli route'ların hata sınırı; sidebar ve zil yerinde kalır
 │   │   ├── dashboard/
 │   │   ├── notifications/
 │   │   ├── settings/
+│   │   │   ├── members/
+│   │   │   └── account/delete/
 │   │   ├── workspaces/new/
 │   │   └── board/[boardId]/
+│   │       └── task/[taskId]/ # panel açık derin bağlantı (bildirim e-postalarının linki)
+│   ├── error.tsx          # kök hata sınırı (oturumsuz route'lar dahil)
+│   ├── not-found.tsx
 │   └── layout.tsx
 ├── components/
 │   ├── layout/            # AppShell, Topbar, WorkspaceProvider, AppSidebar, SancakRail
-│   ├── auth/              # paylaşılan auth form primitive'leri
+│   ├── auth/              # auth ekranlarının view'ları (LoginView, RegisterView, InviteAcceptView, VerifyEmailView, ForgotPasswordView, ResetPasswordView) ve paylaşılan AuthFormField
 │   ├── common/            # ConfirmDialog, FormDialog, InlineRename, SubmitError (board/task/settings arasında paylaşılan)
 │   ├── brand/             # DamgaMark ve diğer marka işaretleri
 │   ├── ui/                # shadcn/ui primitive'leri (Faz 3'te landed)
@@ -210,12 +235,13 @@ apps/web/
 │   └── settings/          # WorkspaceSettings, MembersSettings, TokenSettings, AccountSettings, LanguageSettings, NotificationSettings, ActivationFunnel
 ├── i18n/                  # next-intl request config + locale çözümleme zinciri
 ├── messages/              # en.json, tr.json — UI metni, locale başına tek düz dosya
-└── lib/
-    ├── api.ts             # typed REST client
-    ├── use-api-resource.ts # okuma primitive'i: tek abort, tek loading, tek error
-    ├── socket.ts          # Socket.io client (board realtime)
-    ├── board-permissions.ts
-    └── auth.ts            # Better Auth client (`@kurul/auth-access`)
+├── lib/
+│   ├── api.ts             # typed REST client
+│   ├── use-api-resource.ts # okuma primitive'i: tek abort, tek loading, tek error
+│   ├── socket.ts          # sekme başına tek Socket.io client (board ve bildirim odaları)
+│   ├── board-permissions.ts
+│   └── auth.ts            # Better Auth client (`@kurul/auth-access`)
+└── proxy.ts               # oturum yoklaması + istek başına CSP nonce
 ```
 
 İki route group layout ağacını böler: `(auth)` sade bir kabuk render eder, `(app)` workspace
@@ -228,12 +254,16 @@ session cookie'sini `/auth/get-session` ile doğrular ve aynı geçişte istek b
 typed bir `fetch` sarmalayıcısı) ve `lib/use-api-resource.ts` üzerinden geçer; ikincisi tek bir
 değerin bir kez gelmesini modeller: tek abort, tek loading bayrağı, tek error ve invalidation'ın
 tamamı olarak fetcher'ın kimliği. Yazmalar, dokundukları state'in sahibi olan hook'un içinde düz
-`api.*` çağrılarıdır ve her biri kendi optimistic güncellemesini ve geri almasını yazar. Socket
-payload'ları id taşır ([ADR 0005](decisions/0005-realtime-socketio.md)), yani değişen bir satır
-event'ten birleştirilmek yerine yeniden çekilir; client'ın bir entity cache'ine bu yüzden ihtiyacı
-yok. Board etkileşimi `@dnd-kit` kullanır; doğruluk kaynağı sunucudur: optimistic bir taşıma hem
-API yanıtına hem de gelen socket event'lerine karşı uzlaştırılır. `BoardView` bütünü tek konulu
-küçük hook'lardan birleştirir (`useBoardData` arkasında `useBoardCaches`, `useBoardFetch`,
+`api.*` çağrılarıdır. Çoğu sunucunun yanıtından sonra uygulanır; optimistic ön-yazım isteğe
+bağlıdır ve bugün üç yerde vardır (task taşıma, panelde başlık/açıklama kaydı, checklist tik'i),
+her biri kendi geri almasını yazar ([ADR 0029](decisions/0029-client-data-layer.md) kural 3).
+Socket payload'ları çoğunlukla yalnız id taşır ([ADR 0005](decisions/0005-realtime-socketio.md)):
+oluşturulan ya da güncellenen bir task event'ten birleştirilmek yerine yeniden çekilir, silinen
+task yerel listeden düşülür, column değişikliği column listesini yeniden çeker; tek istisna
+`task:moved`'dır, payload `columnId` ve `position` da taşır ve client bunları doğrudan yerel satıra
+yazar. Client'ın bir entity cache'ine bu yüzden ihtiyacı yok. Board etkileşimi `@dnd-kit` kullanır;
+doğruluk kaynağı sunucudur: optimistic bir taşıma hem API yanıtına hem de gelen socket
+event'lerine karşı uzlaştırılır. `BoardView` bütünü tek konulu küçük hook'lardan birleştirir (`useBoardData` arkasında `useBoardCaches`, `useBoardFetch`,
 `useBoardLoad` ve `useBoardPanelTask`; ardından `useBoardMutations`, `useBoardRealtime`,
 `useBoardTaskDnd`, `useBoardDialogs`) ve board ölçeğindeki yeni bir yüzeyin izlediği desen bu
 birleştirmedir. [ADR 0029](decisions/0029-client-data-layer.md) katmanın neden elle yazıldığını,
@@ -249,10 +279,11 @@ ve i18n middleware'i yok**, çünkü burada indekslenen bir şey yok ve bir dil 
 Ayarlar → Dil ekranı tercihi yazıyor; bugün `en` ve `tr` sevkediliyor
 (`SUPPORTED_LOCALES = ['en', 'tr']`, `messages/tr.json` `en.json` ile eşit), yani üçüncü bir
 dil eklemek component ağacını yeniden yazmak değil, bir `SUPPORTED_LOCALES` girdisi artı bir
-`messages/<tag>.json` — ve doldurulana kadar derlenmeyecek `Record<Locale, …>` seed, şablon
-kataloğu ve mail metni (`board-defaults.ts`, `board-templates.ts`, `mail-templates.ts`) —
-eklemektir. Ek UI dil paketleri için bkz.
-[ROADMAP.md — MVP ötesi](../ROADMAP.md#beyond-mvp).
+`messages/<tag>.json` — ve doldurulana kadar derlenmeyecek iki `Record<Locale, …>` tablosu
+(`board-templates.ts`'teki `TEMPLATE_COPY`, tohum column ve etiket adları dahil, `board-defaults.ts`
+bu kataloğu çağırır; ve `mail-templates.ts`'teki `MAIL_COPY`) artı her katalogda yeni dilin seçici
+adı (`app.settings.language.options.<tag>`; `messages/catalog.test.ts` ister) — eklemektir. Ek UI
+dil paketleri için bkz. [ROADMAP.md — MVP ötesi](../ROADMAP.md#mvp-ötesi).
 
 ---
 
@@ -262,12 +293,15 @@ Telden geçen her şey için tek doğruluk kaynağı. Backend ve frontend aynı 
 import eder, böylece aralarındaki bir sapma runtime sürprizi yerine bir type hatasına
 dönüşür.
 
-| İçerik          | Örnekler                                                                           |
-| --------------- | ---------------------------------------------------------------------------------- |
-| Enum'lar        | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`) |
-| DTO tipleri     | Workspace, Board, Column, Task, Label, Invitation request/response şekilleri       |
-| Sayfalama       | `CursorPage<T>` (varsayılan liste şekli; anahtar `id`)                             |
-| Socket kontratı | Event isim sabitleri ve payload tipleri                                            |
+| İçerik               | Örnekler                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| Enum'lar             | `Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot` (`slot-1`…`slot-8`) |
+| DTO tipleri          | Workspace, Board, Column, Task, Label, Invitation request/response şekilleri       |
+| Sayfalama            | `CursorPage<T>` (varsayılan liste şekli; anahtar `id`)                             |
+| Socket kontratı      | Event isim sabitleri ve payload tipleri                                            |
+| Locale               | `SUPPORTED_LOCALES`, `matchLocale`, `negotiateLocale`                              |
+| Aktivite ve bildirim | `ActivityType`, `AUDIT_ACTIVITY_TYPES`, `NotificationType`                         |
+| Aktivasyon           | `ActivationEvent`, `ActivationFunnelDto`, `TelemetryPingPayload`                   |
 
 Better Auth organization **rol / access-control** tanımları `@kurul/auth-access` içindedir
 (bu pakette değil); böylece api ve web tek AC tanımını paylaşır, types paketine Better Auth
@@ -283,11 +317,11 @@ client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'
 
 | Model                 | Anahtar alanlar                                                                                                                                      | Notlar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`                | `id`, `email`, `name`, `avatarUrl`, `locale`, `emailNotifications`, `createdAt`                                                                      | Kimlik, Better Auth'a ait; `locale` nullable'dır ve boşken "tarayıcıyı izle" demektir; `emailNotifications` varsayılan `true`'dur ve bildirim e-postasının tek anahtarıdır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `User`                | `id`, `email`, `name`, `emailVerified`, `avatarUrl`, `locale`, `emailNotifications`, `deletedAt`, `createdAt`                                        | Kimlik, Better Auth'a ait; `locale` nullable'dır ve boşken "tarayıcıyı izle" demektir; `emailNotifications` varsayılan `true`'dur ve bildirim e-postasının tek anahtarıdır; `deletedAt` doluysa hesap anonimleştirilmiştir: satır silinmez ve yazarlık referansları onu göstermeye devam eder ([ADR 0026](decisions/0026-account-deletion-anonymisation.md))                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `Workspace`           | `id`, `name`, `slug`, `planLimits` (Json, nullable), `createdAt`                                                                                     | Tenant kökü, her şey buna bağlanır. `planLimits`, instance genelindeki tavanları anahtar bazında ezer ve bir plan yazılana kadar her workspace'te null'dır ([ADR 0032](decisions/0032-plan-limits.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `WorkspaceMember`     | `id`, `workspaceId`, `userId`, `role`                                                                                                                | Join tablosu; `role` yetkileri belirler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `Board`               | `id`, `workspaceId`, `name`, `description`, `createdAt`                                                                                              | Board'lar bir workspace'e ait                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `Column`              | `id`, `boardId`, `name`, `position`, `color`, `category`                                                                                             | `position` bir board içindeki column'ları sıralar. `category` (`UNSTARTED` / `STARTED` / `COMPLETED`), metriklerin ve dashboard'un anahtar aldığı semantik aşamadır; asla görünen ad değil ([ADR 0019](decisions/0019-column-category.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `Column`              | `id`, `boardId`, `name`, `position`, `color`, `category`                                                                                             | `position` bir board içindeki column'ları sıralar. `category` (`BACKLOG` / `UNSTARTED` / `STARTED` / `COMPLETED` / `CANCELED`; varsayılan `UNSTARTED`, bugün yalnızca `COMPLETED` okunur), metriklerin ve dashboard'un anahtar aldığı semantik aşamadır; asla görünen ad değil ([ADR 0019](decisions/0019-column-category.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `Task`                | `id`, `boardId`, `columnId`, `title`, `description`, `priority`, `position`, `dueDate`, `estimatedMinutes`, `createdById`, `createdAt`, `updatedAt`  | Çekirdek entity — kurallar aşağıda                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `TaskAssignee`        | `id`, `taskId`, `userId`                                                                                                                             | Join tablosu; task başına birden fazla atanan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `Label`               | `id`, `boardId`, `name`, `color`                                                                                                                     | Board-scoped. `color`, bir design-token slot adı saklar (`slot-1`…`slot-8`), temaya göre resolve edilir — ham bir hex değil; bkz. [design.md](design.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -296,14 +330,14 @@ client hâlâ Nest ve Better Auth adapter için `apps/api/src/generated/prisma`'
 | `Checklist`           | `id`, `taskId`, `title`, `position`, `createdAt`, `updatedAt`                                                                                        | Kart başına çoklu liste — bir task'ın sıfır veya daha fazla checklist'i olabilir ([ADR 0023](decisions/0023-checklist-data-model.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `ChecklistItem`       | `id`, `checklistId`, `content`, `isDone`, `position`, `createdAt`, `updatedAt`                                                                       | Tamamlanma yüzdesi, hangi checklist item'ları yüklenmişse onlardan okuma anında hesaplanır, asla saklanmaz ([ADR 0023](decisions/0023-checklist-data-model.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `Attachment`          | `id`, `taskId`, `uploadedById`, `kind`, `filename`, `storageKey` (nullable), `mimeType` (nullable), `size` (nullable), `url` (nullable), `createdAt` | `kind` bir `AttachmentKind` — `FILE` ya da `LINK` — ve nullable kolonlardan hangilerinin dolu olduğunu söyleyen odur; asla onlardan türetilmez. `FILE` `storageKey`/`mimeType`/`size` taşır, `LINK` `url` taşır. `mimeType` magic byte'ların söylediğidir, asla istemcinin beyan ettiği değil. `storageKey` sunucuda satırın kendi `id`'sinden türetilir, böylece kullanıcının dosya adı hiçbir yola girmeyen bir görüntüleme alanı olarak kalır. `position` yok: attachment'lar kullanıcı tarafından sıralanmaz ve `id`'ye göre en yeni önce döner ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Dosya başına boyut limitinin üstüne workspace başına ve instance başına bayt kotaları da uygulanır ([ADR 0027](decisions/0027-attachment-quotas.md)) |
-| `Activity`            | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                            | Yalnızca-ekleme log. `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu. `taskId` için `ON DELETE SET NULL` — geçmiş task silinince korunur.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `Notification`        | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | Uygulama içi bildirimler (atama, mention, due-soon); SMTP yapılandırılmışsa ve alıcı kapatmadıysa her biri e-postayla da gider. Activity yazımlarından fan-out; due-soon BullMQ ile `REDIS_URL` üzerinde. Bkz. MVP'nin Faz 8'i ([ROADMAP.md](../ROADMAP.md#shipped-mvp-summary))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `Activity`            | `id`, `workspaceId`, `taskId` (nullable), `userId`, `type`, `payload` (Json), `createdAt`                                                            | Yalnızca-ekleme log; iki istisnası var: saklama süpürmesi eski satırları siler ([ADR 0020](decisions/0020-data-retention.md)) ve hesap silme `payload.targetName`'i "Deleted user" ile yeniden yazar ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)). `workspaceId` zorunlu ve `taskId` opsiyonel, böylece task'ı olmayan workspace seviyesi olaylar — "board yeniden adlandırıldı", "üye katıldı" — temsil edilebilir; Faz 8 feed'inin vaat ettiği de bu. `taskId` için `ON DELETE SET NULL` — geçmiş task silinince korunur.                                                                                                                                                                                                                                 |
+| `Notification`        | `id`, `workspaceId`, `userId`, `type`, `taskId` (nullable), `activityId` (nullable), `payload` (Json), `readAt` (nullable), `createdAt`              | Uygulama içi bildirimler (atama, mention, due-soon); SMTP yapılandırılmışsa ve alıcı kapatmadıysa her biri e-postayla da gider. Activity yazımlarından fan-out; due-soon BullMQ ile `REDIS_URL` üzerinde. Bkz. MVP'nin Faz 8'i ([ROADMAP.md](../ROADMAP.md#sevkedilen-mvp-özet))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `PersonalAccessToken` | `id`, `workspaceId`, `userId`, `name`, `prefix`, `tokenHash`, `lastUsedAt`, `expiresAt`, `revokedAt`, `createdAt`                                    | Tarayıcı olmayan bir kimlik bilgisi; tek bir workspace'e scope'lu ve tek bir kullanıcıya ait. Yalnızca `tokenHash` saklanır, token asla; `prefix`, sahibinin artık okuyamadığı bir token'ı listede tanıyabilmesi için var. İptal, silme değil bir zaman damgasıdır, böylece iptal edilmiş token denetim izini korur. Sahibinin canlı rolüyle davranır, bu yüzden rol düşürme bir sonraki istekte etkili olur ([api-conventions.md](api-conventions.md#kimlik-doğrulama))                                                                                                                                                                                                                                                                                                      |
 | `UsagePing`           | `id`, `userId`, `workspaceId`, `kind`, `day`, `createdAt`                                                                                            | Kullanıcı, workspace, tür ve UTC gün başına tek satır; `ON CONFLICT` ile hiçbir şey yapmayan bir yazım, dolayısıyla maliyeti tek bir index yoklaması. Yalnızca instance içi aktivasyon hunisini besler; `day` kaydedilen gün, `createdAt` satırın yazıldığı andır ve retention süpürmesi ikincisine göre filtreler ([ADR 0021](decisions/0021-activation-funnel-and-opt-in-telemetry.md))                                                                                                                                                                                                                                                                                                                                                                                     |
 
 Davetler `WorkspaceInvitation` olarak saklanır; Better Auth organization plugin
-tablolarından Kurul adlarına map edilir. Ürün dili ve REST path'leri
-**Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+tablolarından Kurul adlarına map edilir (plugin'in `schema` yapılandırmasıyla). Ürün dili ve
+REST path'leri **Workspace** kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
 
 Better Auth ayrıca auth altyapısı tablolarını `Session`, `Account` ve `Verification` yönetir; bunlar plugin tarafından yönetilir ve yukarıdaki domain model tablosundan bilerek hariç tutulur.
 
@@ -323,6 +357,10 @@ değiştiren veya **işi yok eden** her eylemi kaydeder.
 | `member.removed` · `member.left` · `member.role_changed`            | `WorkspaceMemberService`     | hedef kullanıcı, hedef adı, `previousRole`, `newRole`, aktörün rolü  |
 | `invitation.created` · `invitation.revoked` · `invitation.accepted` | `WorkspaceInvitationService` | davet id, verilen rol, `emailDelivery` — **davet edilen adres asla** |
 | `task.deleted`                                                      | `TaskService`                | task id, başlık, board ve column                                     |
+| `attachment.deleted`                                                | `AttachmentService`          | attachment id, `kind`, `filename`                                    |
+| `board.imported`                                                    | `TrelloImportService`        | board id, ad, `source`, `imported` sayıları, `skippedTotal`          |
+| `token.created` · `token.revoked`                                   | `TokenService`               | token id, ad, `prefix`; `token.created` ayrıca `expiresAt`           |
+| `account.deleted`                                                   | `AccountDeletionService`     | `targetUserId`, `previousRole`, `initiatedBy` (aşağıda)              |
 
 Dört özellik bilinçlidir:
 
@@ -331,10 +369,13 @@ Dört özellik bilinçlidir:
   kaydı, bir hesabın ne yaptığını yeniden kuran biri tarafından geriye doğru okunur ve ilginç
   olan yarısı genellikle kaybolmuş değerdir: "board'u Archive olarak yeniden adlandırdı" neyin
   gizlendiğini söylemez.
-- **Silmeler, silme işlemini yapan transaction'ın içinde ve silmeden önce kaydedilir.** Silinen
-  bir board'un veya etiketin adı sonrasında başka hiçbir yerde yoktur. Oluşturmalar bunun
-  yerine insert'ten hemen sonra kaydedilebilir; çünkü kaybolan bir oluşturma kaydında bile
-  oluşturulan satırın kendisi kanıt olarak ayakta kalır.
+- **Board, column, label ve task silmeleri, silme işlemini yapan transaction'ın içinde ve
+  silmeden önce kaydedilir.** Silinen bir board'un veya etiketin adı sonrasında başka hiçbir yerde
+  yoktur. Better Auth'un sahip olduğu satırlarda (`member.removed`, `member.left`,
+  `invitation.revoked`) bu mümkün değildir: kayıt plugin çağrısından sonra ve transaction dışında
+  yazılır; bir çökme kaydı düşürebilir ama reddedilmiş bir değişikliği asla kaydetmez.
+  Oluşturmalar bunun yerine insert'ten hemen sonra kaydedilebilir; çünkü kaybolan bir oluşturma
+  kaydında bile oluşturulan satırın kendisi kanıt olarak ayakta kalır.
 - **Bir payload, bir şeyi kimin okuyabileceğini asla genişletmez.**
   `GET /workspaces/:workspaceId/activities` `@WorkspaceScoped()`'tur ve `payload`'ı olduğu gibi
   döner; yani oraya yazılan her şey GUEST dahil her üye tarafından okunabilir. Bekleyen davet
@@ -362,7 +403,7 @@ her workspace'e bir `account.deleted` aktivite satırı yazar — `targetUserId`
 adıyla anmamalı. Aktörü, silmeyi emretmiş olabilecek instance operatörü değil, ayrılan
 kullanıcıdır; böylece bir operatörün kimliği bir tenant'ın feed'inde belirmez. Operatöre düşen
 yarı JSON log'a gider:
-`{ ts, level: 'warn', event: 'account.deleted', userId, initiatedBy, actorId, …sayılar }` —
+`{ ts, level: 'warn', event: 'account.deleted', userId, initiatedBy, actorId, durationMs, …sayılar }` —
 saklama süpürmesinin yalnızca sayı log'lamasıyla aynı sebeple adres ve ad taşımaz. Bir kararın
 sildiği workspace hiç aktivite satırı almaz (`workspace.deleted`'ın aynı cascade problemi) ve
 `deletedWithAccount` taşıyan bir `workspace.deleted` satırı üretir.
@@ -389,21 +430,31 @@ Bunlar pazarlığa açık değildir; ayrıca `CLAUDE.md` içinde de kayıtlıdı
 Join tabloları kullanım kolaylığı için bir surrogate `id` taşır, ama veritabanının
 zorladığı şey doğal anahtardır:
 
-| Kısıt                                             | Neyi önler                                                                                                                                                                                                                                     |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WorkspaceMember @@unique([workspaceId, userId])` | Bir kullanıcının aynı workspace'te iki rol taşıması                                                                                                                                                                                            |
-| `TaskAssignee @@unique([taskId, userId])`         | Aynı atananın listelerde, bildirimlerde ve activity payload'larında iki kez sayılması                                                                                                                                                          |
-| `TaskLabel @@unique([taskId, labelId])`           | Aynı label'ın iki kez eklenmesi                                                                                                                                                                                                                |
-| `Column @@unique([boardId, id])`                  | Yalnızca `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var — "bir task'ın column'u kendi board'undadır" kuralını uygulama-seviyesi bir kontrol yerine bir veritabanı garantisi yapar |
+| Kısıt                                                     | Neyi önler                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WorkspaceMember @@unique([workspaceId, userId])`         | Bir kullanıcının aynı workspace'te iki rol taşıması                                                                                                                                                                                                                     |
+| `TaskAssignee @@unique([taskId, userId])`                 | Aynı atananın listelerde, bildirimlerde ve activity payload'larında iki kez sayılması                                                                                                                                                                                   |
+| `TaskLabel @@unique([taskId, labelId])`                   | Aynı label'ın iki kez eklenmesi                                                                                                                                                                                                                                         |
+| `Column @@unique([boardId, id])`                          | Yalnızca `Task`'ın bir composite foreign key `(boardId, columnId) → Column(boardId, id)` deklare edebilmesi için var — "bir task'ın column'u kendi board'undadır" kuralını uygulama-seviyesi bir kontrol yerine bir veritabanı garantisi yapar                          |
+| `Notification_due_soon_unread_uidx` (kısmi unique indeks) | Aynı kullanıcı ve task için birden fazla okunmamış `due_soon` bildirimi (due-soon taramasının `skipDuplicates`'ı buna yaslanır); şemada görünmez, yalnız migration'da yaşar ve bir testle korunur ([ADR 0017](decisions/0017-partial-indexes-outside-prisma-schema.md)) |
+| `Attachment_kind_fields_check` (CHECK)                    | `kind` ile uyuşmayan kolon doluluğu: bir `FILE` satırı `storageKey`/`mimeType`/`size` taşır ve `url` taşımaz, bir `LINK` tersini; şemada görünmez, yalnız migration'da yaşar ve bir testle korunur ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md))  |
 
 **Silmeler kasıtlı olarak cascade eder.** Prisma'nın zorunlu bir ilişki üzerindeki
 varsayılan aksiyonu `Restrict`'tir, dolayısıyla burayı belirtmeden bırakmak board
 silmenin _başarısız olması_ anlamına gelir — iki varsayılandan daha şaşırtıcı olanı.
-Sahiplenilen çocuklar cascade eder
-(`Workspace → Board → Column, Task → Comment, Activity, TaskAssignee, TaskLabel`).
-`User`'a referanslar cascade etmez: yazarından daha uzun yaşayan bir yorum veya
-activity satırı doğrudur, ve bir kullanıcıyı silmek sessiz bir silinme değil,
-kasıtlı bir operasyon olmalıdır.
+Sahiplenilen çocuklar cascade eder:
+`Workspace → WorkspaceMember, WorkspaceInvitation, PersonalAccessToken, Board, Activity, Notification, UsagePing`;
+`Board → Column, Task, Label`; `Column → Task`;
+`Task → Comment, TaskAssignee, TaskLabel, Checklist, Attachment, Notification`;
+`Checklist → ChecklistItem`; `Label → TaskLabel`. İki ilişki `SET NULL`'dur: `Activity.taskId` task
+silinince, `Notification.activityId` bir aktivite satırı silinince (örneğin saklama süpürmesi eski
+aktiviteleri silerken) boşalır; böylece geçmiş satırlar ve bildirimler kalır. Kimlik satırları
+(`Session`, `Account`, `PersonalAccessToken`) ile `Notification` ve `UsagePing` kullanıcıyla
+birlikte cascade eder. `User`'a yazarlık ve üyelik referansları — `WorkspaceMember`,
+`WorkspaceInvitation.inviter`, `Task.createdBy`, `TaskAssignee`, `Comment`, `Attachment.uploadedBy`,
+`Activity` — ise `Restrict`'tir: yazarından daha uzun yaşayan bir yorum veya activity satırı
+doğrudur; bu yüzden hesap silme `User` satırını silmez, anonimleştirir ve `deletedAt`'i damgalar
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
 
 ---
 
@@ -427,17 +478,26 @@ yeni bir handler, guard'ın örtemeyeceği bir bug'dır:
 5. Workspace/org **mutation**'ları yalnızca Nest `/workspaces/*` üzerinden gider — Better Auth
    `/auth/organization/*` mutation HTTP'si firewall'lanır; Nest politikası bypass edilemez.
 
-**Tek bir istisna, yalnızca bir tane:** saklama süpürmesi (`retention/cleanup.worker.ts`,
-[ADR 0020](decisions/0020-data-retention.md)) `workspaceId` yüklemi olmadan, global siler.
-Yukarıdaki kural bir _çağıranın_ başka bir tenant'ın satırlarına uzanmasını engellemek için
-var; süpürmenin çağıranı, oturumu ve route'u yok — ve `Verification`'ın scope'lanacak bir
-tenant kolonu zaten hiç yok. Bir istekten erişilebilen her şey scope'lu kalır.
+**İstisnalar bilinçli ve sayılıdır:** `workspaceId` yüklemi olmadan çalışan sorgular yalnız tek bir
+tenant'a ait olmayan işlerde vardır. Saklama süpürmesi (`retention/cleanup.worker.ts`,
+[ADR 0020](decisions/0020-data-retention.md)) ve due-soon taraması
+(`notification/due-soon.worker.ts`) arkalarında çağıran olmadan bütün workspace'lerde koşar;
+hesap silme (`account/account-deletion.service.ts`) bir kullanıcının bütün workspace'lerdeki
+satırlarına `userId` ile uzanır; `GET /workspaces` (`workspace/workspace.service.ts`'te
+`listForUser`) oturumdaki kullanıcının üyeliklerini `userId` ile okur, çünkü kullanıcı
+tenant'larını bununla keşfeder; `InstanceAdminGuard` arkasındaki aktivasyon hunisi ile plan
+tavanlarının instance sayımları ve bayt kotası yalnız toplam sayı üretir; workspace slug
+tekilliği ve `tokenHash` ile token çözümü de bir tenant'a bağlanmadan önce çalışır. Yukarıdaki
+kural bir _çağıranın_ başka bir tenant'ın satırlarına uzanmasını engellemek için var; süpürmenin
+çağıranı, oturumu ve route'u yok — ve `Verification`'ın scope'lanacak bir tenant kolonu zaten hiç
+yok. Bir istekten bir tenant'ın satırlarına uzanan her sorgu scope'lu kalır.
 
 Üyelik `role`'ü (`OWNER`/`ADMIN`/`MEMBER`/`GUEST`) yetki kararları için aynı katmanda kontrol
-edilir. Scaffold controller'lar `/workspaces/:workspaceId/...` kullanır; handler'lar
-geldiğinde `WorkspaceGuard` `params.workspaceId` okuyabilir. Kod incelemesi, workspace
-scoping'i olmayan her sorguyu blocking sayar
-([coding-standards.md](coding-standards.md#multi-tenant-izolasyonu)).
+edilir. Workspace kapsamlı her route `/workspaces/:workspaceId/...` altındadır ve
+`WorkspaceGuard` `params.workspaceId`'yi okur; üyelik kapısı olmayan tek workspace route'u davet
+kabulüdür (`POST /workspaces/:workspaceId/invitations/:invitationId/accept`: davet edilen kişi
+kabul edene kadar üye değildir). Kod incelemesi, workspace scoping'i olmayan her sorguyu blocking
+sayar ([coding-standards.md](coding-standards.md#multi-tenant-izolasyonu)).
 
 ---
 
@@ -446,14 +506,14 @@ scoping'i olmayan her sorguyu blocking sayar
 Aşamalı yol bilinçli bir tercihtir: mikroservis kapısı açık kalır, bedeli sadece baştan
 ödenmez.
 
-| Aşama         | Tetikleyici              | Runtime                                                                                                       |
-| ------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| MVP           | Şimdi                    | Tek bir NestJS process (`api`) + `web` + `postgres` + `redis`                                                 |
-| Rolleri bölme | Trafik artışı            | Aynı kod tabanı, aynı image, farklı roller: `api`, `ws` (Socket.io), `worker` (kuyruk) — Compose'da üç servis |
-| Ayırma        | Kanıtlanmış bir darboğaz | _Sadece_ o modülü kendi servisine çıkar                                                                       |
+| Aşama         | Tetikleyici              | Runtime                                                                                                                                                                                                           |
+| ------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MVP           | Şimdi                    | Tek bir NestJS process (`api`) + `web` + `postgres` + `redis`; yardımcı servisler: `migrate` (tek seferlik migration), `backup` (`pg_dump` sidecar'ı), `proxy` (Caddy) ve yalnız `demo` profile'ında `demo-reset` |
+| Rolleri bölme | Trafik artışı            | Aynı kod tabanı, aynı image, farklı roller: `api`, `ws` (Socket.io), `worker` (kuyruk) — Compose'da üç servis                                                                                                     |
+| Ayırma        | Kanıtlanmış bir darboğaz | _Sadece_ o modülü kendi servisine çıkar                                                                                                                                                                           |
 
-2. aşamaya ulaşmak mimari bir değişiklik gerektirmez — temiz NestJS modül sınırları tek ön
-   koşuldur. 3. aşamaya yalnızca kanıt karşısında girilir, asla spekülasyonla değil.
+Aşama 2'ye ulaşmak mimari bir değişiklik gerektirmez — temiz NestJS modül sınırları tek ön
+koşuldur. Aşama 3'e yalnızca kanıt karşısında girilir, asla spekülasyonla değil.
 
 ---
 
@@ -486,11 +546,13 @@ bırakılmış koşunun bir sonraki sorgusu, yarı yıkılmış bir uygulamaya k
 verir.
 
 **Nest, iki provider arasında hâlâ hiçbir sıra garantisi vermez**; ne iki global arasında ne de
-aynı modülün iki provider'ı arasında. `PrismaService` ve Better Auth'un kendi `PrismaClient`'ı,
-süreç genelinde tek bir `pg` havuzundan ödünç alır (`api/src/prisma/database.ts`) ve ikisi de
-global modüllerde yaşar. İki istemci, tek havuz: hangisi önce yıkılırsa havuzu diğerinin altından
-çekip alırdı ve hayatta kalanın `$disconnect()` çağrısı her SIGTERM'de `Called end on pool more
-than once` / `cannot use a pool after calling end` fırlatırdı.
+aynı modülün iki provider'ı arasında. `PrismaService`, Better Auth'un kendi `PrismaClient`'ı ve
+e-posta dilini adres üzerinden okuyan tembel bir üçüncü istemci
+(`apps/api/src/mail/stored-locale.ts`), süreç genelinde tek bir `pg` havuzundan ödünç alır
+(`apps/api/src/prisma/database.ts`); ilk ikisi global modüllerde yaşar, üçüncüsü Nest DI dışındadır.
+Üç istemci, tek havuz: hangisi önce yıkılırsa havuzu diğerlerinin altından çekip alırdı ve hayatta
+kalanların `$disconnect()` çağrısı her SIGTERM'de `Called end on pool more than once` /
+`cannot use a pool after calling end` fırlatırdı.
 
 Çözüm şu: hiçbir modül kendi istemcisini kapatmaz. Havuzun yaşam döngüsünün tek sahibi
 `database.ts`'tir: istemciler `registerPoolConsumer` ile bir disconnect callback'i kaydeder ve
@@ -500,7 +562,7 @@ aynı promise'i bekler — dolayısıyla Nest'in hangi hook'u önce koşturduğu
 
 | Takas                                        | Kabul edilme nedeni                                                                                                                                                                                            |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tek paylaşılan havuz                         | İki havuz, hiçbir fayda sağlamadan Postgres `max_connections`'a karşı bağlantı sayısını ikiye katlardı — iki istemci de aynı veritabanına aynı kimlik bilgileriyle konuşuyor                                   |
+| Tek paylaşılan havuz                         | Birden fazla havuz, hiçbir fayda sağlamadan Postgres `max_connections`'a karşı bağlantı sayısını havuz sayısıyla çarpardı — istemcilerin hepsi aynı veritabanına aynı kimlik bilgileriyle konuşuyor            |
 | Yaşam döngüsünün modül durumunda tutulması   | Alternatif, iki modülün de inject ettiği bir Nest provider'ı; aynı "tek sahip" kuralını ifade etmek için daha fazla bağlantı demek. Better Auth'un istemcisi zaten modül kapsamında, Nest DI dışında kuruluyor |
 | Başarısız bir disconnect kapanışı engellemez | `closeSharedDatabase`, `Promise.allSettled` kullanır — kapanamayan tek bir istemci havuzu açık bırakıp süreci sonlandırma süresinin ötesine takamamalı                                                         |
 
@@ -512,7 +574,7 @@ kapatmıştır. Paylaşılan havuzdan ödünç alan her yeni istemci `registerPo
 ### 9.2 Oturum iptali 60 saniyeye kadar gecikir; rol iptali gecikmez
 
 Better Auth, `session.cookieCache` ile `maxAge: 60` olarak yapılandırılmıştır
-(`api/src/auth/auth.ts`). İmzalı oturum çerezi, süresi dolana kadar veritabanına gidilmeden
+(`apps/api/src/auth/auth.ts`). İmzalı oturum çerezi, süresi dolana kadar veritabanına gidilmeden
 kabul edilir; bu da kimlik doğrulamalı her istekten bir sorgu düşürür.
 
 Bedeli net: **bir oturumu iptal etmek 60 saniyeye kadar geç etkili olur.** Session satırını
@@ -521,13 +583,15 @@ penceresi kapanana dek kabul edilmeye devam eder.
 
 Etkilenmeyenler, etkilenenlerden daha önemlidir:
 
-| Değişiklik                                      | Ne zaman etkili olur                                                                         |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Oturum iptal edildi / başka yerde çıkış yapıldı | 60 saniyeye kadar geç — çerez, önbelleği dolana kadar kabul edilir                           |
-| Rol değişti (ör. ADMIN → GUEST)                 | **Anında** — `WorkspaceGuard`, her istekte `WorkspaceMember`'ı veritabanından okur           |
-| Workspace'ten çıkarıldı                         | **Anında** — aynı guard, aynı okuma; üyelik satırı yok ve istek 404 döner                    |
-| E-posta doğrulandı                              | Anında — `autoSignInAfterVerification` çerezi yeniden yazar, o seçenek zaten bunun için açık |
-| E-postayla gelen bağlantıdan parola sıfırlandı  | 60 saniyeye kadar geç: `revokeSessionsOnPasswordReset` hesabın bütün oturumlarını siler      |
+| Değişiklik                                      | Ne zaman etkili olur                                                                                                                                                                                     |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Oturum iptal edildi / başka yerde çıkış yapıldı | 60 saniyeye kadar geç — çerez, önbelleği dolana kadar kabul edilir                                                                                                                                       |
+| Rol değişti (ör. ADMIN → GUEST)                 | **Anında** — `WorkspaceGuard`, her istekte `WorkspaceMember`'ı veritabanından okur                                                                                                                       |
+| Workspace'ten çıkarıldı                         | **Anında** — aynı guard, aynı okuma; üyelik satırı yok ve istek 404 döner                                                                                                                                |
+| E-posta doğrulandı                              | Anında — `autoSignInAfterVerification` çerezi yeniden yazar, o seçenek zaten bunun için açık                                                                                                             |
+| E-postayla gelen bağlantıdan parola sıfırlandı  | 60 saniyeye kadar geç: `revokeSessionsOnPasswordReset` hesabın bütün oturumlarını siler                                                                                                                  |
+| Personal access token iptal edildi              | **Anında** — `SessionAuthGuard` token'ı her istekte veritabanından çözer                                                                                                                                 |
+| Hesap silindi                                   | Çerez 60 saniyeye kadar kabul edilir, ama üyelik kalmadığı için workspace route'ları `404`, `POST /workspaces` ve `PATCH /me` `401` döner ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)) |
 
 Yani bu pencere bir _yetkilendirme_ penceresi değil, bir _oturum kimliği_ penceresidir. Rolü
 düşürülmüş veya atılmış bir üye 60 saniye boyunca eski rolüyle işlem yapamaz; yalnızca çıkış
@@ -545,43 +609,44 @@ istek başına bir veritabanı okumasıdır.
 
 Bu seçimlerin her birinin arkasındaki gerekçe bir ADR olarak kayıtlıdır:
 
-| ADR                                                                                                          | Konu                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)                           | Monorepo + modüler monolit                                                                                                      |
-| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                                   | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                                                                                  |
-| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                                 | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts                                                                         |
-| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                                             | Organization plugin'i ile Better Auth (→ Workspace)                                                                             |
-| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                                           | Socket.io + Redis adapter                                                                                                       |
-| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                                       | Sıralama için Float position'lar                                                                                                |
-| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                                     | AGPL-3.0                                                                                                                        |
-| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                               | Git Flow + SemVer                                                                                                               |
-| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)                             | Board ve column Nest `@Roles` matrisi                                                                                           |
-| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                                             | Task Nest `@Roles` matrisi                                                                                                      |
-| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md)               | Label ve task-metadata Nest `@Roles` matrisi                                                                                    |
-| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)                           | Yorum silme: yazarlık veya OWNER/ADMIN                                                                                          |
-| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)                   | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde                                                               |
-| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                                         | Çift lisanslama + katkıda bulunan lisans sözleşmesi (yerini 0028 aldı)                                                          |
-| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                           | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi (yerini 0028 aldı)                                                 |
-| [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                     | Prisma `P2003`, `422`'ye değil `409`'a eşlenir                                                                                  |
-| [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md)   | Kısmi indeksler migration'larda yaşar, testlerle korunur                                                                        |
-| [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                   | Locale zinciri, `[locale]` yönlendirmesi yok, API yalnız seed/mail                                                              |
-| [`0019-column-category.md`](decisions/0019-column-category.md)                                               | Kolon tamamlanmışlığı bir kategoridir, ad değil                                                                                 |
-| [`0020-data-retention.md`](decisions/0020-data-retention.md)                                                 | Tablo başına saklama pencereleri, gecelik bir süpürmeyle uygulanır                                                              |
-| [`0021-activation-funnel-and-opt-in-telemetry.md`](decisions/0021-activation-funnel-and-opt-in-telemetry.md) | Aktivasyon Hunisi Instance İçinde, Telemetri Opt-In ve Varsayılan Kapalı                                                        |
-| [`0022-attachment-storage.md`](decisions/0022-attachment-storage.md)                                         | Dosya Eki Depolaması: Bir Port Arkasında Yerel Disk, API Origin'inden Servis                                                    |
-| [`0023-checklist-data-model.md`](decisions/0023-checklist-data-model.md)                                     | Checklist Veri Modeli: Kart Başına Çoklu Liste, Türetilmiş İlerleme, Yeni Realtime Event Yok                                    |
-| [`0024-attachment-kinds-and-serving-policy.md`](decisions/0024-attachment-kinds-and-serving-policy.md)       | Dosya Eki Tipleri ve Servis Politikası: FILE ya da LINK, İki Katmanda Tek Boyut Sayısı, Yalnız Görsellerde Inline               |
-| [`0025-trello-import-mapping.md`](decisions/0025-trello-import-mapping.md)                                   | Trello Import Eşlemesi: Hiçbir Şey Tahmin Edilmez, Gelmeyen Her Şey Sayılır                                                     |
-| [`0026-account-deletion-anonymisation.md`](decisions/0026-account-deletion-anonymisation.md)                 | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor                            |
-| [`0027-attachment-quotas.md`](decisions/0027-attachment-quotas.md)                                           | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                                         |
-| [`0028-open-contributions-hosted-service.md`](decisions/0028-open-contributions-hosted-service.md)           | AGPL-3.0 Altında Açık Katkılar, CLA Yok; Gelir Yalnızca Barındırılan Bir Servisten                                              |
-| [`0029-client-data-layer.md`](decisions/0029-client-data-layer.md)                                           | İstemci Veri Katmanı El Yapımı Kalıyor; Geçiş Tetikleyicisi Üçüncü Generation Sayacı                                            |
-| [`0030-typescript-7-hold.md`](decisions/0030-typescript-7-hold.md)                                           | typescript-eslint ve ts-jest 7'yi Destekleyene Kadar TypeScript 5.x Hattında Kalıyor                                            |
-| [`0031-api-versioning.md`](decisions/0031-api-versioning.md)                                                 | API Sürümleme: 1.0'da Gelen Bir `/v1` URI Öneki ve İşlerin Sevkedilme Sırası                                                    |
-| [`0032-plan-limits.md`](decisions/0032-plan-limits.md)                                                       | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Yapılandırılana Kadar Sınırsız                                                  |
-| [`0033-webhook-delivery-and-failure-policy.md`](decisions/0033-webhook-delivery-and-failure-policy.md)       | Webhook Teslimi ve Hata Politikası: Workspace'in Sahibi Olduğu Endpoint'ler, Bir Outbox Satırı ve İmzalı Zarf (Önerildi)        |
-| [`0034-hosted-billing-and-plan-assignment.md`](decisions/0034-hosted-billing-and-plan-assignment.md)         | Barındırılan Faturalama ve Plan Ataması: Merchant of Record, Tek Abonelik Satırı ve Yapılandırılmadığında Hiçbir Şey (Önerildi) |
-| [`0035-inline-task-composer.md`](decisions/0035-inline-task-composer.md)                                     | Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok                                 |
+| ADR                                                                                                          | Konu                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`0001-monorepo-modular-monolith.md`](decisions/0001-monorepo-modular-monolith.md)                           | Monorepo + modüler monolit                                                                                                                      |
+| [`0002-backend-stack.md`](decisions/0002-backend-stack.md)                                                   | NestJS 11 + Prisma 7 + PostgreSQL 18 + Redis 8                                                                                                  |
+| [`0003-frontend-stack.md`](decisions/0003-frontend-stack.md)                                                 | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts                                                                                         |
+| [`0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md)                                             | Organization plugin'i ile Better Auth (→ Workspace)                                                                                             |
+| [`0005-realtime-socketio.md`](decisions/0005-realtime-socketio.md)                                           | Socket.io + Redis adapter                                                                                                                       |
+| [`0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)                                       | Sıralama için Float position'lar                                                                                                                |
+| [`0007-license-agpl.md`](decisions/0007-license-agpl.md)                                                     | AGPL-3.0                                                                                                                                        |
+| [`0008-git-flow-semver.md`](decisions/0008-git-flow-semver.md)                                               | Git Flow + SemVer                                                                                                                               |
+| [`0009-board-column-permissions.md`](decisions/0009-board-column-permissions.md)                             | Board ve column Nest `@Roles` matrisi                                                                                                           |
+| [`0010-task-permissions.md`](decisions/0010-task-permissions.md)                                             | Task Nest `@Roles` matrisi                                                                                                                      |
+| [`0011-label-task-metadata-permissions.md`](decisions/0011-label-task-metadata-permissions.md)               | Label ve task-metadata Nest `@Roles` matrisi                                                                                                    |
+| [`0012-comment-delete-authorship.md`](decisions/0012-comment-delete-authorship.md)                           | Yorum silme: yazarlık veya OWNER/ADMIN                                                                                                          |
+| [`0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md)                   | SMTP mail gönderimi, e-posta doğrulaması yalnızca davet kabulünde                                                                               |
+| [`0014-dual-licensing-cla.md`](decisions/0014-dual-licensing-cla.md)                                         | Çift lisanslama + katkıda bulunan lisans sözleşmesi (yerini 0028 aldı)                                                                          |
+| [`0015-no-external-contributions.md`](decisions/0015-no-external-contributions.md)                           | Dış katkı yok; CLA yürürlükte değil, hukuk masrafı ertelendi (yerini 0028 aldı)                                                                 |
+| [`0016-foreign-key-violation-status.md`](decisions/0016-foreign-key-violation-status.md)                     | Prisma `P2003`, `422`'ye değil `409`'a eşlenir                                                                                                  |
+| [`0017-partial-indexes-outside-prisma-schema.md`](decisions/0017-partial-indexes-outside-prisma-schema.md)   | Kısmi indeksler migration'larda yaşar, testlerle korunur                                                                                        |
+| [`0018-localization-strategy.md`](decisions/0018-localization-strategy.md)                                   | Locale zinciri, `[locale]` yönlendirmesi yok, API yalnız seed/mail                                                                              |
+| [`0019-column-category.md`](decisions/0019-column-category.md)                                               | Kolon tamamlanmışlığı bir kategoridir, ad değil                                                                                                 |
+| [`0020-data-retention.md`](decisions/0020-data-retention.md)                                                 | Tablo başına saklama pencereleri, gecelik bir süpürmeyle uygulanır                                                                              |
+| [`0021-activation-funnel-and-opt-in-telemetry.md`](decisions/0021-activation-funnel-and-opt-in-telemetry.md) | Aktivasyon Hunisi Instance İçinde, Telemetri Opt-In ve Varsayılan Kapalı                                                                        |
+| [`0022-attachment-storage.md`](decisions/0022-attachment-storage.md)                                         | Dosya Eki Depolaması: Bir Port Arkasında Yerel Disk, API Origin'inden Servis                                                                    |
+| [`0023-checklist-data-model.md`](decisions/0023-checklist-data-model.md)                                     | Checklist Veri Modeli: Kart Başına Çoklu Liste, Türetilmiş İlerleme, Yeni Realtime Event Yok                                                    |
+| [`0024-attachment-kinds-and-serving-policy.md`](decisions/0024-attachment-kinds-and-serving-policy.md)       | Dosya Eki Tipleri ve Servis Politikası: FILE ya da LINK, İki Katmanda Tek Boyut Sayısı, Yalnız Görsellerde Inline                               |
+| [`0025-trello-import-mapping.md`](decisions/0025-trello-import-mapping.md)                                   | Trello Import Eşlemesi: Hiçbir Şey Tahmin Edilmez, Gelmeyen Her Şey Sayılır                                                                     |
+| [`0026-account-deletion-anonymisation.md`](decisions/0026-account-deletion-anonymisation.md)                 | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor                                            |
+| [`0027-attachment-quotas.md`](decisions/0027-attachment-quotas.md)                                           | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                                                         |
+| [`0028-open-contributions-hosted-service.md`](decisions/0028-open-contributions-hosted-service.md)           | AGPL-3.0 Altında Açık Katkılar, CLA Yok; Gelir Yalnızca Barındırılan Bir Servisten                                                              |
+| [`0029-client-data-layer.md`](decisions/0029-client-data-layer.md)                                           | İstemci Veri Katmanı El Yapımı Kalıyor; Geçiş Tetikleyicisi Üçüncü Generation Sayacı                                                            |
+| [`0030-typescript-7-hold.md`](decisions/0030-typescript-7-hold.md)                                           | TypeScript, typescript-eslint ve ts-jest 7'yi Destekleyene Kadar 5.x Hattında Kalır                                                             |
+| [`0031-api-versioning.md`](decisions/0031-api-versioning.md)                                                 | API Versiyonlama: 1.0'da Tanıtılan Bir `/v1` URI Öneki ve Şeylerin Gönderilme Sırası                                                            |
+| [`0032-plan-limits.md`](decisions/0032-plan-limits.md)                                                       | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Ayarlanana Kadar Sınırsız                                                                       |
+| [`0033-webhook-delivery-and-failure-policy.md`](decisions/0033-webhook-delivery-and-failure-policy.md)       | Webhook Teslimi ve Hata Politikası: Workspace'e Ait Endpoint'ler, Bir Outbox Satırı ve İmzalı Bir Zarf (Önerildi)                               |
+| [`0034-hosted-billing-and-plan-assignment.md`](decisions/0034-hosted-billing-and-plan-assignment.md)         | Barındırılan Faturalandırma ve Plan Ataması: Bir Merchant of Record, Tek Bir Subscription Satırı ve Yapılandırılmadığında Hiçbir Şey (Önerildi) |
+| [`0035-inline-task-composer.md`](decisions/0035-inline-task-composer.md)                                     | Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok                                                 |
+| [`0036-turkish-only-documentation.md`](decisions/0036-turkish-only-documentation.md)                         | Dokümantasyon Yalnız Türkçe                                                                                                                     |
 
 ---
 
@@ -607,7 +672,10 @@ uygulaması ise script'i gerçekten çalıştıran ve sayfayı çizen tarayıcı
 API'de `Cross-Origin-Resource-Policy`, helmet'in varsayılanı `same-origin` yerine
 `cross-origin`'dir, çünkü web uygulaması onu meşru olarak okuyan ayrı bir origin **olabilir**
 (`WEB_URL`/`NEXT_PUBLIC_API_URL`); bu erişim CORP tarafından değil,
-`configure-app.ts`'teki CORS allowlist'i tarafından kapılanır.
+`configure-app.ts`'teki CORS allowlist'i tarafından kapılanır. Tek istisna ek dosya içeriğidir
+(`GET .../attachments/:attachmentId/content`): o yanıt `Cross-Origin-Resource-Policy: same-origin`
+taşır, çünkü kullanıcıların yüklediği baytları başka bir origin'in gömmesi için bir sebep yok
+(`attachment/attachment-download.service.ts`).
 
 **Docker dağıtımı aynı origin'dedir.** Bir reverse proxy (`docker/Caddyfile`) web uygulamasını
 ve API'yi tek hostname'den sunar — `/auth/*` ve `/api/*` API'ye, geri kalan her şey web

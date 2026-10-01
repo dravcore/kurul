@@ -3,7 +3,7 @@
 Kurul'un her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
 alternatif.
 
-**Pin’ler.** Aşağıdaki major’lar ve ürün seçimleri kalıcı kararlardır. Tam sürümler kayar;
+**Pin'ler.** Aşağıdaki major'lar ve ürün seçimleri kalıcı kararlardır. Tam sürümler kayar;
 bugün neyin kurulu olduğu için kök ve app `package.json` / `pnpm-lock.yaml` kaynağıdır.
 Mimari şekil: [architecture.md](architecture.md).
 
@@ -63,8 +63,9 @@ olurdu.
 Tartışmasız: ClickUp, Linear, Plane, Taiga ve Focalboard'ın hepsi Postgres üzerinde
 oturuyor. JSON kolonları esnek metadata'yı (custom field'lar, aktivite payload'ları)
 karşılarken ilişkisel bütünlük task/board grafiğini karşılıyor. Redis ise tek bir araçla
-dört ihtiyacı karşılıyor: bildirim kuyruğu, session store, rate limiting ve Socket.io
-pub/sub adapter'ı.
+dört ihtiyacı karşılıyor: Socket.io pub/sub adapter'ı, BullMQ kuyrukları (due-soon
+bildirim taraması ve retention temizliği), auth rate limiting sayaçları ve yükleme bütçesi
+sayaçları; session'lar Better Auth'un Prisma adapter'ı üzerinden PostgreSQL'de yaşar.
 
 Her iki versiyon da bilerek sabitlenmiştir. **PostgreSQL 18** mevcut major sürüm; öncekisi
 hâlâ yıllarca destekleniyor, ama v0.1 çıktıktan sonra bir major atlama her self-hoster'a bir
@@ -163,8 +164,8 @@ asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
 
 ### i18n — next-intl
 
-`next-intl`, Faz 1'den beri kurulu — kullanıcıya görünen metinler `useTranslations()` /
-`messages/<locale>.json` üzerinden geçer. Locale çözümü
+`next-intl`, Faz 1'den beri kurulu — kullanıcıya görünen metinler hardcode edilmek yerine
+`useTranslations()` / `messages/<locale>.json` üzerinden geçer. Locale çözümü
 `User.locale → locale cookie → Accept-Language → 'en'`
 ([ADR 0018](decisions/0018-localization-strategy.md)); **Ayarlar → Dil** tercih veya
 “Tarayıcımı izle” seçebilir. İki katalog sevkediliyor, `en` ve `tr`; `messages/catalog.test.ts`,
@@ -173,7 +174,7 @@ kapı. Üçüncü bir dil yeni bir mekanizma istemiyor: bir katalog dosyası, ar
 `Record<Locale, …>` metin tablosunun her birine birer satır (`apps/api/src/mail/mail-templates.ts`
 içindeki `MAIL_COPY` ve `apps/api/src/common/board-templates.ts` içindeki board template
 kataloğu); ikisi de var olana kadar derleme hatası. Eksik olan yalnızca bir çevirmen, satırın
-[MVP ötesi](../ROADMAP.md#beyond-mvp) altında kalma sebebi de bu.
+[MVP ötesi](../ROADMAP.md#mvp-ötesi) altında kalma sebebi de bu.
 
 ### Dosya yükleme — `multer` + `file-type`
 

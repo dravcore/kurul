@@ -16,9 +16,10 @@ durumlar ve metin.
 - [9. Erişilebilirlik](#9-erişilebilirlik)
 - [10. Çapraz referanslar](#10-çapraz-referanslar)
 
-> **Durum.** Aşağıdaki renk, tipografi ve spacing token'ları üründe **doğrulanmıştır**
-> (`apps/web/app/globals.css`). Hâlâ aspirasyonel olan etkileşim kalıpları satır içinde
-> belirtilir; her cümleyi shipped davranış sanmayın.
+> **Durum.** Aşağıdaki renk ve tipografi token'ları üründe **doğrulanmıştır**
+> (`apps/web/app/globals.css`); spacing ölçeği Tailwind'in 4px tabanıdır, `globals.css`'te
+> token olarak tanımlı değildir ve hiçbir test onu denetlemez. Hâlâ aspirasyonel olan etkileşim
+> kalıpları satır içinde belirtilir; her cümleyi shipped davranış sanmayın.
 
 ## 1. Tasarım ilkeleri
 
@@ -36,14 +37,14 @@ durumlar ve metin.
 5. **Durumlar bir ruh hali değil, bir yöndür.** Boş ekranlar bir aksiyona davet eder, hatalar ne
    olduğunu ve sırada ne yapılması gerektiğini söyler, yükleme ekranı yüklenmekte olan şeye
    benzer.
-6. **String'ler bir tasarım malzemesidir.** Metin, spacing gibi tasarlanır, ekranın kullanıcı
-   tarafından yazılır ve ilk günden itibaren i18n katmanı üzerinden sunulur (§7).
+6. **String'ler bir tasarım malzemesidir.** Metin, spacing gibi tasarlanır, ekranın kullanıcıya
+   bakan tarafından yazılır ve ilk günden itibaren i18n katmanı üzerinden sunulur (§7).
 
 ## 2. Kimlik
 
 Kurul, adını toplanıp karar alan ve işi bölüşen heyetten alır — ve v0.2.0'a kadar projeye ilk
-adını veren _kurultay_'dan: boylar toplanır, sancaklar dikilir, meseleler karara bağlanır, iş
-bölüştürülür. Kimlik hâlâ _bu_ dünyadan gelir — sancak, damga, bozkır — jenerik
+adını veren _kurultay_'dan: boyların toplandığı, sancakların dikildiği, meselelerin karara
+bağlandığı büyük meclis. Kimlik hâlâ _bu_ dünyadan gelir — sancak, damga, bozkır — jenerik
 prodüktivite-aracı dilinden değil. Ad kısaldı, görsel dil değişmedi.
 
 **Signature eleman — sancak rail'i:** o an aktif olan neyse onun leading edge'inde 2px'lik bakır
@@ -95,10 +96,10 @@ Her iki güç seviyesinde de iki kural geçerlidir. **Tonlanmış bir zemin üst
 olmaz**: tint'lenmiş bir satır veya drop-target column, anlamını bir dot veya bir ikonda taşır,
 asla tint'in üstüne yatırılmış renkli bir label'da değil (§8, grafik legend'ları için aynı
 kuralı yazar: "metin text token giyer, asla series hue'sunu değil"). Ve **bakır metin
-`--accent` üzerine hiç konmaz**: açık temada orada 4.28:1 ölçülür (§3), tek başına AA'yı
-geçecek bir sayı, ama kural bir taban değil bir yasak olarak yazılıdır, çünkü `--accent`
-chrome'un kendi hover adımıdır ve üstündeki bakır bir link gibi değil, kimliğin mobilyaya
-sızması gibi okunur.
+`--accent` üzerine hiç konmaz**: açık temada orada 4.28:1 ölçülür (§3), yani 4.5:1 metin
+tabanının altında; kural bu yüzden bir taban değil bir yasak olarak yazılıdır, üstelik
+`--accent` chrome'un kendi hover adımıdır ve üstündeki bakır bir link gibi değil, kimliğin
+mobilyaya sızması gibi okunur.
 
 Aynı anda iki tam güç işaret görünüyorsa ve bunlar rail ile o view'ın tek primary action'ı
 değilse, biri yanlıştır.
@@ -212,8 +213,8 @@ doğrudan fallback fontlara düşer.
 Bu ölçeğin tamamı budur, bir Tailwind varsayılanının fark edilmeden dolduracağı bir boşluk
 bırakmaz: `text-sm`, `text-lg`, `text-xs` ve `font-medium` component ağacından tamamen kalktı, ve
 `app/theme-classes.test.ts` bu iddia üzerinde iki ayrı kapı taşıyor. Biri ağaçtaki her `text-`,
-`bg-`, `border-`, `font-` ve `shadow-` class'ını Tailwind üzerinden derleyip hiçbir şey üretmeyen
-birini build'i kırarak yakalıyor: bu bir typo'dur, asla canlı bir Tailwind varsayılanı değil,
+`bg-`, `border-`, `font-`, `shadow-` ve `rounded-` class'ını (test olmayan `.tsx` dosyalarında)
+Tailwind üzerinden derleyip hiçbir şey üretmeyen birini build'i kırarak yakalıyor: bu bir typo'dur, asla canlı bir Tailwind varsayılanı değil,
 çünkü bir varsayılan temiz derlenir ve bu kapıyı sessizce geçerdi. Diğeri, Tailwind'in kendi
 size ve weight skalasını (`text-xs`'ten `text-9xl`'e, `font-thin`'den `font-black`'e) kısa,
 gerekçeli bir istisna listesine karşı isim bazında yasaklıyor, böylece geri dönen bir varsayılan
@@ -266,7 +267,7 @@ göre.
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas                                                                                                                                                                                                                                                                                                                                                                        |
-| Topbar               | 48px sticky — board adı, filter girişi, overflow (presence avatar'ları henüz gelmedi); **768px altında 56px**, ve orada gezinme trigger'ını da taşır                                                                                                                                                                                                                                                                                                                                                                 |
+| Topbar               | 48px sticky — geri oku, board adı, overflow (presence avatar'ları henüz gelmedi); board filtreleri topbar'ın altında ayrı bir araç satırında durur; **768px altında 56px**, ve orada gezinme trigger'ını da taşır                                                                                                                                                                                                                                                                                                    |
 | Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px); 48rem altında bir column 85vw'dir ve strip ona snap eder (mandatory scroll snap), scroll edilecek column'un kaldığı kenara 24px'lik edge mask (`--background`'dan transparent'a) çizilir                                                                                                                                                                                              |
 | Card                 | 8px 12px padding, artı drag grip'i için 32px sağ kanal (768px altında 48px); title bloğu ile meta satırı arasında 6px, meta satırının içindeki sinyaller arasında 8px; yalnızca title **36px**, tipik **56px** (tek meta satırı), clamp'te **76px**: title 2 satırda clamp'lenir, yani hiçbir kart bundan uzun olmaz. İlk üçü seed'deki board üzerinde ölçüldü; clamp değeri ise bunun için kurulan bir kartta ölçüldü: ikinci satıra taşacak kadar uzun bir title ve altında dolu bir meta satırı.                  |
@@ -300,7 +301,12 @@ bu yerleşimi tuttuğu rakam. `pointer: coarse` yerine drawer'ın kullandığı 
 `max-md` — bağlıdır: birbiriyle çelişebilecek iki koşul yerine tüm mobil yerleşimi tek bir
 koşul yönetsin diye. Masaüstünde 360px genişliğinde bir pencerenin 44px hedef alması bir şeye
 mal olmaz. Zemin, çağrı yerlerinde değil `Button` ile `Input` variant'larında ve dropdown item
-sınıflarında yaşar; böylece okunacak tek bir liste vardır. Breakpoint üstündeki ölçüler
+sınıflarında yaşar; böylece okunacak tek bir liste vardır. Bugün beş yer zemini kendi başına
+veriyor: kart (`task-card.tsx`), drag grip'i (`sortable-task-card.tsx`), filtre chip'i
+(`board-filter-chips.tsx`), sidebar satırı (`sidebar-body.tsx`, `touchTargets` prop'uyla) ve
+checkbox label'ları (`notification-settings.tsx`, `notifications-list.tsx`,
+`task-assignees-section.tsx`, `task-labels-section.tsx`, `searchable-picker.tsx`,
+`checklist-item-row.tsx`); kural onlar için de geçerlidir. Breakpoint üstündeki ölçüler
 değişmez. Ve bu **iddia edilmez, ölçülür**: `e2e/tests/mobile-navigation.spec.ts`, 360px'te
 board'daki, drawer'daki ve `/settings/members` ile `/settings/account/delete` üzerindeki her
 button, link, input ve menu item'ını tarar ve iki eksenden
@@ -409,29 +415,29 @@ dışında durur.
 
 ## 5. Etkileşim kalıpları
 
-| Drag and drop | Kural                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lift          | Kart `1.02`'ye scale olur, `1deg` tilt olur, tek drag shadow'u alır; source, aynı yükseklikte bir `--muted` ghost bırakır, böylece board drag ortasında asla reflow olmaz                                                                                                                                                                                                                  |
-| Drop target   | Column içinde dnd-kit'in displacement'ı kart yüksekliğindeki gap'i açar ve 2px'lik bakır rail onun leading edge'ini işaretler; column'lar arasında yalnızca rail insertion noktasını gösterir, hiçbir şey kaymaz. Destination column bir `--signature-subtle` wash alır. Dashed outline yok.                                                                                               |
-| Commit        | Optimistic — kart anında yerine oturur, ardından `PATCH .../tasks/:taskId/position` gelir                                                                                                                                                                                                                                                                                                  |
-| Failure       | Rollback pozisyonu anında geri alır, kart ise 220ms `--ease-in-out` bir oturmayla yerine iner (`translateY` -6px'ten 0'a, opacity 0.5'ten 1'e); bir toast, bir **Try again** (**Tekrar dene**) kontrolüyle ne olduğunu söyler. Optimistic state hiçbir zaman öylece bırakılmaz.                                                                                                            |
-| Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lift yapar, arrow'lar column içinde ve column'lar arasında taşır, `Space` drop yapar, `Esc` cancel eder. Her transition `aria-live="polite"` üzerinden duyurulur: "Dropped _Fix login redirect_ into In Progress." ("_Fix login redirect_, In Progress içine bırakıldı.") Henüz pozisyon ifadesi yok (Hardening track, "Board keyboard follow-ups"). |
-| Autoscroll    | Her iki axis, `@dnd-kit`'in varsayılan threshold'unda (bir piksel bandı değil, scroller'ın bir oranı); `DndContext` kendi `autoScroll`'unu geçmiyor                                                                                                                                                                                                                                        |
+| Drag and drop | Kural                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lift          | Kart `1.02`'ye scale olur, `1deg` tilt olur, tek drag shadow'u alır; source, aynı yükseklikte %40 opaklıkta bir ghost olarak yerinde kalır, böylece board drag ortasında asla reflow olmaz                                                                                                                                                                                                                                                              |
+| Drop target   | Column içinde dnd-kit'in displacement'ı kart yüksekliğindeki gap'i açar ve 2px'lik bakır rail onun leading edge'ini işaretler; column'lar arasında yalnızca rail insertion noktasını gösterir, hiçbir şey kaymaz. Destination column bir `--signature-subtle` wash alır. Dashed outline yok.                                                                                                                                                            |
+| Commit        | Optimistic — kart anında yerine oturur, ardından `PATCH .../tasks/:taskId/position` gelir                                                                                                                                                                                                                                                                                                                                                               |
+| Failure       | Rollback pozisyonu anında geri alır, kart ise 220ms `--ease-in-out` bir oturmayla yerine iner (`translateY` -6px'ten 0'a, opacity 0.5'ten 1'e); bir toast, bir **Try again** (**Tekrar dene**) kontrolüyle ne olduğunu söyler. Optimistic state hiçbir zaman öylece bırakılmaz.                                                                                                                                                                         |
+| Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` ya da `Enter` lift yapar, arrow'lar column içinde ve column'lar arasında taşır, `Space` ya da `Enter` drop yapar, `Esc` cancel eder. Her transition `aria-live="polite"` üzerinden duyurulur: "Dropped _Fix login redirect_ into In Progress." ("_Fix login redirect_, In Progress içine bırakıldı.") Henüz pozisyon ifadesi yok (Sağlamlaştırma hattı, "Faz 6 parity taramasından Board klavye follow-up'ları"). |
+| Autoscroll    | Her iki axis, `@dnd-kit`'in varsayılan threshold'unda (bir piksel bandı değil, scroller'ın bir oranı); `DndContext` kendi `autoScroll`'unu geçmiyor                                                                                                                                                                                                                                                                                                     |
 
-| Realtime değişikliği   | Surfacing (asla bir layout jump)                                                                                                                                                                                                                               |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remote create / update | 1200ms boyunca fade out olan bir `--signature-subtle` background. Hareket yok, size değişimi yok. Yalnızca renk, böylece `prefers-reduced-motion`'dan değişmeden çıkar.                                                                                        |
-| Remote move            | Kart, column'un kendi sortable transition'ı ile hareket eder (dnd-kit'in 200ms varsayılanı); local bir drag sırasında update queue'lanır ve drop'ta uygulanır                                                                                                  |
-| Remote delete          | **Henüz gelmedi:** kart gider ve gap aynı sortable transition ile kapanır. Olması gereken iki beat, 160ms'te 0'a fade ve ardından 160ms'te gap'in kapanması, hâlâ hedeflenen biçim                                                                             |
-| Presence · disconnect  | Henüz gelmedi (topbar/kart presence'ı). Disconnect: sessiz, inline bir "Connection lost, changes may not be showing" ("Bağlantı koptu, değişiklikler görünmüyor olabilir") bar'ı, socket geri gelene kadar duruyor ve kapatılamıyor, asla blocking bir overlay |
+| Realtime değişikliği   | Surfacing (asla bir layout jump)                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remote create / update | 1200ms boyunca fade out olan bir `--signature-subtle` background. Hareket yok, size değişimi yok. Yalnızca renk, böylece `prefers-reduced-motion`'dan değişmeden çıkar.                                                                                                               |
+| Remote move            | Kart, column'un kendi sortable transition'ı ile hareket eder (dnd-kit'in 200ms varsayılanı); başkası bir task'ı taşıdığında local bir drag sürüyorsa drag iptal edilir ve bir toast "Someone else moved this task" ("Birisi bu task'ı taşıdı") der, update hemen uygulanır            |
+| Remote delete          | **Henüz gelmedi:** kart gider ve gap aynı sortable transition ile kapanır. Olması gereken iki beat, 160ms'te 0'a fade ve ardından 160ms'te gap'in kapanması, hâlâ hedeflenen biçim                                                                                                    |
+| Presence · disconnect  | Presence: henüz gelmedi (topbar/kart presence'ı). Disconnect: ship edildi; sessiz, inline bir "Connection lost, changes may not be showing" ("Bağlantı koptu, değişiklikler görünmüyor olabilir") bar'ı, socket geri gelene kadar duruyor ve kapatılamıyor, asla blocking bir overlay |
 
 **Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px offset'te
 2px `--ring`, ve bir replacement olmadan `outline: none` bir review blocker'dır. O tek işaret,
 `@layer base`'den, her keyboard'la ulaşılabilir kontrolde bir kez çizilir: primitiflerin yanında
 duran `focus-visible:ring-[3px] ring-ring/50` ve `focus-visible:border-ring` class'ları kalktı, ve
 katmanlı kuralı ezecek her `outline-none` / `outline-hidden` de kalktı. Bunlardan geriye kalan,
-script ile focus alan (Tab, bir arrow key veya bir link ile değil) kısa bir programmatic focus
-container listesidir (bir dialog'un content'i, drawer), artı bir dropdown row'u, skip link'in `main`
+script ile focus alan (Tab, bir arrow key veya bir link ile değil) kısa, adı konmuş bir programmatic
+focus container listesidir (bir dialog'un content'i, drawer), artı bir dropdown row'u, skip link'in `main`
 hedefi ve task panel'in heading'i; üçü de bastırılmış değil, herkesle aynı base outline'ı çizer. Hem
 invalid hem focus'ta olan bir field, kenarın yanına ikinci bir işaret büyütmek yerine o tek
 outline'ı `--destructive`'e boyar (`[aria-invalid='true']:focus-visible`); border'ın yanında renkli
@@ -446,19 +452,19 @@ her transition kendi property'lerini tek tek yazar ve o listelerin hiçbirinde o
 widget'tır, bu yüzden column strip'inin tamamı tek bir tab stop'tur, `Home`, `End` ve `Ctrl` +
 arrow onun içindeki column heading'leri arasında gezer, çıplak arrow tuşları ise bir column
 içindeki klavye drag'ine aittir. `Esc` yalnızca en üstteki layer'ı kapatır ve focus'u onu açan
-şeye geri verir. `c` map edilmiştir: bir column'un dibindeki oluşturma composer'ını açar
-([ADR 0035](decisions/0035-inline-task-composer.md)). Şimdiden reserve edilmiş, Faz 4+'ta map
-edilecek: `⌘K` command palette, `/` filter, `?` help; başka hiçbir şey çıplak bir letter key
-talep etmez.
+şeye geri verir. `c` ve `/` map edilmiştir: `c`, bir column'un dibindeki oluşturma composer'ını
+açar ([ADR 0035](decisions/0035-inline-task-composer.md)); `/`, board'un filtre arama kutusuna
+odaklanır. Şimdiden reserve edilmiş, Faz 4+'ta map edilecek: `⌘K` command palette, `?` help;
+başka hiçbir şey çıplak bir letter key talep etmez.
 
 **Dialog'lar sınırlıdır ve kendi gövdelerini scroll eder.** Bir dialog yüzeyi en fazla
-`calc(100dvh - 4rem)` yüksekliğindedir; gövdesi scroll olur, header ve footer o scroll'un dışında
-sabit kalır, böylece submit ve cancel kontrolleri her pencere yüksekliğinde ve §9'un istediği
-%200 zoom'da ekranda kalır. Açık bir dialog'un arkasındaki sayfa scroll kilidi altındadır, yani
-tavanı olmayan bir yüzey kendi footer'ını ekranın altına iter ve ona ulaşmak için scroll edilecek
-hiçbir şey kalmaz. Kapatma kontrolü scrollport'un içine değil, header ile birlikte sabitlenir:
-absolute konumlanmış bir kutu, scroll container'ının içinde içerikle birlikte kayar ve onun
-tarafından kırpılır.
+`calc(100dvh - 4rem)` yüksekliğindedir; gövdesi scroll olur, header ve footer scroll alanının
+içinde `sticky` olarak yerinde kalır, böylece submit ve cancel kontrolleri her pencere
+yüksekliğinde ve §9'un istediği %200 zoom'da ekranda kalır. Açık bir dialog'un arkasındaki sayfa
+scroll kilidi altındadır, yani tavanı olmayan bir yüzey kendi footer'ını ekranın altına iter ve
+ona ulaşmak için scroll edilecek hiçbir şey kalmaz. Kapatma kontrolü scrollport'un içine değil,
+scroll gövdesinin dışında, yüzeye sabitlenir: absolute konumlanmış bir kutu, scroll
+container'ının içinde içerikle birlikte kayar ve onun tarafından kırpılır.
 
 **Motion.** Yalnızca amaçlı micro-interaction'lar, **view başına en fazla bir orchestrated an** —
 board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
@@ -489,8 +495,10 @@ submenu, off-canvas drawer, keyframe'lerini bir Tailwind animation plugin class'
 transition yerine kesme olurdu.
 
 Henüz bir tooltip primitifi ship edilmedi, bu yüzden bir tooltip süresi davranış değil niyettir
-ve yukarıdaki tabloda ona ait bir satır yok; ağaçtaki tek "tooltip", dashboard grafiklerinde
-Recharts'ın kendi tooltip'i (§8). `Select` tablodan tam tersi sebeple çıktı: native bir
+ve yukarıdaki tabloda ona ait bir satır yok; ağaçtaki tek gerçek "tooltip", dashboard
+grafiklerinde Recharts'ın kendi tooltip'i (§8), geri kalan ipuçları tarayıcının yerel `title`
+ipucudur (collapsed rail'in ikonları, label noktası, priority ikonu, zaman damgaları).
+`Select` tablodan tam tersi sebeple çıktı: native bir
 `<select>` (`components/ui/select.tsx`), yani listesini platform çiziyor ve burada onu
 canlandıran hiçbir şey yok.
 
@@ -512,7 +520,8 @@ activity reload, field save) buna bağlı değildir ve hâlâ 4s default'ta çal
 - Saniyede iki kez tetiklenebilecek her şey için (toast'lar, toggle'lar, rail) **keyframe değil
   transition** — transition'lar mevcut değerden retarget eder, keyframe'ler sıfırdan yeniden
   başlar.
-- Panel hariç 300ms'i geçen hiçbir şey yok. Hover motion'ı `@media (hover: hover) and
+- Panel ile Remote create / update işareti (1200ms, yalnızca renk) hariç 300ms'i geçen hiçbir
+  şey yok. Hover motion'ı `@media (hover: hover) and
 (pointer: fine)`'ın arkasına gate'le. Spring'ler (`{ duration: 0.5, bounce: 0.2 }`) yalnızca
   bir gesture'ın velocity taşıdığı yerlerde — drag preview, swipe-to-dismiss.
 - **Loop indicator'lar "300ms'i geçen hiçbir şey yok" kuralının dışında**: bir skeleton'un
@@ -531,8 +540,9 @@ activity reload, field save) buna bağlı değildir ve hâlâ 4s default'ta çal
 ## 6. Durumlar
 
 **Empty state'ler birer davettir** — screen başına bir damga mark'ı ve bir primary action. Bir
-sonraki hamleyi adlandırırlar; feature'ı açıklamazlar. Damga mark'larının göründüğü tek yerler
-empty state'ler ve auth ekranlarıdır (§2); `app/(auth)/layout.tsx` her auth formunun üstüne 64px
+sonraki hamleyi adlandırırlar; feature'ı açıklamazlar. Damga mark'larının göründüğü yerler
+empty state'ler ve auth ekranlarıdır; wordmark ve marketing görselleri de izinlidir, ama bugün
+sidebar wordmark'ı mark taşımıyor (§2). `app/(auth)/layout.tsx` her auth formunun üstüne 64px
 bir tane çizer.
 
 **Bir primary action, tüm ekranda bir tane demektir.** Aksiyonu empty state taşıyorsa, sayfa
@@ -546,14 +556,14 @@ dolguyu çiziyordu, bu da kenar çubuğundaki rail ile birlikte tek ekrana üç 
 Dolgu, rotanın her durumda taşıdığı aksiyonda kalıyor, dolayısıyla chart'ların kısayolu outline bir
 button (`components/dashboard/dashboard-summary.tsx`).
 
-| Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                                              | Action                                                                         |
-| --------------------------------- | ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Henüz board yok                   | Damga 96px | No boards yet (Henüz board yok)                                | A board is where the work gets divided. Start with one. (Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.)                                                                                                                                                | Create board (Board oluştur)                                                   |
-| Board'da column yok               | Damga 96px | This board has no columns (Bu board'da column yok)             | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. (Column'lar, işin içinden geçtiği aşamalardır. To Do (Yapılacak), In Progress (Devam Ediyor) ve Done (Bitti) ile başlayın, ya da kendi isimlerinizi verin.) | Add column · Use default columns (Column ekle · Varsayılan column'ları kullan) |
-| Boş column                        | —          | —                                                              | 56px solid `--border-strong` drop zone: "Drop a task here" ("Bir task'ı buraya bırakın")                                                                                                                                                                          | Add task (Task ekle)                                                           |
-| Filtreler hiçbir şeyle eşleşmiyor | —          | No tasks match these filters (Bu filtrelerle eşleşen task yok) | Three filters are active. (Üç filtre aktif.)                                                                                                                                                                                                                      | Clear filters (Filtreleri temizle)                                             |
-| Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                                                           | Open a board (Bir board aç)                                                    |
-| Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                                                 | —                                                                              |
+| Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                 | Action                                                                         |
+| --------------------------------- | ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Henüz board yok                   | Damga 96px | No boards yet (Henüz board yok)                                | A board is where the work gets divided. Start with one. (Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.)                                                                                                                   | Create board (Board oluştur)                                                   |
+| Board'da column yok               | Damga 96px | This board has no columns (Bu board'da column yok)             | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. (Column'lar, işin içinden geçtiği aşamalardır. Yapılacak, Devam Ediyor ve Bitti ile başlayın, ya da kendi isimlerinizi verin.) | Add column · Use default columns (Column ekle · Varsayılan column'ları kullan) |
+| Boş column                        | —          | —                                                              | 56px solid `--border-strong` drop zone: "Drop a task here" ("Bir task'ı buraya bırakın")                                                                                                                                             | Add task (Task ekle)                                                           |
+| Filtreler hiçbir şeyle eşleşmiyor | —          | No tasks match these filters (Bu filtrelerle eşleşen task yok) | 3 filters are active. (3 filtre aktif.)                                                                                                                                                                                              | Clear filters (Filtreleri temizle)                                             |
+| Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                              | Open a board (Bir board aç)                                                    |
+| Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                    | —                                                                              |
 
 **Loading**, `--accent` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
 pulse'ı ile (1.0 → 0.6) ve shimmer sweep olmadan: board, column'ların yerine column genişliğinde
@@ -593,15 +603,15 @@ yazdırmayın.
 | ------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `400` / `422`, `details[]` ile | Her field'ın altında inline; focus ilkine gider   | `details[].constraint`'ten, bir katalog string'ine map'lenir: "Title can't be empty" ("Title boş olamaz")                                                                                |
 | `401`                          | Return URL'i koruyarak sign-in'e redirect         | Your session ended. Sign in to pick up where you left off. (Oturumunuz sona erdi. Kaldığınız yerden devam etmek için giriş yapın.)                                                       |
-| `403`                          | Block edilen control üzerinde inline              | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için admin erişimine ihtiyacınız var. Bir workspace owner'ından isteyin.)                       |
-| Panelde `404`                  | Panel body'sinin yerini alır                      | This task no longer exists. Someone may have deleted it. (Bu task artık mevcut değil. Biri onu silmiş olabilir.) → **Back to board** (**Board'a dön**)                                   |
+| `403`                          | Block edilen control üzerinde inline              | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.)                     |
+| Panelde `404`                  | Panel body'sinin yerini alır                      | This task no longer exists. Someone may have deleted it. (Bu task artık yok. Birisi silmiş olabilir.) → **Back to board** (**Board'a dön**)                                              |
 | `409`                          | Field'ın altında inline, dialog değil             | Someone else changed this task. Reload it to edit again. (Bu task'ı başka biri değiştirdi. Düzenlemek için yeniden yükleyin.)                                                            |
 | `429` · `5xx`                  | Toast · içeriğin olması gereken yerde error block | Too many requests. Try again in a few seconds. (Çok fazla istek. Birkaç saniye içinde tekrar deneyin.) · The board couldn't load. (Board yüklenemedi.) → **Try again** (**Tekrar dene**) |
 | Offline                        | Kalıcı topbar strip'i                             | You're offline. Changes won't save until the connection is back. (Çevrimdışısınız. Bağlantı geri gelene kadar değişiklikler kaydedilmeyecek.)                                            |
 
 ## 7. UI metni
 
-Ekranın kullanıcı tarafından, active voice, sentence case.
+Ekranın kullanıcıya bakan tarafından, active voice, sentence case.
 
 | Bunun yerine                                             | Şunu yaz                                                                                        | Neden                                       |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -630,7 +640,7 @@ Ekranın kullanıcı tarafından, active voice, sentence case.
   örnek gösterir — bir placeholder asla bir label değildir.
 - **Internal'ları asla ifşa etme** (`workspaceId`, `position`, "fractional index", "optimistic
   update"). Id'ler yalnızca bir copy-id affordance'ının arkasında, mono'da görünür.
-- **Date'ler ve süreler:** şimdiye yakın relative ("in 2 days" / "2 gün içinde"), bir haftadan
+- **Date'ler ve süreler:** şimdiye yakın relative ("3 hours ago" / "3 saat önce"), bir haftadan
   öte absolute, exact değer her zaman `title`'da. `estimatedMinutes`, asla "150" değil "2h 30m"
   ("2s 30dk") render eder.
 
@@ -638,12 +648,12 @@ Ekranın kullanıcı tarafından, active voice, sentence case.
 yarısıdır; diğer yarısı bir sonraki hamledir. Bunu hangi yarının taşıdığına tek bir soru karar
 verir — **aynı request ikinci bir denemede başarılı olabilir mi?**
 
-|                       | **Hayır** — server kendini açıkladı                                                                                                                | **Evet** — server açıklamadı                                                           |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Recovery nerede yaşar | **Cümlede**                                                                                                                                        | **Surface'te**                                                                         |
-| Kullanıcı ne alır     | Sebep, ardından onu değiştiren tek hamle: bir admin'e sor, reload et, diğer adresi kullan, yeni bir link gönder                                    | Başarısız olan object, ardından bir control: toast'ta `action`, block'ta **Try again** |
-| Tipik sebepler        | `400` · `401` · `403` · `404` · `409`, reddedilen bir credential, süresi dolmuş bir link                                                           | network · timeout · `429` · `5xx`                                                      |
-| Örnek                 | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için admin erişimi gerekir. Bir workspace owner'ına sor.) | The board couldn't load. → **Try again** (Board yüklenemedi. → **Yeniden dene**)       |
+|                       | **Hayır** — server kendini açıkladı                                                                                                                                  | **Evet** — server açıklamadı                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Recovery nerede yaşar | **Cümlede**                                                                                                                                                          | **Surface'te**                                                                         |
+| Kullanıcı ne alır     | Sebep, ardından onu değiştiren tek hamle: bir admin'e sor, reload et, diğer adresi kullan, yeni bir link gönder                                                      | Başarısız olan object, ardından bir control: toast'ta `action`, block'ta **Try again** |
+| Tipik sebepler        | `400` · `401` · `403` · `404` · `409`, reddedilen bir credential, süresi dolmuş bir link                                                                             | network · timeout · `429` · `5xx`                                                      |
+| Örnek                 | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.) | The board couldn't load. → **Try again** (Board yüklenemedi. → **Tekrar dene**)        |
 
 Sağdaki sütunu iki şey dürüst tutar. Her basışta yeniden başarısız olan bir control, kullanıcıya
 ürünün bozuk olduğunu öğretir; bu yüzden **açıklanmış** bir failure asla control almaz — server'ın
@@ -655,7 +665,7 @@ sebebi budur.
 
 Kullanıcıya görünen her string, ilk component'ten itibaren **next-intl** üzerinden geçer.
 İngilizce ve Türkçe bugün ikisi de ship ediliyor (`SUPPORTED_LOCALES`, `['en', 'tr']`);
-roadmap'in Beyond-MVP "Further UI language packs" ("daha fazla UI dil paketi") satırı üçüncü bir
+roadmap'in MVP ötesi bölümündeki "Başka arayüz dil paketleri" satırı üçüncü bir
 dille ilgilidir, ve plumbing Faz 1 skeleton'uyla birlikte geldi çünkü onu sonradan eklemek,
 onunla başlamaktan çok daha pahalıya mal olur.
 
@@ -671,7 +681,7 @@ onunla başlamaktan çok daha pahalıya mal olur.
 
 ## 8. Grafikler ve dashboard
 
-Dashboard için ([ROADMAP.md](../ROADMAP.md#shipped-mvp-summary), Faz 7), Recharts ile render edilir. Form, herhangi bir renk
+Dashboard için ([ROADMAP.md](../ROADMAP.md#sevkedilen-mvp-özet), Faz 7), Recharts ile render edilir. Form, herhangi bir renk
 kararından önce, reader'ın job'ına göre seçilir. Asla dual bir y-axis, asla iki slice'ı geçen bir
 pie, asla generate edilmiş bir dokuzuncu ton — tail'i "Other" ("Diğer") içine katla ya da small
 multiple'lara facet'le.
@@ -750,7 +760,7 @@ verify edilmiş olarak.
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Klavye paritesi              | Her pointer etkileşiminin bir klavye yolu vardır, drag and drop dahil (§5). Bir feature yalnızca drag ile yapılabiliyorsa, bitmemiş demektir.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Renk asla tek başına değil   | priority ve status bir ikon ve bir kelimeyle ship edilir; label'lar isimlerini chip'te taşır; series'ler 2+ series'te bir legend alır ve ikinci kanal olarak table view'ı (§8) alır; direct label'lar ship edilmedi; rail'e `aria-current` ve bir weight değişimi eşlik eder                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Focus yönetimi               | Non-modal panel, açılışta focus'u kendi heading'ine taşır, trap etmeden. Kapanışta focus'u onu açan karta geri döndürmesi gerekir; bugün bunun yerine `<main>` üzerine düşüyor, çünkü panel route'u mount'luyken kartın node'u değişiyor ve `use-task-panel-focus.ts` fallback'e geçiyor (Hardening track, "Board keyboard follow-ups"). Dialog'lar _gerçekten_ trap eder, kapanışta focus'u restore eder ve `Esc`'te kapanır; popover'lar focus'u trigger'larına geri döndürür.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Focus yönetimi               | Non-modal panel, açılışta focus'u kendi heading'ine taşır, trap etmeden (masaüstünde; `md` altında panel tam ekran bir sheet'tir ve Tab arkadaki board'a kaçmasın diye elle hapsedilir). Kapanışta focus'u onu açan karta geri döndürmesi gerekir; bugün bunun yerine `<main>` üzerine düşüyor, çünkü panel route'u mount'luyken kartın node'u değişiyor ve `use-task-panel-focus.ts` fallback'e geçiyor (Sağlamlaştırma hattı, "Faz 6 parity taramasından Board klavye follow-up'ları"). Dialog'lar _gerçekten_ trap eder, kapanışta focus'u restore eder ve `Esc`'te kapanır; popover'lar focus'u trigger'larına geri döndürür.                                                                                                                                                                                                                                                                                                                |
 | Menü içinde focus            | Radix, bir dropdown açılırken focus'u content'e, pointer hareket ettikçe de row'a taşır ve row'larda outline bastırıcı yok; bu yüzden pointer'ın altındaki row, `bg-accent` adımının üstünde, arrow ile gelinen row ile aynı tek focus outline'ını giyer. Bilerek böyle: alternatifi, klavyenin arrow key ile ulaştığı tek row türünde outline'ı yeniden bastırmak. Pointer için bir işaret fazla kabul edilir; klavye için bir işaret eksik kabul edilmez. Çalışan uygulamada Chromium 151 ve Firefox 153'te ölçüldü.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Announcement'lar             | Drag transition'ları, optimistic failure'lar, realtime arrival'lar ve toast'lar `aria-live="polite"` üzerinden geçer; yalnızca session'ı bitiren bir error `assertive`'dir                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Reduced motion               | Her yerde respect edilir ve bir state değişimini asla kaldırmaz: state yine değişir, yalnızca hareket etmeyi bırakır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -767,6 +777,6 @@ verify edilmiş olarak.
 | [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` yalnızca shadcn output'udur: token'lar theme'de edit edilir, asla bir primitive'de değil; component'lerde, sabitlenmiş iki istisna dışında, arbitrary hex yok; conditional class'lar `cn()` üzerinden |
 | [architecture.md](architecture.md#4-appsweb--yapı)                     | Bu dokümanın ortaya koyduğu `(auth)` / `(app)` route group'ları ve `board/`, `task/`, `dashboard/`, `layout/` component domain'leri                                                                                    |
 | [api-conventions.md](api-conventions.md#hatalar)                       | Error metninin türediği problem-JSON şekli, ve `statusCode` üzerinden branch'leme kuralı                                                                                                                               |
-| [Sevkedilen MVP özeti](../ROADMAP.md#shipped-mvp-summary)              | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                                                 |
+| [Sevkedilen MVP özeti](../ROADMAP.md#sevkedilen-mvp-özet)              | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                                                 |
 | [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts: yukarıdaki her kuralın karşısında yazıldığı toolkit                                                                                                           |
 | [tech-stack.md](tech-stack.md)                                         | Neden o toolkit                                                                                                                                                                                                        |
