@@ -3,7 +3,7 @@ name: Release images
 # OPS-04 (2026-08-18 devops audit): a self-host product with no published artifact means every
 # install *and every upgrade* rebuilds from source (measured: api 52s + web 22s, real OOM risk
 # on a small VPS). This workflow is the fix — it publishes the images to GHCR so `docker
-# compose pull && up -d` (docs/development.md#full-stack-in-docker) replaces
+# compose pull && up -d` (docs/development.md#dockerda-tam-stack) replaces
 # `docker compose up --build` as the normal path. The `migrate` one-shot service was originally
 # left building from source (OPS-04's own text scopes that fix to "api+web imajlarını yayınla"),
 # and that scoping broke the curl-based install in docs/self-hosting.md outright — that path
@@ -13,7 +13,7 @@ name: Release images
 # after v0.2.0 onward.
 #
 # Triggered by the tag push, not by the release/* -> main PR that precedes it
-# (docs/git-strategy.md#release-process step 5: `git tag -a vX.Y.Z && git push origin vX.Y.Z`)
+# (docs/git-strategy.md#release-süreci step 5: `git tag -a vX.Y.Z && git push origin vX.Y.Z`)
 # — a release/* branch or its PR can still be abandoned or force-fixed before that point, so
 # building images any earlier would risk publishing a version nobody actually released.
 #
@@ -68,7 +68,7 @@ jobs:
   # sign and publish it; a stable tag would also move `{{major}}.{{minor}}` and `latest` under
   # every operator who pulls without TAG (docs/self-hosting.md). Branch protection on main does
   # not reach tags. This job is the check the release process performs by hand
-  # (docs/git-strategy.md#release-process, steps 2 and 5), done by the machine instead:
+  # (docs/git-strategy.md#release-süreci, steps 2 and 5), done by the machine instead:
   #
   #   1. Where the tag points. A stable tag (no `-`) must be the tip of main, because step 5
   #      tags the merge commit of the release/* -> main PR and nothing else. A pre-release tag
@@ -85,7 +85,7 @@ jobs:
   # The job runs on the ephemeral GITHUB_TOKEN with `contents: read`, and it protects even the
   # maintainer's own slip (a `git tag` typed on develop). The complementary protection, a
   # repository ruleset on refs/tags/v*, is a repository setting rather than code and is
-  # described in docs/git-strategy.md#release-process.
+  # described in docs/git-strategy.md#release-süreci.
   # -----------------------------------------------------------------------------------
   guard:
     runs-on: ubuntu-latest
@@ -128,7 +128,7 @@ jobs:
               done
               echo "::error::$tag points at $sha, which is not on main nor on any release/* or hotfix/* branch."
               echo "A pre-release tag is cut on the release or hotfix branch it rehearses, or on main"
-              echo "(docs/git-strategy.md#rehearsing-the-publish-path). Refs searched:"
+              echo "(docs/git-strategy.md#yayın-yolunu-prova-etmek). Refs searched:"
               printf '  %s\n' $refs
               exit 1
               ;;
@@ -136,7 +136,7 @@ jobs:
               if [ "$sha" != "$main" ]; then
                 echo "::error::$tag points at $sha but the tip of main is $main."
                 echo "A release tag is the merge commit of release/* -> main, i.e. main's tip at the"
-                echo "moment it is tagged (docs/git-strategy.md#release-process, step 5)."
+                echo "moment it is tagged (docs/git-strategy.md#release-süreci, step 5)."
                 echo "Refs searched: origin/main"
                 exit 1
               fi
@@ -173,7 +173,7 @@ jobs:
               if awk -v h="$heading" 'index($0, h) == 1 { found = 1 } END { exit !found }' CHANGELOG.md; then
                 echo "guard: CHANGELOG.md has a '$heading' heading"
               else
-                echo "::error file=CHANGELOG.md::CHANGELOG.md has no '${heading}YYYY-MM-DD' heading for $tag; rename [Unreleased] first (docs/git-strategy.md#release-process, step 2)"
+                echo "::error file=CHANGELOG.md::CHANGELOG.md has no '${heading}YYYY-MM-DD' heading for $tag; rename [Unreleased] first (docs/git-strategy.md#release-süreci, step 2)"
                 status=1
               fi
               ;;
@@ -616,7 +616,7 @@ jobs:
           printf 'Attaching %d file(s) to %s:\n' "${#files[@]}" "$TAG"
           printf '  %s\n' "${files[@]}"
 
-          # docs/git-strategy.md#release-process pushes the tag (step 5) *before* a human writes
+          # docs/git-strategy.md#release-süreci pushes the tag (step 5) *before* a human writes
           # the release notes (step 6), so this workflow normally arrives at a tag with no
           # release behind it. Creating a draft is the only shape that stays correct in both
           # orders: if the release does not exist yet, the maintainer finds a draft waiting with
@@ -641,5 +641,5 @@ jobs:
               --draft \
               ${prerelease[@]+"${prerelease[@]}"} \
               --title "$TAG" \
-              --notes 'Release notes pending — replace this with the CHANGELOG.md section for this version (docs/git-strategy.md#release-process, step 6).'
+              --notes 'Release notes pending — replace this with the CHANGELOG.md section for this version (docs/git-strategy.md#release-süreci, step 6).'
           fi

@@ -100,7 +100,7 @@ Test expectations: [docs/testing.md](docs/testing.md).
   exists. Prefer a merge commit into `develop` (`--no-ff`) so multi-commit history stays
   readable; squash into `develop` is allowed for Dependabot / single-commit noise. Squash
   into `main` is never allowed — see
-  [docs/git-strategy.md](docs/git-strategy.md#merge-strategy).
+  [docs/git-strategy.md](docs/git-strategy.md#merge-stratejisi).
 - Clean up noisy fixup commits (interactive rebase or amend) before requesting review — they
   land in `develop` as-is.
 

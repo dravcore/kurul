@@ -10,7 +10,7 @@ import type { CursorPage } from '@kurul/shared-types';
  *
  * The cursor is always the row `id` (UUIDv7, monotonic) and never `position` — a Float that
  * a drag can move behind the cursor, silently hiding rows. See
- * docs/api-conventions.md#the-cursor-key-is-always-id-never-position.
+ * docs/api-conventions.md#cursor-anahtarı-her-zaman-iddir-asla-position-değil.
  *
  * `rows` must already be ordered by `id` in the direction the caller pages in; this helper
  * does not sort.

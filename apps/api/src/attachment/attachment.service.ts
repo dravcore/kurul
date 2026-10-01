@@ -275,7 +275,7 @@ export class AttachmentService {
    * which case this method issues no query at all.
    *
    * The 413 carries `error: ATTACHMENT_QUOTA_ERROR` so a client can tell it from the per-file
-   * size limit's 413 without reading `message` — the field `docs/api-conventions.md#errors`
+   * size limit's 413 without reading `message` — the field `docs/api-conventions.md#hatalar`
    * says to branch on. The messages deliberately avoid multer's error-string constants
    * (`File too large`, …), which `transformException` matches on (ADR 0022).
    */

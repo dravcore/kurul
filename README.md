@@ -257,13 +257,13 @@ Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tech-stack.md) ve
 Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe harita:
 **[docs/tr/README.md](docs/README.md)**.
 
-| Doküman                                                  | Kapsam                                                 |
-| -------------------------------------------------------- | ------------------------------------------------------ |
+| Doküman                                               | Kapsam                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------ |
 | [docs/tr/architecture.md](docs/architecture.md)       | Modül haritası, veri modeli                            |
 | [docs/tr/design.md](docs/design.md)                   | UI/UX dili                                             |
 | [docs/tr/development.md](docs/development.md)         | Yerel kurulum ve günlük komutlar                       |
 | [docs/tr/api-conventions.md](docs/api-conventions.md) | REST, hatalar, pagination                              |
-| [ROADMAP.md](ROADMAP.md) (İngilizce)                     | Sağlamlaştırma + özellik hatları, beyond-MVP backlog'u |
+| [ROADMAP.md](ROADMAP.md) (İngilizce)                  | Sağlamlaştırma + özellik hatları, beyond-MVP backlog'u |
 | [docs/tr/decisions/](docs/decisions/)                 | ADR’ler                                                |
 
 ## Katkıda bulunma

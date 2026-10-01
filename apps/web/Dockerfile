@@ -31,7 +31,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # value, so an empty DSN means the SDK chunk is never emitted into a loaded path and a
 # visitor's browser makes no third-party request. `SENTRY_AUTH_TOKEN` is intentionally *not*
 # a build arg — see the source-map note in apps/web/next.config.ts and
-# docs/development.md#observability.
+# docs/development.md#gözlemlenebilirlik.
 ARG NEXT_PUBLIC_SENTRY_DSN=
 ARG NEXT_PUBLIC_SENTRY_ENVIRONMENT=
 ARG NEXT_PUBLIC_SENTRY_RELEASE=

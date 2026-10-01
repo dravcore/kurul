@@ -208,7 +208,7 @@ ayarlanmadan compose başlamayı reddeder:
 
 ```bash
 $ docker compose config
-error while interpolating services.migrate.environment.DATABASE_URL: required variable POSTGRES_PASSWORD is missing a value: set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials
+error while interpolating services.migrate.environment.DATABASE_URL: required variable POSTGRES_PASSWORD is missing a value: set POSTGRES_PASSWORD in .env — see docs/development.md#veritabanı-ve-cache-kimlik-bilgileri
 ```
 
 Bu, yukarıdaki `BETTER_AUTH_SECRET` ile aynı fail-loud kalıbıdır: bir placeholder varsayılan,
@@ -464,7 +464,7 @@ başarısızlıkta bir düzeltme komutuyla, kontrol başına bir satır yazdır�
 ✗ Prisma client: stale — schema.prisma is newer than the generated client
   fix: pnpm db:generate
 ✗ required env keys: POSTGRES_PASSWORD empty or missing in .env
-  fix: set POSTGRES_PASSWORD in .env — see docs/development.md#environment-variables
+  fix: set POSTGRES_PASSWORD in .env — see docs/development.md#ortam-değişkenleri
 ```
 
 1. `packages/shared-types/dist` ve `packages/auth-access/dist`, kendi `src`'lerinden en az o

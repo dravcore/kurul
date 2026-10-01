@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
  * catalogue key would not.
  */
 export const SMTP_SETUP_DOCS_URL =
-  'https://github.com/dravcore/kurul/blob/main/docs/development.md#smtp-and-mailpit';
+  'https://github.com/dravcore/kurul/blob/main/docs/development.md#smtp-ve-mailpit';
 
 /**
  * What this API instance is configured to do — see `InstanceConfigDto`.

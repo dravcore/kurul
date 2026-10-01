@@ -450,7 +450,7 @@ describe('AttachmentService.createFile', () => {
 
       expect(failure).toBeInstanceOf(PayloadTooLargeException);
       // The discriminator a client branches on: same 413 as the per-file limit, different
-      // `error` (docs/api-conventions.md#errors).
+      // `error` (docs/api-conventions.md#hatalar).
       expect((failure?.getResponse() as { error: string }).error).toBe(ATTACHMENT_QUOTA_ERROR);
       expect(storage.write).not.toHaveBeenCalled();
       expect(prisma.attachment.create).not.toHaveBeenCalled();

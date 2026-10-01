@@ -171,7 +171,7 @@ describe('docker-compose.yml forwards what the API reads', () => {
       'Add each key to the api service environment block in docker-compose.yml as ' +
         '`KEY: ${KEY:-}` (blank means unset to the env helpers), or list it in ' +
         'API_FORWARDING_EXCEPTIONS with the reason it must not be forwarded. See ' +
-        'docs/development.md#environment-variables.',
+        'docs/development.md#ortam-değişkenleri.',
     );
   });
 
@@ -183,7 +183,7 @@ describe('docker-compose.yml forwards what the API reads', () => {
       undocumented,
       [],
       'Add each key to .env.example with a safe placeholder and to the table in ' +
-        'docs/development.md#environment-variables, or list it in UNDOCUMENTED_API_KEYS.',
+        'docs/development.md#ortam-değişkenleri, or list it in UNDOCUMENTED_API_KEYS.',
     );
   });
 

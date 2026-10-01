@@ -395,13 +395,13 @@ require. Nothing to migrate and no new setting.
   verification mail uses. Delivery is a hard requirement: with `SMTP_HOST` unset the whole
   message including the link goes to the API log instead, which is workable on a solo install
   and is not a recovery path for anyone else, see
-  [self-hosting](docs/self-hosting.md#email-smtp). On a `DEMO_MODE` instance the demo account
+  [self-hosting](docs/self-hosting.md#e-posta-smtp). On a `DEMO_MODE` instance the demo account
   is skipped, since its password is published and a reset would only lock every visitor out.
 
   The emailed link is the first URL this API serves with a live secret in its path, so the JSON
   access log now writes it as `/auth/reset-password/:token`. A reverse proxy of your own in
   front of it still logs the URL it was asked for unless you filter that route out, see
-  [self-hosting](docs/self-hosting.md#bringing-your-own-reverse-proxy).
+  [self-hosting](docs/self-hosting.md#kendi-reverse-proxynizi-kullanmak).
 
 - **`SIGNUP_ENABLED`: a switch that closes registration on a self-hosted instance.** Until now
   the only way to stop strangers registering on an internet-facing install was to pin
@@ -489,7 +489,7 @@ require. Nothing to migrate and no new setting.
   and the workspace-administration writes that Better Auth performs on a session (invite,
   revoke, accept, remove a member, change a role, leave, rename and delete the workspace),
   which answer `403` to a token and are named as the boundary of this slice in
-  [api-conventions.md](docs/api-conventions.md#authentication). Migration
+  [api-conventions.md](docs/api-conventions.md#kimlik-doğrulama). Migration
   `20260823120000_personal_access_token` adds the table. The model is first-party rather
   than Better Auth's API-key plugin; the same section says why.
 - **ADR 0031: API versioning.** A `/v1` URI prefix on every route, introduced at 1.0 and not
@@ -519,7 +519,7 @@ require. Nothing to migrate and no new setting.
   `rclone` already on the container's `PATH` is used instead and nothing is downloaded.
 
   **Leaving `BACKUP_REMOTE` blank changes nothing**, including the log lines and the
-  healthcheck. See [Off-host copies](docs/self-hosting.md#off-host-copies).
+  healthcheck. See [Off-host copies](docs/self-hosting.md#host-dışı-kopyalar).
 
 - **Demo mode, and everything a live demo instance needs except the host.** `DEMO_MODE=true` is
   the whole switch: the app shows a standing, dismissible banner naming how often the data
@@ -741,7 +741,7 @@ require. Nothing to migrate and no new setting.
   `scripts/bootstrap.mjs` validates only `docker-compose.dev.yml`, which is how the `demo-reset`
   interpolation fixed below reached `develop`. The compose legs need no daemon, the job takes
   seconds, and it is wired into the `ci-ok` gate like every other job
-  ([testing.md](docs/testing.md#compose-and-caddyfile-parse)).
+  ([testing.md](docs/testing.md#compose-ve-caddyfile-parse)).
 - **Better Auth upgraded to 1.7.1, which needs a database migration before the API starts.**
   `Account` gains a required `issuer` column and a unique `(issuer, accountId)` index: identity
   is now keyed on the pair rather than on `accountId` alone, so two providers handing out the
@@ -799,7 +799,7 @@ require. Nothing to migrate and no new setting.
   `shm_size: 256m`, because Docker's default 64 MB `/dev/shm` is where parallel workers and hash
   joins run out of dynamic shared memory on a heavy dashboard query. None of it is memory on top
   of the existing ceilings; the sizing notes in
-  [self-hosting.md](docs/self-hosting.md#server-sizing) describe all three.
+  [self-hosting.md](docs/self-hosting.md#sunucu-boyutlandırma) describe all three.
 
   `REDIS_MAXMEMORY` in `.env` (default `100mb`, unchanged) now makes that ceiling adjustable
   without editing the compose file. On an instance that is already running, check where the
@@ -1446,7 +1446,7 @@ require. Nothing to migrate and no new setting.
   sessions and renaming the account stay open on purpose: both are a sign-in away from
   recovered, and the list admits what the reset cannot recover, not what is annoying. An
   ordinary install is untouched; the `DEMO_MODE` table in
-  [self-hosting.md](docs/self-hosting.md#what-demo_modetrue-changes) names the new row.
+  [self-hosting.md](docs/self-hosting.md#demo_modetrue-neyi-değiştirir) names the new row.
 - **Request bodies to `/auth/*` are bounded, at the proxy and at the API.** Better Auth reads
   the raw request stream itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on
   every other route, and the bundled `docker/Caddyfile` set `request_body max_size` only on
@@ -1502,7 +1502,7 @@ require. Nothing to migrate and no new setting.
   Every job in the workflow also gained a `timeout-minutes`. The guard catches a slip inside
   the workflow; keeping a `v*` tag from being pushed, moved or deleted by anyone but the
   repository admin is a repository ruleset, described in
-  [git-strategy.md](docs/git-strategy.md#release-process) and listed on the
+  [git-strategy.md](docs/git-strategy.md#release-süreci) and listed on the
   [Launch checklist](ROADMAP.md#launch-checklist).
 
 ## [0.3.0] - 2026-08-22
@@ -1703,7 +1703,7 @@ the 2026-08-18 "atlas" audit. See
   contact details. What the workspace keeps is the membership history itself, in
   `WorkspaceMember` and `Activity`, which never carried the address. **For an operator this
   narrows what a dump can restore**: the erasure-recovery runbook in
-  [development.md](docs/development.md#undoing-an-account-deletion) now lists invitee-side
+  [development.md](docs/development.md#bir-hesap-silmesini-geri-almak) now lists invitee-side
   invitation rows as recoverable only from a dump that predates the deletion.
 
 - **Outside contributions are accepted again, under plain AGPL-3.0 and with nothing to
@@ -1856,7 +1856,7 @@ the 2026-08-18 "atlas" audit. See
   — and therefore the same container and volume names for every service both define:
   `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came from that:
   `docker compose -f docker-compose.dev.yml down -v` (the documented way to reset a local
-  database, docs/development.md#database-workflow) dropped the full stack's Postgres/Redis
+  database, docs/development.md#veritabanı-iş-akışı) dropped the full stack's Postgres/Redis
   volumes too if the full stack had ever been started from the same directory, and bringing the
   full stack up afterward silently recreated the dev loop's `postgres` container from
   `docker-compose.yml`'s definition, which publishes no host port — `localhost:5432` simply
@@ -1944,7 +1944,7 @@ the 2026-08-18 "atlas" audit. See
   container-memory heuristic — both buffer request data into that heap up to
   `REQUEST_BODY_MAX_BYTES`/`ATTACHMENT_MAX_BYTES` (`.env.example`) per concurrent request, which
   is the likeliest source of unbounded growth in this stack. See
-  [self-hosting.md#server-sizing](docs/self-hosting.md#server-sizing) for the full per-service
+  [self-hosting.md#server-sizing](docs/self-hosting.md#sunucu-boyutlandırma) for the full per-service
   table and how the ceilings add up against the 2 GB budget. Not verified by a live run under
   the new limits — the sizing is derived from the request/attachment ceilings already documented
   in `.env.example`, not measured under load.
@@ -2009,7 +2009,7 @@ the 2026-08-18 "atlas" audit. See
   and divides the work — the same idea and the same root as the _kurultay_ it was named for,
   and what the tool does for a team either way. The identity does not change with it; the
   banner, the seal and the steppe are still where the visual language comes from
-  ([design.md](docs/design.md#2-identity)).
+  ([design.md](docs/design.md#2-kimlik)).
 
   **What this renames, beyond the label.** The npm scope (`@kurultay/*` → `@kurul/*`), the
   repository (`dravcore/kurultay` → `dravcore/kurul`), the published images
@@ -2020,7 +2020,7 @@ the 2026-08-18 "atlas" audit. See
   **For an existing v0.1.0 install this is a breaking change, and there is no in-place upgrade
   that renames a running database for you.** The step-by-step path — dump, rename the
   directory, create the new role and database, restore, verify — is in
-  [self-hosting.md](docs/self-hosting.md#coming-from-kurultay-v010), including the one-line
+  [self-hosting.md](docs/self-hosting.md#kurultaydan-geliyorsanız-v010), including the one-line
   alternative for an operator who would rather keep the old volume names
   (`COMPOSE_PROJECT_NAME`). Take the dump before anything else: it is the only copy that
   predates the rename.
@@ -2166,7 +2166,7 @@ the 2026-08-18 "atlas" audit. See
   default so an otherwise-unmodified `.env` still works once the password is filled in, and
   `REDIS_PASSWORD` is new and optional — leaving it unset keeps `redis` passwordless exactly
   as before, so this half is not a breaking change on its own. See
-  [docs/development.md#database-and-cache-credentials](docs/development.md#database-and-cache-credentials).
+  [docs/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 
   **Migration for existing installs:** add `POSTGRES_PASSWORD=<your-password>` to `.env`
   before the next `docker compose up` — without it, compose now fails before creating a single
@@ -2309,7 +2309,7 @@ the 2026-08-18 "atlas" audit. See
   one `warn` JSON log line carrying the user id and counts, and no address. Recovery, if a
   deletion was executed in error, is a restore from the nightly dump into a scratch database:
   the procedure is in
-  [Undoing an account deletion](docs/development.md#undoing-an-account-deletion), including the
+  [Undoing an account deletion](docs/development.md#bir-hesap-silmesini-geri-almak), including the
   clock that runs on attachment bytes once the orphan sweep's grace window passes.
 
   Better Auth's own `user.deleteUser` stays disabled, on purpose: it hard-deletes the `user`
@@ -2424,7 +2424,7 @@ the 2026-08-18 "atlas" audit. See
   restore procedure grew a step: restoring the dump without the matching file archive brings
   the rows back and leaves every file behind, which passes every check written before
   attachments existed. The rehearsed drill in
-  [development.md](docs/development.md#restoring-from-a-backup) now compares file count **and**
+  [development.md](docs/development.md#yedekten-geri-dönme) now compares file count **and**
   per-file size against the rows. Second, **the reverse-proxy contract gains a body-size row,
   and its number is deliberately not the same as the user-facing limit**:
   `ATTACHMENT_MAX_BYTES` is `26214400` (25 MiB) and is the size of the _file_, while the proxy
@@ -2654,7 +2654,7 @@ the 2026-08-18 "atlas" audit. See
   assignees on a quarter, due dates spread across and past the due-soon window — because a
   board where every card is the same shape measures one shape of card. This is what the board
   render budget below was measured against. See
-  [docs/development.md](docs/development.md#seeding-a-large-board).
+  [docs/development.md](docs/development.md#büyük-board-seedlemek).
 - A **Workspace** section in Settings — renaming and deleting a workspace no longer require
   `curl`. `PATCH /workspaces/:workspaceId` and `DELETE /workspaces/:workspaceId` existed from
   the start, but nothing in the product called either. Rename (OWNER/ADMIN, matching the
@@ -2736,7 +2736,7 @@ the 2026-08-18 "atlas" audit. See
   the configured API origin plus its derived `ws(s)` origin so both the REST client and the
   Socket.io transport keep working. `Permissions-Policy` denies `camera`, `microphone`,
   `geolocation`, `payment`, `usb`, and `interest-cohort` (FLoC/Topics-API opt-out) — none of
-  which the app ever requests. See `docs/architecture.md#11-security-headers` for the full
+  which the app ever requests. See `docs/architecture.md#11-güvenlik-başlıkları` for the full
   header table across both processes.
 - Bounded timeouts on the shared database connection pool (`apps/api/src/prisma/database.ts`):
   `DATABASE_POOL_CONNECTION_TIMEOUT_MS` (default `10000`) caps how long a request waits for a
@@ -2748,7 +2748,7 @@ the 2026-08-18 "atlas" audit. See
   so `prisma migrate deploy`/`dev` and `pnpm db:seed`'s own bulk operations — neither goes
   through this pool — are unaffected. `DATABASE_POOL_MAX` itself (already the pool's size knob)
   is now also documented in `.env.example` and `docs/development.md`, which it previously was
-  not. See [docs/development.md#database-connection-pool](docs/development.md#database-connection-pool).
+  not. See [docs/development.md#veritabanı-bağlantı-havuzu](docs/development.md#veritabanı-bağlantı-havuzu).
 - Observability baseline — until now a production failure or outage was only discovered when
   a user complained, and container logs grew without a ceiling until the disk filled. Three
   pieces close that, none of which is a metrics stack:
@@ -2769,7 +2769,7 @@ the 2026-08-18 "atlas" audit. See
     default; every service in `docker-compose.yml` and `docker-compose.dev.yml` now caps at
     3 files × 10 MB via a shared `x-logging` anchor. This applies at container *creation*, so
     an existing deployment needs `docker compose up -d` (not a plain restart) to pick it up.
-  - **An uptime-monitoring procedure** in `docs/development.md#observability`: which endpoint
+  - **An uptime-monitoring procedure** in `docs/development.md#gözlemlenebilirlik`: which endpoint
     to poll (`/health/ready`, not `/health` — the liveness probe stays green while the
     database is down, by design), at what interval and threshold, and how to verify the alert
     actually fires. The monitor itself lives outside this repository, in a free external
@@ -2879,7 +2879,7 @@ the 2026-08-18 "atlas" audit. See
   nobody chose and no file recorded, discoverable only by sending a large body and watching what
   came back. The limit is now explicit and named: `REQUEST_BODY_MAX_BYTES`, default `1048576`
   (1 MiB), documented in `.env.example` and
-  [api-conventions.md](docs/api-conventions.md#request-body-size), applied to the JSON *and* the
+  [api-conventions.md](docs/api-conventions.md#request-body-boyutu), applied to the JSON *and* the
   form-encoded parser. 1 MiB is about two orders of magnitude above the largest body any endpoint
   legitimately receives today (no array bodies; the longest single field any DTO accepts is 2048
   characters), and it is a memory ceiling as much as a size one — the body is parsed into heap
@@ -3000,7 +3000,7 @@ the 2026-08-18 "atlas" audit. See
   arm64 do not contain the same packages, so one file for both would have been quietly wrong
   for every ARM operator — and attached to the GitHub Release as an asset. The verification
   commands, with this repository's exact identity and issuer, are in
-  [docs/self-hosting.md](docs/self-hosting.md#verifying-what-you-pulled); an unchecked
+  [docs/self-hosting.md](docs/self-hosting.md#çektiğiniz-imajı-doğrulamak); an unchecked
   signature protects nobody.
 - **`TAG=vX.Y.Z` now resolves to a published image.** Every place in this repository that tells
   an operator how to pin a release — both READMEs, both self-hosting guides, `docs/development.md`
@@ -3060,7 +3060,7 @@ the 2026-08-18 "atlas" audit. See
   where the cookie has to be `SameSite=None` and `SameSite` protects nothing. Operator
   consequence: `WEB_URL` must be the exact origin the browser loads the app from — any spelling
   of it (trailing slash, path, explicit `:443`) works, a non-URL now fails the process at start.
-  See [api-conventions.md](docs/api-conventions.md#cross-origin-requests). Closes audit finding
+  See [api-conventions.md](docs/api-conventions.md#cross-origin-istekler). Closes audit finding
   SEC-04.
 - Rate limiting across the whole API surface. A global `ThrottlerGuard` gives every route
   100 requests per minute per client IP, with tighter budgets where a request is expensive
@@ -3099,7 +3099,7 @@ the 2026-08-18 "atlas" audit. See
   `DAC_OVERRIDE` back (its official entrypoint `chown`s `PGDATA` and re-execs via `gosu` on
   every boot); `redis` gets `SETUID`/`SETGID` back so its own entrypoint can drop privilege
   to the `redis` user via `setpriv` (see the next entry for why that path was broken before
-  this PR). See [development.md#container-hardening](docs/development.md#container-hardening)
+  this PR). See [development.md#container-hardening](docs/development.md#container-sertleştirme)
   for the full per-service reasoning.
 - **Fixed:** the `redis` service ran as root for its entire life, not the `redis` user the
   image ships. `REDIS_PASSWORD` becoming optional (below) wrapped the container's command in

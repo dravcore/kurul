@@ -3,7 +3,7 @@
 # own) also falls back to. Same project means same container and volume names for every service
 # both files define: `postgres`, `redis`, `postgres_data`, `redis_data`. Two failure modes came
 # from that, not one — `docker compose -f docker-compose.dev.yml down -v` (the documented way to
-# reset a local database, docs/development.md#database-workflow) dropped the full stack's
+# reset a local database, docs/development.md#veritabanı-iş-akışı) dropped the full stack's
 # Postgres/Redis volumes too if `docker compose up -d` (no `-f`) had ever been run from the same
 # directory, and running the full stack afterward silently recreated the dev loop's `postgres`
 # container from docker-compose.yml's definition, which publishes no host port — `localhost:5432`
@@ -55,7 +55,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-kurul}
       # Same fail-loud requirement as docker-compose.yml (see there for why): no baked-in
       # default, and only the *first* boot of an empty postgres_data volume applies it.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#database-and-cache-credentials}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env — see docs/development.md#veritabanı-ve-cache-kimlik-bilgileri}
       POSTGRES_DB: ${POSTGRES_DB:-kurul}
     ports:
       - '5432:5432'
@@ -123,7 +123,7 @@ services:
   # SMTP catch-all for local dev: nothing it receives ever leaves the container. Point
   # SMTP_HOST=localhost / SMTP_PORT=1025 / SMTP_SECURE=false at it in .env, then read
   # verification links and invitation mail from the web UI instead of a real inbox — see
-  # docs/development.md#smtp-and-mailpit.
+  # docs/development.md#smtp-ve-mailpit.
   mailpit:
     image: axllent/mailpit:v1.31.1@sha256:98b916bd3c8d61f7633a52d3ea2f58d00620cb01ca57ab59edde68c347a95365
     restart: unless-stopped

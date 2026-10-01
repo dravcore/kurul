@@ -49,13 +49,13 @@
 # instance whose off-host copy has silently stopped arriving reports unhealthy instead of
 # looking fine until the restore. Credentials are rclone's own: either RCLONE_CONFIG_* env
 # vars (rclone's native env-only config, no file needed) or a mounted rclone.conf pointed at by
-# RCLONE_CONFIG. See docs/self-hosting.md#off-host-copies.
+# RCLONE_CONFIG. See docs/self-hosting.md#host-dışı-kopyalar.
 #
 # BACKUP_INTERVAL and BACKUP_KEEP are read by the API too: the nightly orphan-file sweep will
 # not delete a stored file while a dump old enough to disown it is still restorable, and that
 # grace period is their product. Shortening either one shortens that window.
 #
-# Restore is `pg_restore`, not `psql` — see docs/development.md#upgrading-and-backups for
+# Restore is `pg_restore`, not `psql` — see docs/development.md#yükseltme-ve-yedekleme for
 # the full, rehearsed procedure, including the file half.
 
 set -eu

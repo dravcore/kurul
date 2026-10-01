@@ -118,7 +118,7 @@ function readEnv() {
       'no `.env` in the repository root.',
       '\n  cp .env.example .env\n\n' +
         'Then set POSTGRES_PASSWORD (openssl rand -hex 32) and BETTER_AUTH_SECRET\n' +
-        '(openssl rand -base64 32) — see docs/development.md#environment-variables.',
+        '(openssl rand -base64 32) — see docs/development.md#ortam-değişkenleri.',
     );
   }
   const env = new Map();
@@ -148,7 +148,7 @@ if (!env.get('POSTGRES_PASSWORD')) {
       '`openssl rand -hex 32` (NOT -base64: `/` and `+` break the connection URL it is\n' +
       'embedded in), then copy the same value into the password segment of DATABASE_URL\n' +
       'a few lines above it — compose does not keep the two in sync.\n' +
-      'See docs/development.md#database-and-cache-credentials.',
+      'See docs/development.md#veritabanı-ve-cache-kimlik-bilgileri.',
   );
 }
 
@@ -174,7 +174,7 @@ if (!capture('docker', ['compose', 'version'])) {
   fail(
     'Docker Compose v2 is not available.',
     'This script needs the `docker compose` plugin form; the v1 `docker-compose` binary is\n' +
-      'not supported. Is Docker running? See docs/development.md#prerequisites.',
+      'not supported. Is Docker running? See docs/development.md#ön-koşullar.',
   );
 }
 

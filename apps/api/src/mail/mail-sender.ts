@@ -36,7 +36,7 @@ export interface MailSender {
    * here" for a deployment that sends mail perfectly well. This asks the question the product
    * actually has, which is a capability and not an identity, and it is the single source the
    * `mailEnabled` signal and the per-send delivery status both read
-   * (`docs/api-conventions.md#instance-configuration`).
+   * (`docs/api-conventions.md#instance-yapılandırması`).
    */
   readonly deliversMail: boolean;
   send(message: MailMessage): Promise<void>;
