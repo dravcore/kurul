@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-09
 
-> 🌐 [English (kanonik)](../../decisions/0010-task-permissions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Faz 4, task CRUD ve drag-and-drop taşımalarını getiriyor.

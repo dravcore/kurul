@@ -4,8 +4,6 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — "standart seçim" gerekçesine dayanmak yerine, Redis adapter'ın ne zaman gerçekten gerekli olduğunu belirtir.
 
-> 🌐 [English (kanonik)](../../decisions/0005-realtime-socketio.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Bir kanban board'unun, bağlı client'lar arasında board/task state'ini senkron tutması gerekiyor. Proje, serverless bir deployment'ı hedeflemek yerine, zaten kendi Postgres ve Redis altyapısını çalıştırıyor.

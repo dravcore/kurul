@@ -3,8 +3,6 @@
 **Durum:** [0028](0028-open-contributions-hosted-service.md) tarafından yerini aldı
 **Tarih:** 2026-08-12
 
-> 🌐 [English (kanonik)](../../decisions/0015-no-external-contributions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 > **Yerini aldı:** katkılar 2026-08-21'de [0028](0028-open-contributions-hosted-service.md) ile yeniden açıldı. Kod, doküman ve çeviri pull request'leri, CLA olmadan ve imzalanacak hiçbir şey olmadan, düz AGPL-3.0 altında yeniden kabul ediliyor. Aşağıdaki FSEK sorusunun artık cevaplanması gerekmiyor, çünkü hiçbir şey yeniden lisanslanmıyor. Bu kayıt tarihsel olarak duruyor; içindeki hiçbir şey yürürlükte değil.
 
 ## Bağlam
@@ -37,7 +35,7 @@ Bu ADR, [ADR 0014](0014-dual-licensing-cla.md)'ün **yerini almıyor**. 0014'ün
 
 - **Kod yazan bir topluluk oluşmuyor.** Bu, açık kaynağın en büyük avantajlarından birinden — dışarıdan gözler, dışarıdan yamalar, dışarıdan bakım — vazgeçmek demek ve bu kararın en büyük maliyeti; isteksizce değil, bilinçli olarak göze alınıyor. Kod hâlâ açık, okunabilir, fork'lanabilir ve AGPL-3.0 ile self-host edilebilir; kapalı olan, içeri gelen yol.
 - **Tek geliştirici darboğaz.** Proje büyürse üretim hızı tek kişinin zamanıyla sınırlı ve bunu rahatlatacak bir mekanizma yok. Birikmiş iş devredilemiyor ve bus factor'ün bir olması hiçbir şeyle telafi edilmiyor.
-- **Yardım etmek isteyenler geri çevrilecek ve bir kısmı bunu kişisel algılayacak.** Reddedilen bir pull request, gerekçesi ne kadar dikkatli yazılırsa yazılsın reddedilme olarak okunuyor ve bazı katkıcılar projenin gerçekten açık kaynak olmadığı sonucuna varacak. [CONTRIBUTING.md](../../../CONTRIBUTING.md) bu duruşu açıkça ve önceden söylüyor ki kimse emeğini harcadıktan sonra öğrenmesin; bu konuda yapılabilecek en fazlası bu.
+- **Yardım etmek isteyenler geri çevrilecek ve bir kısmı bunu kişisel algılayacak.** Reddedilen bir pull request, gerekçesi ne kadar dikkatli yazılırsa yazılsın reddedilme olarak okunuyor ve bazı katkıcılar projenin gerçekten açık kaynak olmadığı sonucuna varacak. [CONTRIBUTING.md](../../CONTRIBUTING.md) bu duruşu açıkça ve önceden söylüyor ki kimse emeğini harcadıktan sonra öğrenmesin; bu konuda yapılabilecek en fazlası bu.
 - **Duraklamanın bitiş tarihi yok.** ADR 0014 CLA'nın yürürlüğe gireceği beklentisiyle yazılmıştı; bu karar bilinçli olarak hiçbir takvim vaat etmiyor, çünkü kayan bir tarih vaadi dürüst bir "belirsiz"den daha kötü.
 - **Karar geri alınabilir ve geri alındığı an sorun aynen geri geliyor.** Katkıları yeniden açmak önce CLA'nın yürürlükte olmasını, o da bu ADR'nin ertelediği hukuki incelemeyi gerektiriyor — FSEK sorusu zamanla ne kolaylaşıyor ne ucuzluyor. Buradaki hiçbir şey tek yönlü bir kapı değil, ama kapı yalnızca 0014'ün tarif ettiği sırayla açılıyor.
 - **Dokümantasyonun tek dilde kanonik kalması artık gelenek değil zorunluluk.** Çeviri katkıları kapalı olduğu için `docs/tr/` altındaki Türkçe ayna, güncel tutulması sahibin kendi işi olan bir yük olmaya devam ediyor.

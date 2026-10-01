@@ -20,8 +20,6 @@ süpürmenin penceresini aştığı gözlemlenirse yeniden gözden geçir" şart
 gibi işlemesi: karar, varsayımla değil ölçümle ve yalnızca ölçümün istediği yerde yeniden gözden
 geçirildi.
 
-> 🌐 [English (kanonik)](../../decisions/0020-data-retention.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Bu karara kadar Kurul bir satırı yalnızca bir kullanıcı istediğinde siliyordu. Due-soon

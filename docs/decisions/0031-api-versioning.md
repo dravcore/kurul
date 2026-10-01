@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-23
 
-> 🌐 [English (kanonik)](../../decisions/0031-api-versioning.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 REST API, `apps/api/openapi.json`'da commit edilen ve `/docs`'ta servis edilen, üretilmiş bir

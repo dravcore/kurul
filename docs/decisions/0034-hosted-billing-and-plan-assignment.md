@@ -3,8 +3,6 @@
 **Durum:** Önerildi
 **Tarih:** 2026-08-26
 
-> 🌐 [English (kanonik)](../../decisions/0034-hosted-billing-and-plan-assignment.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 [ADR 0028](0028-open-contributions-hosted-service.md) paranın nereden geleceğine karar verdi:
@@ -132,7 +130,7 @@ bir kod yolunu paylaşır.
 İkinci bir tablo, `BillingEvent`, 4. bölümün idempotency defteridir: bu şemadaki her satır gibi
 `id String @id @default(uuid(7))`, ardından `provider`, `eventId` ve `receivedAt`, `(provider,
 eventId)` üzerinde tekil bir indeksle. Tablonun var olma nedeni ve **okunduğu** anahtar o tekil
-çifttir; id ise isteğe bağlı bir süs değildir, çünkü [CLAUDE.md](../../../CLAUDE.md) her satırın
+çifttir; id ise isteğe bağlı bir süs değildir, çünkü [CLAUDE.md](../../CLAUDE.md) her satırın
 id'sini UUIDv7 yapıyor ve bu tablonun aşağıda girdiği saklama süpürmesi, API'deki her cursor gibi `id`
 üzerinden sayfalıyor.
 
@@ -387,7 +385,7 @@ reddetmek için inşa edildi ve faturalandırma, ondan bundan fazlasını isteye
   davet oluşturma ve kabul etme ve dosya eki oluşturma workspace başına serileşir. Bu, eşzamanlılık
   altında gerçek bir gecikme maliyetidir ve tam tavana ihtiyaç duyan deployment'lar için, ADR 0027'nin
   önceden gördüğü bir tetikle değil, bu kaydın yazdığı bir tetikle burada kabul ediliyor.
-- **Kabul edilirse [ROADMAP.md](../../../ROADMAP.md) ve
+- **Kabul edilirse [ROADMAP.md](../../ROADMAP.md) ve
   [api-conventions.md](../api-conventions.md) değişir, bu kayıt onları değiştirmez.** "Hosted service
   billing and plan assignment" satırı buraya bir link ve ilk bir alt maddesi (ADR'nin kendisi) kazanır,
   kabul kriteri atıllık e2e'siyle büyür ve api-conventions'ın `Plan limitleri` bölümü

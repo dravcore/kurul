@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-08
 
-> 🌐 [English (kanonik)](../../decisions/0001-monorepo-modular-monolith.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Kurul henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk satır yazılmadan önce hem kod organizasyonu ekseni (monorepo vs. polyrepo) hem de runtime ekseni (monolit vs. mikroservis) karara bağlanmalı. Bu iki eksen birbirinden bağımsız — kodun _nasıl saklandığı_, _nasıl çalıştığı_ değildir — ve ikisi de açık bir cevap gerektiriyor.

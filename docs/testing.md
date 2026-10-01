@@ -2,8 +2,6 @@
 
 Kurul'un neyi, hangi araçlarla test ettiği ve CI'ın neyi zorunlu kıldığı.
 
-> 🌐 [English (kanonik)](../testing.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## İçindekiler
 
 - [Strateji](#strateji)
@@ -111,7 +109,7 @@ akışlar binden fazla unit testi ve her endpoint için bir integration testiyle
 ve **bir kez bile gerçek bir tarayıcıda değil**. İki suite de hiç render olmayan bir board
 ile yeşil kalır.
 
-Suite [`e2e/`](../../e2e) altında yaşar, derlenmiş bir API ve production web build'i
+Suite [`e2e/`](../e2e) altında yaşar, derlenmiş bir API ve production web build'i
 üzerinde gerçek bir Chromium koşturur, ve tam olarak sekiz senaryodur. Dört senaryoyla başladı ve
 yalnızca stack seviyesindeki bağlantısına başka hiçbir şeyin ulaşamadığı özelliklerle büyüdü:
 gerçek bir tarayıcıdan gelen gerçek bir multipart yükleme, importer'ı besleyen gerçek bir dosya
@@ -178,7 +176,7 @@ axe kuralı düzeltilmek yerine bastırılır. `tests/` içinde değil, çünkü
 değil, bir UI fazının sonunda talep üzerine üretilen kanıttır; ve her gecelik koşuya on iki sayfa
 yüklemesi eklemek, bir faz kapanana kadar kimsenin okumadığı bir sonuç için her run'a maliyet
 biner. Çıktısı bir çalışma notudur, dolayısıyla diğer bütün çalışma notları gibi repo dışında
-kalır; kalıcı olan [ROADMAP.md](../../ROADMAP.md)'ye ya da bir ADR'ye girer.
+kalır; kalıcı olan [ROADMAP.md](../ROADMAP.md)'ye ya da bir ADR'ye girer.
 
 **`measure.config.ts`** (`e2e/measure/`), bu deponun söz verdiği performans sayılarını üretir:
 10 MB'lık bir yükleme, 500 kartlık bir Trello import'u ve board'un badge maliyeti. Her dosya
@@ -291,7 +289,7 @@ tane: Trello'nun kendi varsayılan "Starter Guide" panosu ve on bir listeli bir 
 `trello-import-real.e2e-spec.ts` oradaki her `*.json` dosyasını gerçek endpoint üzerinden import
 eder ve raporu ile veritabanını dosyadan türetilen sayılarla karşılaştırır; ikisi de temiz şekilde
 import ediliyor, okuyucunun kullandığı hiçbir alanda sentetik fixture'larla fark çıkmadı
-([`fixtures/trello/README.md#field-mapping-diffs`](../../apps/api/test/fixtures/trello/README.md#field-mapping-diffs)).
+([`fixtures/trello/README.md#field-mapping-diffs`](../apps/api/test/fixtures/trello/README.md#field-mapping-diffs)).
 Dizin bir gün yeniden boşalırsa spec tam olarak bir atlanmış test bildirir,
 `no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, böylece açık kapı
 CI'da görünür kalır. Anonimleştiricinin kendi unit testleri `pnpm test:scripts` ile `node:test`
@@ -507,7 +505,7 @@ Kapının üstündeki altı job paralel koşar ve hiçbiri bir diğerine `needs`
 container'ı olan tek job `test-integration`'dır, bu yüzden `test-unit` içindeki unit suite'ler
 container çekmeden başlar. Pipeline'ın duvar saati süresi dolayısıyla job'ların toplamı değil
 en uzun job'ıdır ve
-[ROADMAP.md](../../ROADMAP.md#hardening-track) içindeki
+[ROADMAP.md](../ROADMAP.md#hardening-track) içindeki
 OPS-10 satırına karşı izlenir.
 
 **Merge öncesi tüm adımlar geçmelidir.** `main` ve `develop` üzerindeki branch koruması iki
@@ -534,7 +532,7 @@ CI, `develop` ve `main`'e yapılan push'larda olduğu gibi herhangi bir branch'a
 request'lerde çalışır. Bkz.
 [git-strategy.md](git-strategy.md#pull-request-süreci).
 
-Workflow dosyası: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
+Workflow dosyası: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
 ### Imaj build'i ve CVE taraması
 
@@ -580,7 +578,7 @@ job'larının yanında koşar.
 ### CI'da browser e2e
 
 Browser suite'i kendi workflow'unda,
-[`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml), farklı bir takvimle ve
+[`.github/workflows/e2e.yml`](../.github/workflows/e2e.yml), farklı bir takvimle ve
 **`ci-ok` kapısının dışında** koşar:
 
 | Tetikleyici                            | Neden                                                                                                                |
@@ -612,4 +610,4 @@ edilebilir kılan da budur.
 - [coding-standards.md](coding-standards.md) — testlerin varsaydığı kod konvansiyonları
 - [api-conventions.md](api-conventions.md) — assert edilecek status kodları ve hata şekilleri
 - [git-strategy.md](git-strategy.md) — PR gereksinimleri
-- [../../ROADMAP.md](../../ROADMAP.md) — MVP durumu ve Beyond MVP
+- [../../ROADMAP.md](../ROADMAP.md) — MVP durumu ve Beyond MVP

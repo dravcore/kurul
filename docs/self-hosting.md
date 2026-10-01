@@ -3,8 +3,6 @@
 Kurul'u bir sunucuya, kendi domain'inize, HTTPS ve çalışan e-posta ile kurun. Aşağıdakilerin
 tamamı bilinçli olarak tek sayfa; çoğu DNS beklemekle geçen yaklaşık bir saat ayırın.
 
-> 🌐 [English (kanonik)](../self-hosting.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları indirir ve aynı imaj
 her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (gerekçesi için bkz.
 [Neden yeniden build gerekmiyor](#neden-yeniden-build-gerekmiyor)).
@@ -540,7 +538,7 @@ için `docker-compose.yml` içinde sabit bir liste tanımlanamaz, bu yüzden `ba
 compose dosyasının yanındaki isteğe bağlı `rclone.env` dosyasını okur. O dosyayı yalnızca bu
 container okur. `.env`'i de hiçbir container okumaz: Compose onu `${VAR}` enterpolasyonu için
 kullanır ve her servise açık bir anahtar listesi iletir. API'nin okuduğu her ayar için o liste,
-[`docker-compose.yml`](../../docker-compose.yml) içindeki `api` servisinin `environment:`
+[`docker-compose.yml`](../docker-compose.yml) içindeki `api` servisinin `environment:`
 bloğudur; o blokta olmayan bir anahtar `.env`'de nasıl ayarlanırsa ayarlansın API'ye ulaşmaz.
 `rclone.env`'i `chmod 600` ile oluşturun ve git'e sokmayın (`.gitignore` zaten listeliyor).
 
@@ -731,7 +729,7 @@ eklediği servis (`demo` profilinin `demo-reset`'i), compose'un ilettiği deği�
 dosyaları bu yüzden yeniden indirir. Adımları her seferinde bu sırayla yapın; hiçbiri uzun
 değil.
 
-1. **Release'i okuyun.** Hedef sürümün [CHANGELOG](../../CHANGELOG.md) bölümü her kırıcı
+1. **Release'i okuyun.** Hedef sürümün [CHANGELOG](../CHANGELOG.md) bölümü her kırıcı
    değişikliği ve her migration notunu taşır; aşağıdaki
    [Operatörler için sürüm notları](#operatörler-için-sürüm-notları) ise `pull`'dan önce sizden
    bir şey isteyenleri gösterir.
@@ -803,13 +801,13 @@ adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonr
 Bir release'in bu sayfanın indirttiği dosyalarda neyi değiştirdiği ya da `pull`'dan önce
 sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca onları gösterir.
 
-- **Sonraki release ([Unreleased](../../CHANGELOG.md#unreleased)):** Better Auth 1.7.5,
+- **Sonraki release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.5,
   `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor: 0.4.0'ın eklediği ve
   Better Auth'un artık yazmadığı `Account.issuer` sütunundan `NOT NULL` kısıtını ve benzersiz
   indeksi kaldırıyor. Çalıştırılacak bir şey yok, onu 2. adımdaki yedek karşılıyor. Sonrasında
   v0.4.1'e geri dönmek şema değişikliği gerektirmez, ama yükseltmeden sonra açılan bir hesap
   v0.4.1'de oturum açamaz.
-- **0.4.0 ([CHANGELOG](../../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1,
+- **0.4.0 ([CHANGELOG](../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1,
   `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor; çalıştırılacak bir şey
   yok, ama onu karşılayan 2. adımdaki yedek. `BACKUP_REMOTE` ve host dışı kopya, 3. adımdaki
   `scripts/backup.sh` ve `docker-compose.yml`'i gerektirir (v0.3.0'ın script'i değişkeni hata
@@ -818,7 +816,7 @@ sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca o
   `.env.example`'ın `.env`'inizde bıraktığı `TRUST_PROXY=false` satırını silin, yoksa Caddy
   arkasındaki API istemci adreslerini görmeyi bırakır
   ([ayrıntı](#kendi-reverse-proxynizi-kullanmak)).
-- **0.3.0 ([CHANGELOG](../../CHANGELOG.md#030---2026-08-22)):** attachment kotalarına
+- **0.3.0 ([CHANGELOG](../CHANGELOG.md#030---2026-08-22)):** attachment kotalarına
   varsayılan geldi; upgrade'den önce kullanımınızı kontrol edin, bkz. aşağıdaki
   [Attachment kotalarının artık varsayılanı var](#attachment-kotalarının-artık-varsayılanı-var).
   Ayrıca `kurul-migrate`'i yayınlayan ilk sürüm, yani bu sayfadaki `curl` kurulumunun çalıştığı

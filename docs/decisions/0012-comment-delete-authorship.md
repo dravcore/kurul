@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-09
 
-> 🌐 [English (kanonik)](../../decisions/0012-comment-delete-authorship.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 [ADR 0011](0011-label-task-metadata-permissions.md) Faz 5 için düz bir kural getirdi: herhangi

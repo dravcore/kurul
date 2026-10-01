@@ -6,14 +6,12 @@ Açık kaynak, Kanban odaklı proje yönetim aracı.
 
 ![Kurul panosu](docs/assets/board.png)
 
-> 🌐 [English (canonical)](README.md) | Türkçe
-
 ## Durum
 
 Kurul’ın **MVP özellik seti (Faz 1–9) tamamlandı** (Faz 0 docs/standartlardı): auth/workspace’ler, board ve
 task’lar, filtreleme, dashboard, aktivite/bildirimler ve realtime board senkronu. Kritik tarayıcı
 akışlarını sekiz senaryoluk bir Playwright smoke paketi kapsıyor
-([docs/tr/testing.md](docs/tr/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
+([docs/tr/testing.md](docs/testing.md#browser-uçtan-uca)). O günden bu yana ne sevkedildiği,
 neyin üzerinde çalışıldığı ve neyin bilinçli olarak programa alınmadığı tek bir yerde,
 [ROADMAP.md](ROADMAP.md) içinde; burada ikinci kez listelenip eskimesin diye.
 
@@ -50,7 +48,7 @@ Kurul'un cevabı bilinçli olarak dar:
 - **Tek lisans, tek katman.** Kod tabanının tamamı AGPL-3.0, hiçbir şey saklı değil. Ticari
   model isteğe bağlı bir barındırma servisi; ücretli bir özellik sürümü değil. Kendi sunucunuzda
   çalıştırmak ücretsiz ve eksiksiz
-  ([ADR 0028](docs/tr/decisions/0028-open-contributions-hosted-service.md)).
+  ([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)).
 - **Güncel stack, tek compose dosyası.** Next.js 16 / NestJS 11 / PostgreSQL 18, uçtan uca
   TypeScript, tamamı için `docker compose pull && docker compose up -d` — yayınlanmış
   image'lar, lokal build gerekmiyor.
@@ -61,8 +59,8 @@ Ve `v0.4.1` itibarıyla olmayanlar: subtask yok, zaman takibi yok, webhook yok. 
 token'lar bu sürümle çıkıyor: workspace'e scope'lanıyor ve `Authorization: Bearer` ile
 gönderiliyor, yani bir script ya da bir CI job'ı bir board'u sürebiliyor; bunu stabil bir API'ye
 çeviren `/v1` öneki ise 1.0'da geliyor, öncesinde değil
-([ADR 0031](docs/tr/decisions/0031-api-versioning.md)). Webhook'ların ise tasarımı var
-([ADR 0033](docs/tr/decisions/0033-webhook-delivery-and-failure-policy.md)),
+([ADR 0031](docs/decisions/0031-api-versioning.md)). Webhook'ların ise tasarımı var
+([ADR 0033](docs/decisions/0033-webhook-delivery-and-failure-policy.md)),
 uygulaması yok. UI hem İngilizce hem Türkçe konuşuyor (her arayüz metni, yeni bir board'un
 başladığı column adları ve size gönderdiğimiz e-posta dahil) ve üçüncü bir dil bir katalog
 uzakta. Webhook'lar ve ek dil paketleri
@@ -97,16 +95,16 @@ Faz 1–9 (Faz 0 docs/standartlardı), `v0.1.0` ile geldi. Sıralama geçmişi i
   workspace farklı diller okuyan insanları bir arada tutabilir. Giriş yaptığınız her cihaza
   gelir, oluşturduğunuz board'un başladığı column adlarını belirler ve size gönderilen e-postanın
   dilini seçer. Bir katalogda olup diğerinde olmayan bir key build'i düşürür
-  ([ADR 0018](docs/tr/decisions/0018-localization-strategy.md))
+  ([ADR 0018](docs/decisions/0018-localization-strategy.md))
 - **Checklist'ler**: bir task'ta birden çok adlandırılmış checklist, her birinin kendi
   item'ları; board kartında ilerleme rozeti (`3/5`) görünür, task'ta checklist yoksa hiç
-  görünmez ([ADR 0023](docs/tr/decisions/0023-checklist-data-model.md))
+  görünmez ([ADR 0023](docs/decisions/0023-checklist-data-model.md))
 - **Ek'ler**: kartta dosya ve bağlantı. Dosyalar kendi diskinizde saklanır, uzantısına değil
   magic byte'larına bakılarak kabul edilir ve sizin belirlediğiniz boyut limitiyle geri servis
   edilir; görseller panelde önizlenir. Bağlantı saklanır, gösterilir ve açılır — sunucu o URL'e
   hiç istek atmaz, yani hiçbir önizleme fetch'i ağınızı yoklayan bir araca dönüşemez
-  ([ADR 0022](docs/tr/decisions/0022-attachment-storage.md),
-  [ADR 0024](docs/tr/decisions/0024-attachment-kinds-and-serving-policy.md))
+  ([ADR 0022](docs/decisions/0022-attachment-storage.md),
+  [ADR 0024](docs/decisions/0024-attachment-kinds-and-serving-policy.md))
 - **Trello import'u (tek yönlü)**: bir Trello board'unun JSON export'unu yükleyin, karşılığında
   bir Kurul board'u alın: list'ler, kart'lar, label'lar ve checklist'ler. Tek yönlüdür ve
   tekrarlanabilir değildir: **aynı export'u iki kez import etmek iki board yaratır** — yerinde
@@ -118,9 +116,9 @@ Faz 1–9 (Faz 0 docs/standartlardı), `v0.1.0` ile geldi. Sıralama geçmişi i
   kolon "başlanmadı" olarak gelir — Kurul hangi kolonunuzun "bitti" demek olduğunu asla tahmin
   etmez, onu sonradan siz ayarlarsınız. Rapor yalnız cevabın içindedir: bir kez gösterilir,
   saklanmaz, kapatmak kalıcıdır
-  ([ADR 0025](docs/tr/decisions/0025-trello-import-mapping.md))
+  ([ADR 0025](docs/decisions/0025-trello-import-mapping.md))
 - **Hesap silme**: kendi kendine silme talebi `User` satırınızı silmek yerine yerinde
-  anonimleştirir ([ADR 0026](docs/tr/decisions/0026-account-deletion-anonymisation.md))
+  anonimleştirir ([ADR 0026](docs/decisions/0026-account-deletion-anonymisation.md))
 - **E-posta bildirimleri**: atama, mention ve due-soon uyarıları artık alıcının dilinde
   e-postayla da gidiyor, kullanıcı başına açılıp kapatılabilir
 - **Board şablonları**: yeni bir board artık her zaman aynı varsayılan kolonlar yerine dört
@@ -130,7 +128,7 @@ Faz 1–9 (Faz 0 docs/standartlardı), `v0.1.0` ile geldi. Sıralama geçmişi i
 - **E-postayla parola sıfırlama**: kendi kendine "parolanızı mı unuttunuz" bağlantısı.
   Sıfırlama hesaptaki her oturumu kapatır, yani çalınan bir oturum parolayla birlikte ölür
 - **Plan limitleri**: koltuk, board, workspace ve hesap sayısına isteğe bağlı tavanlar; bir
-  operatör ayarlamadıkça sınırsız ([ADR 0032](docs/tr/decisions/0032-plan-limits.md))
+  operatör ayarlamadıkça sınırsız ([ADR 0032](docs/decisions/0032-plan-limits.md))
 - **Demo modu**: herkese açık, kendi kendini sıfırlayan bir demo instance çalıştırmak için
   `DEMO_MODE=true` anahtarı
 
@@ -157,7 +155,7 @@ sunar; `api` ve `web` kendi host portlarını yayınlamaz. İkisini tek origin'd
 **aynı yayınlanmış imaj her domain'de yeniden build edilmeden çalışır** — kendi domain'inize
 taşımak için `.env`'de `SITE_URL=https://kurul.example.com` ayarlamanız yeterli, bu aynı
 zamanda otomatik HTTPS'i de açar. SMTP dahil tek sayfalık rehber:
-[docs/tr/self-hosting.md](docs/tr/self-hosting.md).
+[docs/tr/self-hosting.md](docs/self-hosting.md).
 
 Her etiketli release, servis imajlarını GHCR'a yayınlar (`ghcr.io/dravcore/kurul-api`,
 `ghcr.io/dravcore/kurul-web` ve — v0.2.0'dan sonraki ilk sürümden itibaren — tek seferlik
@@ -225,7 +223,7 @@ için olan `pnpm db:migrate:dev` ikisini birden yapar).
 `POSTGRES_PASSWORD`'ün varsayılanı yoktur: ayarlanmadan compose başlamayı reddeder. Doğrudan bir
 bağlantı URL'ine gömüldüğü için `-base64` ile değil `openssl rand -hex 32` ile üretin. Bunun neden
 önemli olduğu tek bir yerde yazılı:
-[docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri).
+[docs/tr/development.md#veritabanı-ve-cache-kimlik-bilgileri](docs/development.md#veritabanı-ve-cache-kimlik-bilgileri).
 Dev loop'ta `.env.example`'da birkaç satır üstündeki `DATABASE_URL`'in şifre kısmı bununla elle
 eşleştirilmelidir — o host tarafındaki string, `pnpm dev`'in `localhost:5432`'ye ulaşmak için
 kullandığı şeydir ve compose ikisini senkronize tutmaz. `docker compose up` kendi bağlantı
@@ -235,9 +233,9 @@ Uygulama SMTP yapılandırılmadan da ayağa kalkar, ama davetler yapılandırı
 edilemez — yukarıdaki dev compose dosyası [Mailpit](https://mailpit.axllent.org/)'i zaten
 başlatır, böylece bu akışı gerçek bir mail sağlayıcısı olmadan lokal olarak test edebilirsiniz
 (`SMTP_HOST=localhost`, `SMTP_PORT=1025`); bkz.
-[docs/tr/development.md#smtp-ve-mailpit](docs/tr/development.md#smtp-ve-mailpit).
+[docs/tr/development.md#smtp-ve-mailpit](docs/development.md#smtp-ve-mailpit).
 
-Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
+Günlük detaylar: [docs/tr/development.md](docs/development.md).
 
 ## Stack
 
@@ -251,22 +249,22 @@ Günlük detaylar: [docs/tr/development.md](docs/tr/development.md).
 | Deployment        | Docker Compose                                                                 |
 | Mimari            | Monorepo, modüler monolit — mikroservis yok                                    |
 
-Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tr/tech-stack.md) ve
-[docs/tr/decisions/](docs/tr/decisions/).
+Her seçimin tam gerekçesi: [docs/tr/tech-stack.md](docs/tech-stack.md) ve
+[docs/tr/decisions/](docs/decisions/).
 
 ## Dokümantasyon
 
 Beş dakikalık harita (EN kanonik): **[docs/README.md](docs/README.md)**. Türkçe harita:
-**[docs/tr/README.md](docs/tr/README.md)**.
+**[docs/tr/README.md](docs/README.md)**.
 
 | Doküman                                                  | Kapsam                                                 |
 | -------------------------------------------------------- | ------------------------------------------------------ |
-| [docs/tr/architecture.md](docs/tr/architecture.md)       | Modül haritası, veri modeli                            |
-| [docs/tr/design.md](docs/tr/design.md)                   | UI/UX dili                                             |
-| [docs/tr/development.md](docs/tr/development.md)         | Yerel kurulum ve günlük komutlar                       |
-| [docs/tr/api-conventions.md](docs/tr/api-conventions.md) | REST, hatalar, pagination                              |
+| [docs/tr/architecture.md](docs/architecture.md)       | Modül haritası, veri modeli                            |
+| [docs/tr/design.md](docs/design.md)                   | UI/UX dili                                             |
+| [docs/tr/development.md](docs/development.md)         | Yerel kurulum ve günlük komutlar                       |
+| [docs/tr/api-conventions.md](docs/api-conventions.md) | REST, hatalar, pagination                              |
 | [ROADMAP.md](ROADMAP.md) (İngilizce)                     | Sağlamlaştırma + özellik hatları, beyond-MVP backlog'u |
-| [docs/tr/decisions/](docs/tr/decisions/)                 | ADR’ler                                                |
+| [docs/tr/decisions/](docs/decisions/)                 | ADR’ler                                                |
 
 ## Katkıda bulunma
 
@@ -302,9 +300,9 @@ Kurul'u kendi sunucunuzda çalıştırmak sonsuza kadar ücretsiz. Kendi kurduğ
 hiçbir şey esirgenmiyor, open core yok, ayrıca satılan bir sürüm de yok. Dravcore'un para
 istediği tek şey isteğe bağlı bir barındırma servisi: bizim sunucularımızda bir hesap,
 yayınlanmış limitlerin (koltuk, board, depolama) içinde ücretsiz, üzerinde ücretli
-([ADR 0028](docs/tr/decisions/0028-open-contributions-hosted-service.md)). O servis de bu
+([ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md)). O servis de bu
 depodaki aynı AGPL-3.0 kodunu çalıştırıyor. Plan limitleri katmanı çoktan sevkedildi, yani kendi
 instance'ını çalıştıran herkes o limitleri kendi belirleyebilir ya da tümüyle kapatabilir
-([ADR 0032](docs/tr/decisions/0032-plan-limits.md)). Bu limitlerin üzerine faturalama ise hâlâ
+([ADR 0032](docs/decisions/0032-plan-limits.md)). Bu limitlerin üzerine faturalama ise hâlâ
 önerilen bir tasarım, henüz inşa edilmedi
-([ADR 0034](docs/tr/decisions/0034-hosted-billing-and-plan-assignment.md)).
+([ADR 0034](docs/decisions/0034-hosted-billing-and-plan-assignment.md)).

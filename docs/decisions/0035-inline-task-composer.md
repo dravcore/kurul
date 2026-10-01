@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-26
 
-> 🌐 [English (kanonik)](../../decisions/0035-inline-task-composer.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 [design.md](../design.md) §5, board'u bloklamasına izin verilen etkileşimleri sayıyor:

@@ -4,8 +4,6 @@
 [ADR 0012](0012-comment-delete-authorship.md) aldı; diğer tüm satırlar geçerliliğini korur)
 **Tarih:** 2026-08-09
 
-> 🌐 [English (canonical)](../../decisions/0011-label-task-metadata-permissions.md) | Türkçe
-
 ## Bağlam
 
 Faz 5 board label'ları, assignee'ler, priority/due/estimate alanları ve yorumları ekler.

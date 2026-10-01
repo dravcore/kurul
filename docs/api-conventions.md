@@ -3,8 +3,6 @@
 Kurul API'si için REST konvansiyonları: URL'ler, verb'ler, payload'lar, hatalar,
 pagination ve DTO'lar.
 
-> 🌐 [English (kanonik)](../api-conventions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## İçindekiler
 
 - [Kapsam](#kapsam)
@@ -1128,7 +1126,7 @@ UUIDv7 string'leridir.
 ## OpenAPI belgesi
 
 Bu sayfa düz metin. Makine tarafından okunabilir olanı
-**[`apps/api/openapi.json`](../../apps/api/openapi.json)** — çalışan uygulamadan üretiliyor;
+**[`apps/api/openapi.json`](../apps/api/openapi.json)** — çalışan uygulamadan üretiliyor;
 içindeki her path, parametre, request body ve response, NestJS router'ının ve DTO sınıflarının
 gerçekten beyan ettiği şey.
 

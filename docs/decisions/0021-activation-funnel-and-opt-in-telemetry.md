@@ -3,13 +3,11 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-14
 
-> 🌐 [English (kanonik)](../../decisions/0021-activation-funnel-and-opt-in-telemetry.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Kurul kendi kullanımı hakkında hiçbir şey ölçmüyordu. `apps/` ve `docs/` altında
 `telemetry`, `analytics`, `posthog`, `plausible`, `umami` araması kaynak kodda sıfır eşleşme
-veriyordu; roadmap'in (bugünkü [ROADMAP.md](../../../ROADMAP.md)) "Beyond MVP" listesinde metrik
+veriyordu; roadmap'in (bugünkü [ROADMAP.md](../../ROADMAP.md)) "Beyond MVP" listesinde metrik
 maddesi yoktu. Dolayısıyla her ürün sorusu sezgiyle yanıtlanıyordu:
 
 - Onboarding nerede kopuyor — kayıt, workspace, board, ilk kart, ilk davet?

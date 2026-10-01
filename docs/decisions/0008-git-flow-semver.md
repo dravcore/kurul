@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-08
 
-> 🌐 [English (kanonik)](../../decisions/0008-git-flow-semver.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Kurul, tek bir hosted SaaS instance'ını sürekli deploy etmek yerine, self-hosted bir ürünün versiyonlanmış release'lerini yayınlıyor. Branching modelinin, commit konvansiyonunun ve versiyonlama şemasının bu release şekline uyması gerekiyor.

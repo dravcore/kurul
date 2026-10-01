@@ -6,8 +6,6 @@
 birlikte ilerledi: `en.json` ve `tr.json` bugün her biri 514 yaprak key taşıyor, katalog-parity
 kapısının şart koştuğu gibi hâlâ birbirine eşit.
 
-> 🌐 [English (kanonik)](../../decisions/0018-localization-strategy.md) | Türkçe
-
 ## Bağlam
 
 Ürün planı, İngilizce arayüzü baştan sona bitirmek ve ardından ikinci dil olarak Türkçeyi

@@ -4,8 +4,6 @@
 [0015](0015-no-external-contributions.md)'in yerini alır)
 **Tarih:** 2026-08-21
 
-> 🌐 [English (kanonik)](../../decisions/0028-open-contributions-hosted-service.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 > **Güncellendi (2026-08-22):** `docs/archive/` CLA taslağıyla birlikte tamamen kaldırıldı. Aşağıda
 > `docs/cla.md`'yi `docs/archive/cla-draft.md`'ye taşıyan sonuç uygulandı ve bir gün sonra geçersiz
 > kaldı; taslak artık yalnızca git geçmişinde.
@@ -102,7 +100,7 @@ Bu ADR, 0014 ve 0015'in yerini bütünüyle alır. 0007'yi tamamlar.
   genişletiyor: yapılandırmadan okunan yumuşak tavanlar, ayarlanmadığında sınırsız, aşıldığında açık
   bir hata koduyla `413` tarzı bir ret. Faturalama entegrasyonu ve plan ataması da aynı açık kodun
   parçası, yalnızca barındırılan instance'ın verdiği yapılandırmayla açılıyor. Kapsam ve sıralama
-  [ROADMAP.md](../../../ROADMAP.md) içinde.
+  [ROADMAP.md](../../ROADMAP.md) içinde.
 - **Dış işi review etmek artık gerçek maintainer zamanı.** CONTRIBUTING.md, PR şablonu ve
   `docs/coding-standards.md`, bir yabancının PR açmadan önce okuduğu sözleşme hâline geliyor;
   dolayısıyla neyin merge edildiği konusunda net olmaları gerekiyor. CI, fork'lardan gelen pull

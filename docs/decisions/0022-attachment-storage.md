@@ -3,13 +3,11 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-14
 
-> 🌐 [English (kanonik)](../../decisions/0022-attachment-storage.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Kurul insanlara bunu yapamadığını, üstelik nedenini de söyleyerek anlatıyor. `README.md`,
 ürünün `v0.1.0`'da olmadığı şeyler arasında "no task attachments" satırını taşıyor ve
-[ROADMAP.md — Beyond MVP](../../../ROADMAP.md#beyond-mvp)'ye işaret ediyor; oradaki kayıt
+[ROADMAP.md — Beyond MVP](../../ROADMAP.md#beyond-mvp)'ye işaret ediyor; oradaki kayıt
 `Task attachments — Needs an object-storage decision (ADR)` diyor.
 [tech-stack.md](../tech-stack.md) aynı şeyi öbür taraftan söylüyor: "File attachments are out of
 MVP scope. When added, pick an S3-compatible store." Bu doküman ikisinin de beklediği karardır.

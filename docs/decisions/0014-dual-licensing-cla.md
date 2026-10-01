@@ -3,8 +3,6 @@
 **Durum:** [0028](0028-open-contributions-hosted-service.md) tarafından yerini aldı
 **Tarih:** 2026-08-11
 
-> 🌐 [English (kanonik)](../../decisions/0014-dual-licensing-cla.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 > **Yerini aldı:** aşağıda anlatılan ticari lisans modeli ve CLA, 2026-08-21'de [0028](0028-open-contributions-hosted-service.md) ile terk edildi. Gelir artık yalnızca Dravcore'un işlettiği barındırılan bir servisten geliyor, katkılar ise imzalanacak hiçbir sözleşme olmadan, düz AGPL-3.0 altında kabul ediliyor. Bu kayıt tarihsel olarak duruyor; içindeki hiçbir şey yürürlükte değil.
 
 ## Bağlam
@@ -44,7 +42,7 @@ Bu ADR, ADR 0007'nin **yerini almaz, onu tamamlar**. 0007'nin lisans kararı de�
 ## Sonuçlar
 
 - **CLA katkı kaybettirecek.** Bazı geliştiriciler CLA'yı ilke olarak reddeder, bazıları bir yazım hatası düzeltmek için hukuki belge okumaz, bazıları da işvereninden peşine düşmeye üşeneceği bir onay almadan imzalayamaz. Bu, drive-by katkılar üzerinde gerçek ve kalıcı bir vergidir ve genç bir projenin en az sahip olduğu para birimiyle ödenir. Bilerek kabul ediliyor.
-- **Dürüstlük bilinçli, ve o da bir maliyet.** [CONTRIBUTING.md](../../../CONTRIBUTING.md) ve botun yorumu, CLA'nın maintainer'ın kodu ticari lisansla satabilmesi için var olduğunu açıkça söylüyor. Daha muğlak bir ifade kısa vadede daha az katkıda bulunan kaybettirir, biri durumu çözdüğünde daha çok güven kaybettirir.
+- **Dürüstlük bilinçli, ve o da bir maliyet.** [CONTRIBUTING.md](../../CONTRIBUTING.md) ve botun yorumu, CLA'nın maintainer'ın kodu ticari lisansla satabilmesi için var olduğunu açıkça söylüyor. Daha muğlak bir ifade kısa vadede daha az katkıda bulunan kaybettirir, biri durumu çözdüğünde daha çok güven kaybettirir.
 - **Bunların hiçbiri geliri garanti etmiyor.** Çift lisanslama yalnızca AGPL uyumunun gerçekten korkulduğu yerde dönüşür — düzenlemeye tabi kurumlar, ürünü sattıkları bir şeye gömen şirketler, lisans kara listesi tutan hukuk departmanı olan organizasyonlar. Küçük şirketler ve iç dağıtımlar ezici çoğunlukla umursamıyor; AGPL bir aracı kurum içinde self-host etmek zaten hiçbir yükümlülük doğurmuyor. CLA geliri _mümkün_ kılıyor, _muhtemel_ değil; model kusursuz uygulanıp yine de hiçbir şey kazandırmayabilir.
 - **İlk imzasız dış katkı geri alınamaz.** Kontrol devreye girmeden bir PR merge edilirse, o kod yalnızca AGPL'dir. Sonradan çıkarmak, revert etmek veya sıfırdan yeniden yazmak demektir; o kod yerinde dururken ticari lisansı yayımlamak ise lisans ihlali olurdu. Mekanizmanın ilk dış PR'dan sonra değil önce kurulmasının sebebi budur.
 - **Hukuki iş bitmedi.** Belge, açık soruları olan bir taslak — bir şirket kurulduğunda "Biz" kim olacak, PR yorumu geçerli bir imza mı, FSEK'in şekil şartı lisans vermeye de uzanıyor mu, hangi hukuk uygulanacak. Bunlar `docs/cla.md` içinde listeliydi (2026-08-22'de silindi, git geçmişinde) ve CLA kimseyi bağlamadan önce cevaplanmalı. O zamana kadar kontrol, uygulama değil iskele.

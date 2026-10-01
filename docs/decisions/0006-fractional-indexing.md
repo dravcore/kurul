@@ -4,8 +4,6 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — rebalancing periyodik bir job değil, talep üzerine yapılıyor; testing.md ve roadmap.md ile eşleşecek şekilde.
 
-> 🌐 [English (kanonik)](../../decisions/0006-fractional-indexing.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Kanban kartları ve kolonları drag-and-drop ile sürekli yeniden sıralanıyor. Naif bir integer position kolonu, iki mevcut kart arasına bir kart eklendiğinde sonraki her satırın yeniden numaralanmasını gerektiriyor, bu da her drag-and-drop hareketini bir O(n) yazmaya ve board'lar büyüdükçe bir lock contention kaynağına dönüştürüyor.

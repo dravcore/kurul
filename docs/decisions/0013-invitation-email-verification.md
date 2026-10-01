@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-10
 
-> 🌐 [English (kanonik)](../../decisions/0013-invitation-email-verification.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Better Auth'un organization plugin'i bir advisory taşıyor, GHSA-fmh4-wcc4-5jm3: doğrulanmamış
@@ -21,7 +19,7 @@ otomatik olarak uygulanırdı — ancak `apps/api/src/auth/auth.ts`,
 geçer ve açığı açık tutar.
 
 Bu override bir gözden kaçırma değildi. Yazıldığı sırada `sendInvitationEmail` bir no-op'tu
-(e-posta gönderimi MVP ötesine ertelenmişti — bkz. [ROADMAP.md](../../../ROADMAP.md)) ve
+(e-posta gönderimi MVP ötesine ertelenmişti — bkz. [ROADMAP.md](../../ROADMAP.md)) ve
 `emailAndPassword.requireEmailVerification` zaten `false`'tu, dolayısıyla hiçbir kullanıcı
 doğrulanmış bir duruma ulaşamıyordu; davet kontrolünü olduğu gibi açmak her daveti güvensiz
 olmaktan çıkarıp kalıcı olarak kabul edilemez hale getirirdi. better-auth bağımlılığını tek
@@ -74,7 +72,7 @@ doğrulanmış bir e-posta adresi gerektirir.
   haline geliyor; bozuk bir SMTP yapılandırması "API çalışmıyor" yerine "davetler başarısız
   oluyor"a düşer — başlangıçta ona dokunan tek kod yolları davet gönderme ve davet kabuldür.
 - Gelecekteki bildirim e-postaları (mention'lar, due-soon hatırlatmaları — bkz.
-  [ROADMAP.md — MVP ötesi](../../../ROADMAP.md#beyond-mvp)) aynı modülü ve aynı ortam değişkenlerini
+  [ROADMAP.md — MVP ötesi](../../ROADMAP.md#beyond-mvp)) aynı modülü ve aynı ortam değişkenlerini
   yeniden kullanabilir, ileride ikinci bir mail yolu eklemek yerine.
 
 ## Değerlendirilen Alternatifler

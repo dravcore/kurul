@@ -4,8 +4,6 @@
 
 **Tarih:** 2026-08-23
 
-> 🌐 [English (kanonik)](../../decisions/0030-typescript-7-hold.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 TypeScript 7.0 (Go'ya yeniden yazılmış, ~10x daha hızlı, önceden `tsgo` diye bilinen derleyici)

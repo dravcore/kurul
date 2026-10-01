@@ -2,8 +2,6 @@
 
 Kurul için branch modeli, commit convention'ı, PR süreci ve release prosedürü.
 
-> 🌐 [English (kanonik)](../git-strategy.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## İçindekiler
 
 - [Branch modeli](#branch-modeli)
@@ -70,12 +68,12 @@ request üzerinden ulaşır. Bu maintainer'lar için de geçerlidir.
 `hotfix/*`'ten bir merge değilse, bir şeyler ters gitmiştir.
 
 `main` ve `develop` üzerindeki branch protection bunu zorunlu kılar: doğrudan push yok,
-pull request zorunlu. Zorunlu status check'ler [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) ile uygulanır.
+pull request zorunlu. Zorunlu status check'ler [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ile uygulanır.
 
 ### Dependabot ve `main`
 
 Dependabot `main`'e değil, `develop`'a açmalıdır. Her iki ekosistem
-[`.github/dependabot.yml`](../../.github/dependabot.yml) içinde bu yüzden
+[`.github/dependabot.yml`](../.github/dependabot.yml) içinde bu yüzden
 `target-branch: develop` ayarlıdır. Bağımlılık bump'larını doğrudan `main`'e merge etmek
 ([#82](https://github.com/dravcore/kurul/pull/82)'de olduğu gibi) Git Flow'u atlar ve
 `develop`'ı CI config'te geride bırakır — tekrarlanmamalı. Bir Dependabot PR bir şekilde
@@ -450,7 +448,7 @@ Kurul, SemVer'ın garantilerinin 1.0 öncesi daha zayıf olduğu dürüst çekin
 - MINOR: geriye uyumlu özellik.
 - PATCH: geriye uyumlu fix.
 
-1.0.0, [ROADMAP.md](../../ROADMAP.md)'deki MVP özellik seti tamamlandığında ve REST API uyumluluk
+1.0.0, [ROADMAP.md](../ROADMAP.md)'deki MVP özellik seti tamamlandığında ve REST API uyumluluk
 vaat edecek kadar kararlı sayıldığında kesilir.
 
 API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
@@ -471,10 +469,10 @@ API versiyonlama duruşu (1.0 öncesi `/v1` öneki yok)
 
 ## Ayrıca bakınız
 
-- [../CONTRIBUTING.md](../../CONTRIBUTING.md) — bu sürecin katkıda bulunanlara yönelik özeti
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — bu sürecin katkıda bulunanlara yönelik özeti
 - [development.md](development.md) — ortam kurulumu ve günlük döngü
 - [coding-standards.md](coding-standards.md) — reviewer'ların bir PR'da kontrol ettikleri
 - [testing.md](testing.md) — CI'ın her PR'da çalıştırdığı
-- [../../ROADMAP.md](../../ROADMAP.md) — bir release'in içerdiği
+- [../../ROADMAP.md](../ROADMAP.md) — bir release'in içerdiği
 - [decisions/0008-git-flow-semver.md](decisions/0008-git-flow-semver.md) — Git Flow ve
   SemVer'ın neden seçildiği

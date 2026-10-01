@@ -6,8 +6,6 @@
 mutation'ları, Better Auth organization yazıları için HTTP firewall, paylaşılan
 `@kurul/auth-access` rolleri.
 
-> 🌐 [English (kanonik)](../../decisions/0004-auth-better-auth.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Çok kiracılı workspace'ler ürünün merkezinde — her kullanıcı rolleri ve davetleriyle bir veya daha fazla workspace'e ait — dolayısıyla auth seçimi, ne kadar çok kiracılılık mantığının sıfırdan elle inşa edilmesi gerekeceğini, ne kadarının yeniden kullanılabileceğini belirliyor.

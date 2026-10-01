@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
 
-> 🌐 [English (kanonik)](../../decisions/0025-trello-import-mapping.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Bu kaydın hizmet ettiği ROADMAP kalemi tek yönlü bir Trello JSON import'u: board, liste, kart,

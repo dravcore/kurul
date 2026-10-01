@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-12
 
-> 🌐 [English (kanonik)](../../decisions/0016-foreign-key-violation-status.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 `AllExceptionsFilter`, bir servisten dışarı sızabilen üç Prisma hata kodunu HTTP durumlarına

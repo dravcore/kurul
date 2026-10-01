@@ -3,8 +3,6 @@
 Kurul'un her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
 alternatif.
 
-> 🌐 [English (kanonik)](../tech-stack.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 **Pin’ler.** Aşağıdaki major’lar ve ürün seçimleri kalıcı kararlardır. Tam sürümler kayar;
 bugün neyin kurulu olduğu için kök ve app `package.json` / `pnpm-lock.yaml` kaynağıdır.
 Mimari şekil: [architecture.md](architecture.md).
@@ -175,7 +173,7 @@ kapı. Üçüncü bir dil yeni bir mekanizma istemiyor: bir katalog dosyası, ar
 `Record<Locale, …>` metin tablosunun her birine birer satır (`apps/api/src/mail/mail-templates.ts`
 içindeki `MAIL_COPY` ve `apps/api/src/common/board-templates.ts` içindeki board template
 kataloğu); ikisi de var olana kadar derleme hatası. Eksik olan yalnızca bir çevirmen, satırın
-[MVP ötesi](../../ROADMAP.md#beyond-mvp) altında kalma sebebi de bu.
+[MVP ötesi](../ROADMAP.md#beyond-mvp) altında kalma sebebi de bu.
 
 ### Dosya yükleme — `multer` + `file-type`
 

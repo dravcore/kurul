@@ -4,8 +4,6 @@
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — @dnd-kit gerekçesi registry ile çelişiyordu ve dürüstçe yeniden yazıldı; kaynaksız Recharts bundle rakamı yerine bağımlılık yüzeyi kondu.
 
-> 🌐 [English (kanonik)](../../decisions/0003-frontend-stack.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Frontend; interaktif bir kanban board'u (drag-and-drop ile yeniden sıralama), stillendirilmiş bir component sistemini ve grafikli bir dashboard'u render etmeli, aynı zamanda solo/küçük ekip kod tabanının bakımını yapabileceği kadar hafif kalmalı.

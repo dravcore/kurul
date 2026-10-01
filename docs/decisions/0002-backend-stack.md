@@ -12,8 +12,6 @@ SEC-03). Kalan nüans şu: Nest `ThrottlerModule`'ün kendisi hâlâ Redis kulla
 kütüphanenin varsayılan bellek-içi deposu, yani yalnızca Better Auth'un kendi limiter'ı bir Redis
 işi, API'nin genel amaçlı olanı değil.
 
-> 🌐 [English (kanonik)](../../decisions/0002-backend-stack.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Backend'in; solo/küçük ekip tarafından geliştirilen, realtime'a eğilimli, çok kiracılı bir kanban aracına uygun ve Next.js frontend'iyle tipleri temiz biçimde paylaşabilen bir framework, ORM, veritabanı ve cache/kuyruk katmanına ihtiyacı var.

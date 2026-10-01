@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-23
 
-> 🌐 [English (kanonik)](../../decisions/0029-client-data-layer.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 `apps/web`'in bir veri çekme kütüphanesi yok. Hiç olmadı ve şimdiye kadar bunun nedenini kimse
@@ -157,7 +155,7 @@ query kütüphanesiyle de bedava değil; bunlar migration'dan değişmeden çık
 ## Sonuçlar
 
 - **Aktivite akışının önü açıldı.** Beyond MVP satırındaki
-  [Realtime push of the activity feed](../../../ROADMAP.md#beyond-mvp) bu ADR'yi bekliyordu, ve
+  [Realtime push of the activity feed](../../ROADMAP.md#beyond-mvp) bu ADR'yi bekliyordu, ve
   beklediği şey "bunu hangi katmanda inşa edeceğim" sorusunun cevabıydı. Artık zaten var olan ve
   yeni bir state eklemeyen deyimle inşa edilebilir: panelin yorum yolu bunu zaten yapıyor.
   `use-board-realtime.ts`'in `onCommentAdded`'ı seçili görev için `metaRefreshKey`'i artırır, bu

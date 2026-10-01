@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-12
 
-> 🌐 [English (kanonik)](../../decisions/0017-partial-indexes-outside-prisma-schema.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Yaklaşan son tarih bildirimleri, her tick'te son tarihi yaklaşan tüm task'ları yeniden tarayan

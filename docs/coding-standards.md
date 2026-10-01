@@ -2,8 +2,6 @@
 
 Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 
-> 🌐 [English (kanonik)](../coding-standards.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## İçindekiler
 
 - [İlkeler](#ilkeler)
@@ -360,4 +358,4 @@ pnpm typecheck     # shared paket build + tsc --noEmit
 - [testing.md](testing.md) — test yerleşimi ve beklentiler
 - [git-strategy.md](git-strategy.md) — commit'ler ve PR süreci
 - [architecture.md](architecture.md#2-monorepo-yerleşimi) — bu kuralların varsaydığı dizin yerleşimi
-- [../CONTRIBUTING.md](../../CONTRIBUTING.md) — katkı süreci
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — katkı süreci

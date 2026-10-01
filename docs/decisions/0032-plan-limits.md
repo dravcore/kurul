@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-23
 
-> 🌐 [English (kanonik)](../../decisions/0032-plan-limits.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 [ADR 0028](0028-open-contributions-hosted-service.md) gelirin nereden geldiğini karara bağladı:

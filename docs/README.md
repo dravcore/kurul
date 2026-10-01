@@ -3,22 +3,20 @@
 Kurul dokümanlarının beş dakikalık haritası. İngilizce kanoniktir; Türkçe kopyalar
 [`tr/`](.) altında yaşar.
 
-> 🌐 [English (kanonik)](../README.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Buradan başlayın
 
 | Ne istiyorsanız…                          | Okuyun                                                                                                   |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Ürün ne / hızlı başlangıç                 | [../../README.tr.md](../../README.tr.md)                                                                 |
+| Ürün ne / hızlı başlangıç                 | [../../README.tr.md](../README.md)                                                                 |
 | Sistem nasıl şekillendi                   | [architecture.md](architecture.md) · [design.md](design.md)                                              |
 | Günlük kodlama                            | [development.md](development.md) · [coding-standards.md](coding-standards.md)                            |
 | Kendi domain'inizde çalıştırmak           | [self-hosting.md](self-hosting.md)                                                                       |
 | REST şekilleri ve hatalar                 | [api-conventions.md](api-conventions.md)                                                                 |
-| Üretilen API spesifikasyonu               | [`apps/api/openapi.json`](../../apps/api/openapi.json) (İngilizce), veya çalışan bir instance'da `/docs` |
+| Üretilen API spesifikasyonu               | [`apps/api/openapi.json`](../apps/api/openapi.json) (İngilizce), veya çalışan bir instance'da `/docs` |
 | Test'ler ve CI kapıları                   | [testing.md](testing.md)                                                                                 |
 | Branch'ler, PR'lar, release'ler           | [git-strategy.md](git-strategy.md)                                                                       |
 | Bir stack ya da politika kararının nedeni | [tech-stack.md](tech-stack.md) · [decisions/](decisions/)                                                |
-| Ne bitti / ne ertelendi                   | [../../ROADMAP.md](../../ROADMAP.md)                                                                     |
+| Ne bitti / ne ertelendi                   | [../../ROADMAP.md](../ROADMAP.md)                                                                     |
 
 Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, …)
 `docs/` dışında durur, çünkü GitHub bunlara özel davranır.
@@ -43,7 +41,7 @@ Kök topluluk dosyaları (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGE
 | [git-strategy.md](git-strategy.md)               | Git Flow, Conventional Commits, release'ler                                                                    |
 | [testing.md](testing.md)                         | Test katmanları ve beklentiler                                                                                 |
 | [api-conventions.md](api-conventions.md)         | REST adlandırma, hatalar, pagination ve üretilen OpenAPI dokümanının nerede olduğu                             |
-| [../../ROADMAP.md](../../ROADMAP.md) (İngilizce) | Yol haritası: sağlamlaştırma + özellik hatları, beyond-MVP backlog'u                                           |
+| [../../ROADMAP.md](../ROADMAP.md) (İngilizce) | Yol haritası: sağlamlaştırma + özellik hatları, beyond-MVP backlog'u                                           |
 | [decisions/](decisions/)                         | Mimari karar kayıtları (ADR'ler)                                                                               |
 
 MVP sonrası yeni özellik tasarımı bir **GitHub Issue** olarak açılır (kalıcı bir karar

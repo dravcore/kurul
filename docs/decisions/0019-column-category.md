@@ -7,8 +7,6 @@ geçişinin "mevcut `perf/api-scale-debt` dalı merge olana kadar bekler" notu a
 `Column.category` yayına girdi (`schema.prisma`, `dashboard.service.ts`) ve web bunu, aynı bölümün
 zaten belirttiği gibi `column-settings-dialog.tsx` içinde kullanıcıya açıyor.
 
-> 🌐 [English (kanonik)](../../decisions/0019-column-category.md) | Türkçe
-
 ## Bağlam
 
 Dashboard'daki tamamlanma ve throughput metrikleri "done" kolonunu şu an **adına bakarak**

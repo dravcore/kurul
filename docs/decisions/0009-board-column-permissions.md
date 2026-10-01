@@ -3,8 +3,6 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-09
 
-> 🌐 [English (kanonik)](../../decisions/0009-board-column-permissions.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 Faz 3, workspace tenancy altında board ve column mutasyonlarını getiriyor. Nest

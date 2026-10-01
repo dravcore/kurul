@@ -1817,7 +1817,7 @@ the 2026-08-18 "atlas" audit. See
   Independently, the same download step never fetched `scripts/backup.sh` either, which the
   `backup` service bind-mounts — so on a fresh curl-based install, scheduled backups silently
   never ran, with nothing in the logs to say why.
-  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/tr/self-hosting.md)) now
+  [self-hosting.md](docs/self-hosting.md) (+ [tr mirror](docs/self-hosting.md)) now
   downloads it alongside the compose file.
 
   **`kurul-migrate` exists from the first release after v0.2.0 onward, not on v0.2.0 itself** —

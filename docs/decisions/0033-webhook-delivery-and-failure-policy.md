@@ -3,8 +3,6 @@
 **Durum:** Önerildi
 **Tarih:** 2026-08-26
 
-> 🌐 [English (kanonik)](../../decisions/0033-webhook-delivery-and-failure-policy.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 [ADR 0031](0031-api-versioning.md), webhook'ları 1.0 sıralamasının sonuna koydu, çünkü "imzalı
@@ -12,7 +10,7 @@ teslim ve bir hata politikası kendi ADR'lerini ve işaret edecekleri bir kontra
 ADR. Henüz hiçbir şema, route ve queue yokken yazıldı; böylece aşağıdaki sorular bir kez, burada
 karara bağlanıyor, onları hayata geçiren pull request'te yeniden tartışılmıyor.
 
-[ROADMAP.md](../../../ROADMAP.md)'nin "API 1.0" bölümü bugünkü şartnamenin tamamı: tam olarak üç
+[ROADMAP.md](../../ROADMAP.md)'nin "API 1.0" bölümü bugünkü şartnamenin tamamı: tam olarak üç
 event (`task.created`, `task.moved`, `task.completed`), "workspace başına, operatörün yapılandırdığı
 bir URL'e teslim", imzalı ve en-az-bir-kere, ve "bir implementasyon değil bir ADR isteyen" bir hata
 politikası. Bu cümle, depodaki tek endpoint sahipliği ifadesi. Bir karar olarak değil, bir
@@ -409,7 +407,7 @@ hacimli tabloda daha kısa bir pencere, gecelik süpürmenin maliyetini de orant
   görebildiği bir adrese gider. [ADR 0021](0021-activation-funnel-and-opt-in-telemetry.md)'in ilkesi bu
   indirgenmiş biçimde hayatta kalır ve değişikliğin dürüst kısmı şudur: bir denetçi artık "bu instance
   nereye veri gönderebilir" sorusunu yalnızca ortamdan cevaplayamaz, bir tablo okumak zorundadır.
-- **Kabul edilirse [ROADMAP.md](../../../ROADMAP.md) satırları buna göre yeniden yazılır.** API 1.0
+- **Kabul edilirse [ROADMAP.md](../../ROADMAP.md) satırları buna göre yeniden yazılır.** API 1.0
   bölümündeki "Minimal webhooks" satırı "operatörün yapılandırdığı URL"i kaybeder ve "bir admin
   tarafından workspace başına yapılandırılır"ı kazanır, "API 1.0 remainder" satırı bu kaydı linkler ve
   ertelenmiş `PM-09` satırı hız belirleyici olarak lansman geri bildirimini korur. Bu ADR o düzenlemeleri

@@ -18,8 +18,6 @@ yapılan atıflar, gitignore'lu `audit/` ağacı olmayan hiç kimse için çöz�
 getirdiği içeriği doğrudan taşıyacak şekilde yeniden yazıldı, bir kopyası olmayan bir dosyaya
 işaret etmek yerine.
 
-> 🌐 [English (kanonik)](../../decisions/0024-attachment-kinds-and-serving-policy.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## Bağlam
 
 [ADR 0022](0022-attachment-storage.md) dosya eki baytlarının nerede yaşadığını, onları kimin
@@ -119,7 +117,7 @@ mutasyonu kendini `{ workspaceId, boardId, actorId, taskId }` taşıyan bir
 `SocketEvents.TASK_UPDATED` olarak duyurur — `TaskEventsService.emitUpdated`'ın
 `apps/api/src/task/task-events.service.ts:29-38`'de ürettiği payload'ın aynısı — ve istemci
 görevi REST üzerinden yeniden okur. O yayını hangi nesnenin yaptığı bir modül-sınırı sorusudur ve
-burada değil aşağıda karara bağlanır. Faz-3 planı (bugün [ROADMAP.md](../../../ROADMAP.md)'ye
+burada değil aşağıda karara bağlanır. Faz-3 planı (bugün [ROADMAP.md](../../ROADMAP.md)'ye
 katlanmış durumda) bu seçimi P3-1 ile P3-2'den hangisi önce teslim ederse ona vermiş ve
 "Attachments ve import aynı kararı miras alır" demişti; P3-2 onu [ADR 0023](0023-checklist-data-model.md)
 olarak teslim etti. Bu paragraf, 0022'nin hiç kurmadığı bağdır.
@@ -136,7 +134,7 @@ yeniden adlandırmak eski dizeyi taşıyan her satırı öksüz bırakır. Ekle,
 `<özne>.<geçmiş zaman fiil>` sözlüğü böyle — doğrudan emsaller `comment.created` ve `task.deleted`,
 ve listedeki hiçbir isim `added` kullanmıyor.
 
-**Faz-3 planı (bugün [ROADMAP.md](../../../ROADMAP.md)'ye katlanmış durumda) denetim alt kümesi
+**Faz-3 planı (bugün [ROADMAP.md](../../ROADMAP.md)'ye katlanmış durumda) denetim alt kümesi
 için iki tipi birden önermişti ve önerinin o yarısı burada reddediliyor.** "(Öneri: evet,
 ekleme+silme.)" diyordu — yani hem ekleme hem silme. Bu ADR silmeyi alıyor, eklemeyi reddediyor.
 Öneri, soruyu belirleyen iki şeyden önce
@@ -151,7 +149,7 @@ saklanır, döndürülür ve istemci tarafından render edilir; sunucu onu opak 
 Saklanan URL'ler `http:` ve `https:` şemalarıyla sınırlıdır — `javascript:`, `data:` ve `file:`
 yazma anında reddedilir — ve web istemcisi onları `target="_blank" rel="noopener noreferrer"` ile
 açar. Bu bir uygulama detayı değil, bir karardır; ve bir kod yorumuna değil buraya yazılmıştır,
-çünkü faz-3 planı (bugün [ROADMAP.md](../../../ROADMAP.md)'ye katlanmış durumda) bu biçimdeki her
+çünkü faz-3 planı (bugün [ROADMAP.md](../../ROADMAP.md)'ye katlanmış durumda) bu biçimdeki her
 kısıt için şunu soruyordu: "Bu kısıtı ihlal edecek kişi onu nerede okuyacak?" İleride link
 önizlemesi ekleyecek olan, bu paragrafı okumak
 ve bilerek bozmak zorunda kalır.
@@ -252,7 +250,7 @@ API hiç görmez, dolayısıyla ne uygulama logları ne Sentry bir şey olduğun
 davrandığı bir sisteme karşı açılmış bir hata kaydı üretir. Tek sayı, bir kez adlandırılmış, iki
 yerde alıntılanmış — bunun hata ayıklanabilir kalan tek versiyonu budur.
 
-**Neden özellikle 25 MiB.** Bugün [ROADMAP.md](../../../ROADMAP.md)'ye katlanmış denetim panosunda
+**Neden özellikle 25 MiB.** Bugün [ROADMAP.md](../../ROADMAP.md)'ye katlanmış denetim panosunda
 izlenen P3-1'in başarı metriği "10 MB dosya ekleme ≤3 sn" idi. 25 MiB'lık bir tavan, bu ölçümü
 sınırın üstünde oturtmak yerine izinli
 aralığın rahatça içinde bırakır; sınırda otursaydı ölçüm, yükleme yolunu değil limiti ölçüyor
@@ -486,7 +484,7 @@ yerine kabul edilen bir tipe düşüyor.
 `where`'i ile Prisma üzerinden kendisi çözüyor ve yayını `CommentService`'in zaten yaptığı gibi
 doğrudan `RealtimeModule` üzerinden yapıyor. Bedeli, kod tabanında `task: { board: { workspaceId } }`
 yükleminin bir kopyası daha — `task.module.ts`'in export'larını genişletmemenin fiyatı bu; ve o
-yüklem, bugün [ROADMAP.md](../../../ROADMAP.md)'ye katlanmış denetim panosunun zaten şart koştuğu
+yüklem, bugün [ROADMAP.md](../../ROADMAP.md)'ye katlanmış denetim panosunun zaten şart koştuğu
 tenant izolasyonu e2e testlerinin bu özellikte en çok kapsadığı parça.
 
 ## Değerlendirilen alternatifler
@@ -505,7 +503,7 @@ tenant izolasyonu e2e testlerinin bu özellikte en çok kapsadığı parça.
 | Depolama yolunu yüklenen dosya adından kurmak                                                                                                   | Path traversal'ı, anahtarın satırın kendi UUIDv7'sinden geldiği için ifade bile edilemeyen bir sorun olmaktan çıkarıp sonsuza dek her yazma yolunda doğru çözülmesi gereken bir doğrulama sorunu yapar                                  |
 | `uploadedById` olmasın; yükleyen activity izinden okunsun                                                                                       | "Bunu kim yükledi"yi nesnenin bir özelliği olmaktan çıkarıp denetim loguna karşı bir sorguya çevirir — iz bir olayın olduğunu kaydeder, satır ise o olayın ürettiği şeydir                                                              |
 | Activity tiplerini `attachment.added` / `attachment.removed` diye adlandırmak                                                                   | `ActivityType`'ta `added` kullanan hiçbir isim yok; emsaller `comment.created` ve `task.deleted`, ve isimler bir kez yazıldıktan sonra değiştirilemiyor — mevcut sözlüğe uymak tek seferlik ve bedava bir seçim                         |
-| Faz-3 planının (bugün [ROADMAP.md](../../../ROADMAP.md)'ye katlanmış durumda) önerdiği gibi `attachment.created` de denetim alt kümesinde olsun | Yüklemek bir içerik yaratmadır; alt kümenin topladığı "kaldırdı, verdi ya da yok etti" değil. Üstelik P3-3'ün importer'ı içe aktarılan her URL için bir satır yazıyor — `comment.created`'ın dışlanma sebebi olan toplu hacim davranışı |
+| Faz-3 planının (bugün [ROADMAP.md](../../ROADMAP.md)'ye katlanmış durumda) önerdiği gibi `attachment.created` de denetim alt kümesinde olsun | Yüklemek bir içerik yaratmadır; alt kümenin topladığı "kaldırdı, verdi ya da yok etti" değil. Üstelik P3-3'ün importer'ı içe aktarılan her URL için bir satır yazıyor — `comment.created`'ın dışlanma sebebi olan toplu hacim davranışı |
 | Yeni modül yayın yapabilsin diye `TaskEventsService`'i `task.module.ts`'ten export etmek                                                        | `task.module.ts:17-19`'un bilinçle koyduğu bir kapsüllemeyi, comment modülünün aynı payload ile zaten doğrudan yaptığı tek bir `emitToBoard` çağrısı uğruna genişletir                                                                  |
 | Attachment uçları checklist uçları gibi `TaskDto` döndürsün                                                                                     | Checklist `TaskDto` döndürüyor çünkü controller'ı _`TaskController`_; ayrı modülde o sebep yok ve istemci `task:updated` geldiğinde görevi zaten yeniden okuyor                                                                         |
 | Checklist emsalini izleyip dosya ekleri için activity satırı yazmamak                                                                           | Silinen bir checklist maddesi yeniden yazılabilir; silinen bir dosya sahipsiz dosya süpürmesiyle diskten de alınır ve activity satırı onun var olduğuna dair tek kanıt hâline gelir                                                     |

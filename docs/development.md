@@ -2,8 +2,6 @@
 
 Kurul geliştirme ortamının nasıl kurulacağı ve günden güne nasıl çalışılacağı.
 
-> 🌐 [English (kanonik)](../development.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
-
 ## İçindekiler
 
 - [Durum](#durum)
@@ -33,7 +31,7 @@ PR’da düzeltilir.
 
 - Yerleşim ve modül haritası: [architecture.md](architecture.md#2-monorepo-yerleşimi)
 - Veri modeli ve kritik alan kuralları: [architecture.md](architecture.md#kritik-alan-kuralları)
-- Faz ilerlemesi (MVP tamam): [ROADMAP.md](../../ROADMAP.md)
+- Faz ilerlemesi (MVP tamam): [ROADMAP.md](../ROADMAP.md)
 - Her aracın neden seçildiği: [tech-stack.md](tech-stack.md)
 
 ## Ön koşullar
@@ -186,7 +184,7 @@ openssl rand -base64 32
 Bu üretici yalnızca bu değişken için doğru; bir connection URL'in içine giren iki değişken için
 yanlış. Kural, önlediği hata ve olasılıklar tek bir yerde yazılı:
 [Veritabanı ve cache kimlik bilgileri](#veritabanı-ve-cache-kimlik-bilgileri). `.env.example`,
-[README.tr.md](../../README.tr.md) ve [self-hosting.md](self-hosting.md) kendi kopyalarını
+[README.tr.md](../README.md) ve [self-hosting.md](self-hosting.md) kendi kopyalarını
 taşımak yerine oraya işaret eder.
 
 **Yeni bir ortam değişkeni eklemek dört adımlı bir değişikliktir** ve dördü de aynı PR'a girer:
@@ -434,7 +432,7 @@ pnpm bootstrap   # paylaşılan paketler, Prisma client, container'lar, migratio
 pnpm dev         # api + web paralel, hot reload
 ```
 
-`pnpm bootstrap` ([`scripts/bootstrap.mjs`](../../scripts/bootstrap.mjs)) tam olarak aşağıdaki
+`pnpm bootstrap` ([`scripts/bootstrap.mjs`](../scripts/bootstrap.mjs)) tam olarak aşağıdaki
 komutları, bu sırayla koşturur; üstüne `.env` üzerinde bir ön kontrol ve container'ların kendi
 healthcheck'lerine bir bekleme ekler — TCP bağlantısını kabul etmiş ama `initdb`'yi bitirmemiş
 bir Postgres'e atılan `prisma migrate` tam olarak o beklemenin engellediği hatadır ve ilk
@@ -485,8 +483,8 @@ Kasıtlı olarak `apps/api/dist` ya da `apps/web/.next`'i kontrol **etmez**: ne 
 de `pnpm dev` bunları build eder (bunlar `pnpm typecheck` ve bir production build için gereken
 `nest build` / `next build` çıktıları, dev loop'un değil), yani burada onları kontrol etmek sağlıklı
 bir dev checkout'u bozuk olarak raporlardı. Her kontrol geçtiğinde çıkış kodu `0`, aksi halde
-`1` — mantık [`scripts/lib/doctor.mjs`](../../scripts/lib/doctor.mjs)'de yaşıyor,
-[`scripts/lib/doctor.test.mjs`](../../scripts/lib/doctor.test.mjs)'de test ediliyor
+`1` — mantık [`scripts/lib/doctor.mjs`](../scripts/lib/doctor.mjs)'de yaşıyor,
+[`scripts/lib/doctor.test.mjs`](../scripts/lib/doctor.test.mjs)'de test ediliyor
 (`pnpm test:scripts`).
 
 `schema.prisma`'nın ve commit edilmiş migration'ların hâlâ uyuştuğunu doğrulamak için, en son
@@ -634,7 +632,7 @@ seti — `CAP_NET_RAW`, `CAP_SYS_PTRACE`, `CAP_CHOWN` ve bir düzine daha fazlas
 sistemi kullanıcısıyla çalıştığından bağımsız olarak saldırı yüzeyidir: bir kod-çalıştırma
 açığı, uygulamanın kendi inisiyatifiyle düşürdüğü değil, kernel'in container'a verdiği her
 şeyi devralır. Bu, 2026-08-13 denetiminin SEC-02 bulgusunun ikinci yarısıdır; artık
-[ROADMAP.md](../../ROADMAP.md#hardening-track)'a katıldı. Birinci yarı — her iki Dockerfile'ın
+[ROADMAP.md](../ROADMAP.md#hardening-track)'a katıldı. Birinci yarı — her iki Dockerfile'ın
 runner stage'inde `USER node`, yani `api`/`web`'in baştan root olarak çalışmaması — PR #109'da
 tamamlandı.
 
@@ -680,7 +678,7 @@ Bu sertleştirme turunun kapsamı dışında: salt-okunur kök dosya sistemi (`r
 `pids_limit` ve seccomp profilleri. Üçü de hangi yolların yazılabilir kalması gerektiğine dair
 servis-bazlı bir denetim isteyen daha katı kısıtlar (geçici dizinler, node'un kendi `/tmp`
 kullanımı vb.); o denetimi iki Dockerfile o zamandan beri yazdı.
-[ROADMAP.md](../../ROADMAP.md#hardening-track) içindeki "Container hardening pass 2" satırı
+[ROADMAP.md](../ROADMAP.md#hardening-track) içindeki "Container hardening pass 2" satırı
 olarak izleniyor, buraya dahil edilmedi.
 
 ## pnpm script'leri
@@ -763,7 +761,7 @@ pnpm db:drift     # sonra schema.prisma ile karşılaştır
 halde uyuşmazlığı yazıp sıfırdan farklı bir kodla çıkar. Ayrı bir shadow veritabanı yoktur:
 `--from-config-datasource`, `prisma.config.ts`'teki datasource'u (yani `DATABASE_URL`'i)
 doğrudan şemayla karşılaştırır — CI'nin de aynı job içinde `db:migrate`'ten hemen sonra
-çalıştırdığı şey budur, bkz. [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) —
+çalıştırdığı şey budur, bkz. [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) —
 dolayısıyla yerelde geçmesiyle CI'de geçmesi aynı anlama gelir.
 
 Yerel bir veritabanını sıfırdan sıfırlamak:
@@ -793,7 +791,7 @@ olduğunuzdan başka boyutta bir board'u sessizce seed'lememelidir.
 Satırlar tekdüze değil gerçekçidir — karışık öncelikler, kartların yaklaşık yarısında label,
 dörtte birinde atanan kişi, due-soon penceresinin içine ve gerisine yayılmış son tarihler —
 çünkü her kartın aynı şekilde olduğu bir board tek bir kart şeklini ölçer.
-[`apps/web/components/board/board-column.tsx`](../../apps/web/components/board/board-column.tsx)
+[`apps/web/components/board/board-column.tsx`](../apps/web/components/board/board-column.tsx)
 içindeki column başına render bütçesi bu board'a karşı ölçüldü.
 
 ## Veri saklama
@@ -1003,7 +1001,7 @@ hemen önce bir dump daha alın.**
 ### Zamanlanmış yedekleme sidecar'ı
 
 `docker compose up`, `postgres`'in yanında bir `backup` servisi de başlatır.
-[`scripts/backup.sh`](../../scripts/backup.sh)'i bir `postgres:18-alpine` container'ında
+[`scripts/backup.sh`](../scripts/backup.sh)'i bir `postgres:18-alpine` container'ında
 çalıştırır — sunucuyla aynı image, yani `pg_dump`/`pg_restore` her zaman sunucu major'ıyla
 eşleşir — ve döngüye girer:
 
@@ -1452,9 +1450,9 @@ yolu yoktur. Seçenekler, tercih sırasıyla:
 için bir geliştirme döngüsü kolaylığıdır, asla bir rollback aracı değildir — ve production'ı
 işaret etmesini engelleyen tek şey shell'inizdeki `DATABASE_URL`'dir. Seed de aynı biçimde bir
 tehlikedir: `pnpm db:seed`, demo veriyi eklemeden önce **her tablodaki her satırı** silerek
-başlar; bu yüzden [`apps/api/prisma/seed.ts`](../../apps/api/prisma/seed.ts), `NODE_ENV`
+başlar; bu yüzden [`apps/api/prisma/seed.ts`](../apps/api/prisma/seed.ts), `NODE_ENV`
 `production` iken çalışmayı reddeder
-([`apps/api/src/common/seed-guard.ts`](../../apps/api/src/common/seed-guard.ts)) — bilinçli
+([`apps/api/src/common/seed-guard.ts`](../apps/api/src/common/seed-guard.ts)) — bilinçli
 olarak hiçbir override flag'i yoktur. `migrate reset`'in böyle bir koruması yoktur. Gece
 2'deki kural mutlaktır: bu iki komuttan hiçbiri, bir dump'tan yeniden oluşturmayı göze
 alamayacağınız bir veritabanına karşı asla çalışmaz.
@@ -1683,9 +1681,9 @@ PR/release süreci [git-strategy.md](git-strategy.md)'de belirtilmiştir.
 - [architecture.md](architecture.md) — bu dokümanın kontratı olduğu modül haritası ve
   kritik alan kuralları
 - [self-hosting.md](self-hosting.md) — bir release'i kendi domain'inize kurmak: DNS, HTTPS, SMTP
-- [../../ROADMAP.md](../../ROADMAP.md) — faz sırası
+- [../../ROADMAP.md](../ROADMAP.md) — faz sırası
 - [git-strategy.md](git-strategy.md) — branch'ler, commit'ler, release'ler
 - [coding-standards.md](coding-standards.md) — bu uygulamaların içindeki kodun nasıl
   yazıldığı
 - [testing.md](testing.md) — testlerin nasıl çalıştırılacağı ve yazılacağı
-- [../CONTRIBUTING.md](../../CONTRIBUTING.md) — katkı süreci
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — katkı süreci
