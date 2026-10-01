@@ -172,7 +172,7 @@ organization plugin performs on the caller's own session (rename and delete the 
 invite, revoke and accept invitations, remove a member, change a role, leave). Boards, columns,
 tasks, labels, comments, checklists, attachments, imports, activity, notifications, the
 dashboard and every read under the workspace accept either credential. See
-[\`docs/api-conventions.md\`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md#authentication).
+[\`docs/api-conventions.md\`](https://github.com/dravcore/kurul/blob/develop/docs/api-conventions.md#kimlik-doğrulama).
 
 Writes (\`POST\`/\`PUT\`/\`PATCH\`/\`DELETE\`) are additionally checked server-side against an
 origin allowlist. A request that announces an \`Origin\` other than \`WEB_URL\` is refused with

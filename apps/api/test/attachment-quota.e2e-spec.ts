@@ -212,7 +212,7 @@ describe('Attachment storage quotas (e2e)', () => {
     const refused = await tryUpload(mine, PNG).expect(413);
 
     // The shape a client branches on: same status as the per-file limit, its own `error`
-    // (docs/api-conventions.md#errors — statusCode and error, never message).
+    // (docs/api-conventions.md#hatalar — statusCode and error, never message).
     expect(refused.body.error).toBe(ATTACHMENT_QUOTA_ERROR);
     expect(refused.body.statusCode).toBe(413);
 

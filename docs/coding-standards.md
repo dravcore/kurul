@@ -1,91 +1,101 @@
-# Coding Standards
+# Kodlama Standartları
 
-Conventions for TypeScript, NestJS, and Next.js code in this repository.
+Bu repository'deki TypeScript, NestJS ve Next.js kodu için konvansiyonlar.
 
-> 🌐 English (canonical) | [Türkçe](tr/coding-standards.md)
+## İçindekiler
 
-## Contents
-
-- [Principles](#principles)
+- [İlkeler](#i̇lkeler)
 - [TypeScript](#typescript)
-- [Naming conventions](#naming-conventions)
+- [Adlandırma konvansiyonları](#adlandırma-konvansiyonları)
 - [NestJS (`apps/api`)](#nestjs-appsapi)
-- [DTOs and validation](#dtos-and-validation)
+- [DTO'lar ve validation](#dtolar-ve-validation)
 - [Next.js (`apps/web`)](#nextjs-appsweb)
-- [Shared types (`packages/shared-types`)](#shared-types-packagesshared-types)
-- [Imports](#imports)
-- [Formatting and linting](#formatting-and-linting)
+- [Paylaşılan tipler (`packages/shared-types`)](#paylaşılan-tipler-packagesshared-types)
+- [Import'lar](#importlar)
+- [Formatting ve linting](#formatting-ve-linting)
 
-## Principles
+## İlkeler
 
-1. **The linter is the source of truth for style.** Formatting is never discussed in code
-   review. If a rule is worth having, it is worth encoding in ESLint or Prettier.
-2. **Module boundaries are the architecture.** Kurul is a modular monolith; the only
-   thing keeping it from becoming a mud ball is discipline about who may import whom.
-3. **Types are declared once.** Anything crossing the API boundary lives in
-   `@kurul/shared-types` and is imported, never re-typed.
-4. **Explicit over clever.** Code is read far more often than written.
+1. **Stil için doğruluk kaynağı linter'dır.** Formatting code review'da asla tartışılmaz.
+   Bir kural sahip olmaya değerse, ESLint veya Prettier'a kodlanmaya da değer.
+2. **Modül sınırları mimaridir.** Kurul bir modüler monolit; onu bir çamur yumağına
+   dönüşmekten alıkoyan tek şey kimin kimi import edebileceği konusundaki disiplindir.
+3. **Tipler bir kez deklare edilir.** API sınırını geçen her şey `@kurul/shared-types`
+   içinde yaşar ve import edilir, asla yeniden tiplenmez.
+4. **Zekice olan yerine açık olan.** Kod, yazıldığından çok daha sık okunur.
 
 ## TypeScript
 
-- `strict: true` in **every** `tsconfig.json` — root, `apps/api`, `apps/web`,
-  `packages/shared-types`. No package opts out.
-- Also on: `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`.
+- `strict: true` kökteki `tsconfig.base.json`'da açıktır; `apps/api`, `apps/web`,
+  `packages/shared-types`, `packages/auth-access` ve `e2e` bu dosyayı `extends` eder ve hiçbiri
+  kapatmaz. Hiçbir paket bundan muaf değildir.
+- Ayrıca açık: `noUncheckedIndexedAccess`, `noImplicitOverride`,
+  `noFallthroughCasesInSwitch`.
 
-| Rule                   |                                                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `any`                  | Forbidden. Use `unknown` and narrow, or write the type. `// eslint-disable` needs a comment explaining why.                             |
-| Non-null assertion `!` | Avoid. Narrow the type or throw explicitly.                                                                                             |
-| `as` casts             | Only for genuinely un-typeable boundaries (parsed JSON, third-party gaps), with a comment.                                              |
-| Return types           | Explicit on exported functions and all public service/controller methods. Inferred is fine for local helpers.                           |
-| `enum`                 | Prefer string-literal unions or `as const` objects; the Prisma-generated enums are the exception and are re-exported from shared types. |
-| `interface` vs `type`  | `interface` for object shapes that may be extended, `type` for unions, intersections, and mapped types. Do not mix in the same concept. |
-| `null` vs `undefined`  | `null` is a stored absence (a DB column), `undefined` is an absent value (an optional field). Do not use them interchangeably.          |
+| Kural                  |                                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `any`                  | Yasak. `unknown` kullanıp daraltın, ya da tipi yazın. `// eslint-disable` nedenini açıklayan bir yorum gerektirir.                                                                                                                                                                                          |
+| Non-null assertion `!` | Kaçının. Tipi daraltın ya da açıkça throw edin.                                                                                                                                                                                                                                                             |
+| `as` cast'leri         | Yalnızca gerçekten tiplenemeyen sınırlar için (parse edilmiş JSON, üçüncü parti boşlukları), bir yorumla birlikte.                                                                                                                                                                                          |
+| Return tipleri         | Export edilen fonksiyonlarda ve tüm public service/controller metotlarında açık. Lokal helper'lar için inferred olması sorun değil.                                                                                                                                                                         |
+| `enum`                 | String-literal union'ları veya `as const` objelerini tercih edin. Ürün enum'ları `@kurul/shared-types`'ta `as const` objesi (artı türetilmiş union tipi) olarak yazılır ve `schema.prisma`'daki enum'un elle tutulan yansımasıdır (`enums.ts` başındaki not); shared types Prisma'dan yeniden export etmez. |
+| `interface` vs `type`  | Genişletilebilecek obje şekilleri için `interface`, union'lar, intersection'lar ve mapped tipler için `type`. Aynı kavram için ikisini karıştırmayın.                                                                                                                                                       |
+| `null` vs `undefined`  | `null` saklanan bir yokluktur (bir DB kolonu), `undefined` yok olan bir değerdir (opsiyonel bir alan). İkisini birbirinin yerine kullanmayın.                                                                                                                                                               |
 
-Errors are typed and thrown, never returned as `{ error: string }` from a service. The API
-translates them into the response shape described in
-[api-conventions.md](api-conventions.md#errors).
+Hatalar tiplenir ve throw edilir, bir servisten asla `{ error: string }` olarak
+döndürülmez. API, bunları [api-conventions.md](api-conventions.md#hatalar)'de tarif edilen
+yanıt şekline çevirir.
 
-## Naming conventions
+## Adlandırma konvansiyonları
 
-| Thing                                         | Convention                   | Example                                               |
-| --------------------------------------------- | ---------------------------- | ----------------------------------------------------- |
-| Files and directories                         | `kebab-case`                 | `task-position.service.ts`, `components/board/`       |
-| Classes, decorators, types, interfaces, enums | `PascalCase`                 | `TaskService`, `CreateTaskDto`, `MemberRole`          |
-| Functions, variables, methods, properties     | `camelCase`                  | `moveTask`, `workspaceId`                             |
-| Constants (module-level, truly constant)      | `UPPER_SNAKE_CASE`           | `DEFAULT_PAGE_SIZE`, `POSITION_GAP`                   |
-| React components                              | `PascalCase` file and export | `components/board/task-card.tsx` exporting `TaskCard` |
-| React hooks                                   | `use` prefix, camelCase      | `use-board-socket.ts` exporting `useBoardSocket`      |
-| Booleans                                      | `is` / `has` / `can` prefix  | `isArchived`, `hasUnreadComments`                     |
-| Prisma models                                 | `PascalCase` singular        | `Task`, `WorkspaceMember`                             |
-| Database-facing ids                           | `<entity>Id`                 | `workspaceId`, `boardId`                              |
+| Şey                                                       | Konvansiyon                             | Örnek                                                     |
+| --------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------- |
+| Dosyalar ve dizinler                                      | `kebab-case`                            | `task-position.service.ts`, `components/board/`           |
+| Class'lar, decorator'lar, tipler, interface'ler, enum'lar | `PascalCase`                            | `TaskService`, `CreateTaskDto`, `MemberRole`              |
+| Fonksiyonlar, değişkenler, metotlar, property'ler         | `camelCase`                             | `moveTask`, `workspaceId`                                 |
+| Sabitler (modül seviyesi, gerçekten sabit)                | `UPPER_SNAKE_CASE`                      | `DEFAULT_PAGE_SIZE`, `POSITION_GAP`                       |
+| React component'leri                                      | `kebab-case` dosya, `PascalCase` export | `components/task/task-card.tsx`, `TaskCard`'ı export eder |
+| React hook'ları                                           | `use` öneki, camelCase                  | `use-board-socket.ts`, `useBoardSocket`'i export eder     |
+| Boolean'lar                                               | `is` / `has` / `can` öneki              | `isArchived`, `hasUnreadComments`                         |
+| Prisma modelleri                                          | `PascalCase` tekil                      | `Task`, `WorkspaceMember`                                 |
+| Veritabanına bakan id'ler                                 | `<entity>Id`                            | `workspaceId`, `boardId`                                  |
 
-File names are kebab-case even when the default export is `PascalCase` — the file system is
-case-insensitive on macOS and case-sensitive in CI, and kebab-case avoids that entire class
-of breakage.
+Default export `PascalCase` olsa bile dosya adları kebab-case'dir — dosya sistemi macOS'ta
+büyük/küçük harf duyarsız, CI'da ise duyarlı, ve kebab-case bu bozulma sınıfının tamamından
+kaçınır.
 
-### NestJS file suffixes
+### NestJS dosya son ekleri
 
-Every file in `apps/api` carries a suffix naming its role:
+`apps/api`'deki Nest bileşenleri rolünü belirten bir son ek taşır (bugün üç provider bunun
+dışında: `notification/notification-mailer.ts`, `common/rate-limit/upload-budget.ts` ve
+`health/redis-health.client.ts`); rolü olmayan saf yardımcı modüller (`common/env.ts`,
+`common/uuid.ts`) son eksiz, kebab-case adlıdır:
 
-| Suffix             | Role                                  |
-| ------------------ | ------------------------------------- |
-| `*.module.ts`      | Nest module definition                |
-| `*.controller.ts`  | HTTP route handlers                   |
-| `*.service.ts`     | Business logic                        |
-| `*.dto.ts`         | Request/response DTOs (inside `dto/`) |
-| `*.guard.ts`       | Guards                                |
-| `*.interceptor.ts` | Interceptors                          |
-| `*.filter.ts`      | Exception filters                     |
-| `*.decorator.ts`   | Custom decorators                     |
-| `*.gateway.ts`     | Socket.io gateways                    |
-| `*.spec.ts`        | Unit tests, colocated                 |
+| Son ek             | Rol                                          |
+| ------------------ | -------------------------------------------- |
+| `*.module.ts`      | Nest modül tanımı                            |
+| `*.controller.ts`  | HTTP route handler'ları                      |
+| `*.service.ts`     | İş mantığı                                   |
+| `*.dto.ts`         | Request/response DTO'ları (`dto/` içinde)    |
+| `*.guard.ts`       | Guard'lar                                    |
+| `*.interceptor.ts` | Interceptor'lar (bugün kullanılmıyor)        |
+| `*.filter.ts`      | Exception filter'lar                         |
+| `*.decorator.ts`   | Özel decorator'lar                           |
+| `*.gateway.ts`     | Socket.io gateway'leri                       |
+| `*.schema.ts`      | OpenAPI response şeması (`openapi/schemas/`) |
+| `*.mapper.ts`      | Satır → DTO dönüşümü                         |
+| `*.worker.ts`      | BullMQ worker'ları                           |
+| `*.pipe.ts`        | Pipe'lar                                     |
+| `*.middleware.ts`  | Middleware'ler                               |
+| `*.spec.ts`        | Yerinde (colocated) unit testler             |
 
 ## NestJS (`apps/api`)
 
-### Module skeleton
+### Modül iskeleti
 
-Every domain module has the same shape. No exceptions, even for a module with one endpoint.
+Her domain modülü aynı şekle sahiptir. Bugün ise bu iskeletin (`*.module.ts`,
+`*.controller.ts`, `*.service.ts`, `dto/`) bir kısmını taşımayan modüller var; listesi
+[architecture.md §3](architecture.md#3-appsapi--modül-haritası)'te.
 
 ```
 src/task/
@@ -100,21 +110,24 @@ src/task/
 └── task.service.spec.ts
 ```
 
-| Layer      | Responsibility                                        | Must not                                                                             |
-| ---------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Controller | HTTP shape: routing, params, status codes, DTO in/out | Contain business logic or touch Prisma                                               |
-| Service    | Business logic, transactions, Prisma access           | Know about HTTP (no `Request`, `Response`, no HTTP exceptions in pure logic helpers) |
-| DTO        | The contract at the edge, with validation decorators  | Contain logic                                                                        |
+| Katman     | Sorumluluk                                                      | Yapmamalı                                                                              |
+| ---------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Controller | HTTP şekli: routing, param'lar, status kodları, giren/çıkan DTO | İş mantığı içermemeli veya Prisma'ya dokunmamalı                                       |
+| Service    | İş mantığı, transaction'lar, Prisma erişimi                     | HTTP'yi bilmemeli (saf logic helper'larında `Request`, `Response`, HTTP exception yok) |
+| DTO        | Validation decorator'larıyla birlikte sınırdaki kontrat         | Logic içermemeli                                                                       |
 
-### Module boundaries
+### Modül sınırları
 
-**A module never imports another module's service directly.**
+**Bir modül başka bir modülün iç parçalarına uzanmaz; yalnızca o modülün `exports`
+listesindeki provider'ları kullanır.** Bir servisi inject etmek için sınıfı TypeScript'te
+import etmek kaçınılmazdır (constructor tipi); sınır DI düzeyindedir: bağımlı olduğunuz modülü
+`imports`'a yazın, onun provider'ını kendi `providers` dizinize yazmayın ya da `new` ile
+üretmeyin.
 
 ```ts
-// Wrong — reaches past the module boundary
-import { BoardService } from '../board/board.service';
-
-// Right — depend on the module, inject what it exports
+// Yanlış — başka modülün servisini kendi providers dizisine yazmak
+@Module({ providers: [TaskService, BoardService] })
+// Doğru — modüle bağımlı ol, modülün export ettiğini inject et
 @Module({
   imports: [BoardModule],
   providers: [TaskService],
@@ -122,159 +135,193 @@ import { BoardService } from '../board/board.service';
 export class TaskModule {}
 ```
 
-Rules:
+Kurallar:
 
-- A module's public API is what its `@Module({ exports: [...] })` lists. Everything else is
-  private to that module.
-- Export the smallest surface that works. If only two methods are needed elsewhere, export
-  a narrow facade rather than the whole service.
-- Cross-module reads that would create a cycle are a design smell. Resolve them by moving
-  the shared concern into `common/`, or by emitting an event, not by adding a back-import.
-- `PrismaModule`, `common/`, and `AuthModule` are globally available (`@Global()`);
-  feature modules still import what they need for clarity where the boundary matters.
+- Bir modülün public API'si, `@Module({ exports: [...] })`'ünün listelediği şeydir. Geri
+  kalan her şey o modüle özeldir.
+- İşe yarayan en küçük yüzeyi export edin. Başka yerde yalnızca iki metot gerekiyorsa,
+  tüm servisi değil dar bir facade'ı export edin.
+- Bir döngü yaratacak cross-module okumalar bir tasarım kokusudur. Bunları paylaşılan
+  kaygıyı `common/`'a taşıyarak veya bir back-import eklemek yerine bir event yayarak
+  çözün.
+- `PrismaModule`, `AuthModule` ve `TokenModule` `@Global()`'dır; `common/` ise bir modül
+  değil, her yerden import edilebilen paylaşılan koddur. Feature modülleri yine de, sınırın
+  önemli olduğu yerlerde ihtiyaç duyduklarını açıklık için import eder.
 
-This is what keeps the modular monolith extractable later — see
-[architecture.md](architecture.md) and
+Modüler monoliti ileride ayrıştırılabilir tutan şey budur — bkz.
+[architecture.md](architecture.md) ve
 [decisions/0001-monorepo-modular-monolith.md](decisions/0001-monorepo-modular-monolith.md).
 
-### Multi-tenant isolation
+### Multi-tenant izolasyonu
 
-Every query is scoped by `workspaceId`. `WorkspaceGuard` establishes membership; each
-service method still filters Prisma with that `workspaceId` (or `board: { workspaceId }`).
-A service method that takes a `boardId` without a `workspaceId` in scope is a bug, not a
-shortcut.
+Her sorgu `workspaceId` ile scope'lanır. `WorkspaceGuard` yalnızca üyeliği kurar; her servis
+metodu Prisma'yı yine de o `workspaceId` ile (ya da `board: { workspaceId }` ile) filtreler.
+Kapsamda bir `workspaceId` olmadan `boardId` alan bir servis metodu bir kısayol değil, bir
+bug'dır.
 
-> Request-scoped Prisma Client Extensions remain deferred. Isolation is enforced by
-> review and by the workspace-isolation integration tests — not by a lint rule or an
-> automatic query rewriter. Treat any query without workspace scoping as blocking in review.
+> Request-scoped Prisma Client Extension'lar hâlâ ertelenmiş durumda. İzolasyon review ve
+> `apps/api/test/*.e2e-spec.ts` içine dağılmış cross-tenant integration testleriyle zorlanır —
+> bir lint kuralı ya da otomatik bir sorgu yeniden yazıcısıyla değil. Workspace scoping'i
+> olmayan herhangi bir sorguyu review'da engelleyici (blocking) kabul edin.
 
-## DTOs and validation
+## DTO'lar ve validation
 
-Validation happens **at the edge**, in DTOs, with `class-validator`. Services trust their
-input; controllers do not.
+Validation **sınırda**, DTO'larda, `class-validator` ile gerçekleşir. Servisler kendi
+girdilerine güvenir; controller'lar güvenmez.
 
 ```ts
-// src/task/dto/create-task.dto.ts
+// src/task/dto/create-task.dto.ts (import'lar çıkarıldı; sınırlar dto/task-limits.ts'te)
 export class CreateTaskDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
+  @MinLength(1)
+  @MaxLength(MAX_TASK_TITLE_LENGTH)
   title!: string;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(10_000)
-  description?: string;
+  @IsUuidV7()
+  columnId!: string;
 
-  @IsEnum(Priority)
+  @OptionalNullable()
+  @IsString()
+  @MaxLength(MAX_TASK_DESCRIPTION_LENGTH)
+  description?: string | null;
+
   @IsOptional()
+  @IsEnum(Priority)
   priority?: Priority;
 
-  @IsOptional()
-  @IsISO8601()
-  dueDate?: string;
+  @OptionalNullable()
+  @IsISO8601({ strict: true, strictSeparator: true })
+  dueDate?: string | null;
 
-  @IsOptional()
+  @OptionalNullable()
   @IsInt()
   @Min(0)
-  estimatedMinutes?: number;
+  @Max(MAX_ESTIMATED_MINUTES)
+  estimatedMinutes?: number | null;
+
+  @IsOptional()
+  @IsUuidV7()
+  afterTaskId?: string | null;
 }
 ```
 
-- A global `ValidationPipe` runs with `whitelist: true`, `forbidNonWhitelisted: true`, and
-  `transform: true`. Unknown properties are rejected, not silently dropped.
-- `UpdateXDto` is derived: `export class UpdateTaskDto extends PartialType(CreateTaskDto) {}`.
-- Ids in the path are validated too (`@IsUUID('7')` — every id is a UUIDv7, see
-  [api-conventions.md](api-conventions.md#data-types)), never trusted raw.
-- Response DTOs are explicit — never return a Prisma entity straight from a controller.
-  Password hashes, internal flags, and soft-delete columns do not leak by accident when the
-  response shape is declared.
+- Global bir `ValidationPipe`, `whitelist: true`, `forbidNonWhitelisted: true` ve
+  `transform: true` ile çalışır. Bilinmeyen property'ler sessizce düşürülmez, reddedilir.
+- `UpdateXDto`, `CreateXDto`'dan `PartialType` ile türetilmez; alanlarını kendisi bildirir,
+  çünkü `PATCH`'te `null`'ın anlamı sütuna bağlıdır: nullable bir sütunun alanı
+  `@OptionalNullable()` taşır (atlanırsa dokunulmaz, `null` temizler), nullable olmayanınki
+  `@OptionalNonNullable()` (atlanırsa dokunulmaz, `null` `400`'dür) —
+  `common/validation/optional.ts`, bkz. [api-conventions.md](api-conventions.md#dto-adlandırma).
+- Id'ler de doğrulanır, asla ham güvenilmez: path'teki id'ler `@UuidParam()` ile
+  (`ParseUuidV7Pipe`), gövdedeki id'ler `@IsUuidV7()` ile (`common/uuid.ts`; `@IsUUID('7')`'yi
+  sarar) — her id bir UUIDv7'dir, bkz. [api-conventions.md](api-conventions.md#veri-tipleri).
+- Response DTO'ları açıktır — bir controller'dan asla doğrudan bir Prisma entity'si
+  döndürülmez. Response şekli deklare edildiğinde şifre hash'leri, dahili flag'ler ve
+  soft-delete kolonları kazara sızmaz.
 
-DTO naming and the response/error format: [api-conventions.md](api-conventions.md).
+DTO adlandırması ve response/hata formatı: [api-conventions.md](api-conventions.md).
 
 ## Next.js (`apps/web`)
 
-- **App Router only.** No `pages/`.
-- **Server Components by default.** Add `'use client'` only when the component needs state,
-  effects, event handlers, or browser APIs — and push it as far down the tree as possible.
-  A whole board page should not be a client component because one button needs `onClick`.
-- Data fetching for initial render happens on the server; interactive mutations go through
-  the typed client in `lib/api.ts`.
-- Socket.io subscriptions live in client components, set up in a hook, torn down on unmount.
+- **Yalnızca App Router.** `pages/` yok.
+- **Varsayılan olarak Server Component'ler.** `'use client'`'ı yalnızca component'in state,
+  effect, event handler veya browser API'lerine ihtiyacı olduğunda ekleyin — ve ağaçta
+  olabildiğince aşağı itin. Sadece bir buton `onClick` istediği için tüm bir board sayfası
+  client component olmamalı.
+- İlk render için veri bugün istemcide çekilir: sayfalar (`page.tsx`) veri okumaz; okumalar
+  client component'lerde `lib/use-api-resource.ts` (board'da el yapımı yükleme) üzerinden,
+  yazmalar `lib/api.ts`'teki tipli client üzerinden gider
+  ([ADR 0029](decisions/0029-client-data-layer.md)). Sunucuda yapılan tek okumalar `proxy.ts`'teki
+  oturum yoklaması ve `i18n/user-locale.ts`'teki locale için `/me` okumasıdır.
+- Socket.io subscription'ları client component'lerde yaşar, bir hook içinde kurulur,
+  unmount'ta kapatılır.
 
-### Component organization
+### Component organizasyonu
 
-Components are organized **by domain**, not by type.
+Component'ler tipe göre değil, **domain'e göre** organize edilir.
 
 ```
 components/
-├── ui/           # shadcn/ui primitives ONLY — generated, not hand-edited
-├── board/        # kanban-board.tsx, board-column.tsx, task-card.tsx
-├── task/         # task-detail-panel.tsx, task-priority-badge.tsx
-├── dashboard/    # chart components
-└── layout/       # sidebar, workspace switcher
+├── ui/           # yalnızca shadcn/ui primitive'leri — üretilir, elle düzenlenmez
+├── common/       # domain'ler arası bileşikler: ConfirmDialog, FormDialog, InlineRename, SubmitError
+├── board/        # board-view.tsx, board-canvas.tsx, board-column.tsx, task-composer.tsx, use-board-*.ts
+├── task/         # task-card.tsx, task-panel.tsx, priority-icon.tsx, use-board-task-dnd.ts
+├── dashboard/    # grafik component'leri
+├── notification/ # zil, liste, okunmamış sayacı
+├── settings/     # ayar bölümleri ve dialog'ları
+├── auth/         # oturum açma, kayıt, davet ve doğrulama ekranları
+├── brand/        # DamgaMark
+└── layout/       # app-shell, sidebar, workspace switcher, topbar
 ```
 
-| Rule                          |                                                                                                                                          |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `components/ui/`              | shadcn/ui output only. Do not put project components here, and do not hand-modify primitives beyond what the shadcn workflow produces.   |
-| Domain folders                | Own their components; a board component belongs in `board/`, however small                                                               |
-| `components/common/`          | Domain-free composites shared across domains — no DTOs, no API calls. `ConfirmDialog` / `FormDialog` live here, not in `ui/`             |
-| Shared cross-domain component | Prefer keeping it local. Promote to `common/` when 3+ domains use it, or when 2 domains would otherwise duplicate a non-trivial skeleton |
-| Page files                    | `page.tsx` composes components; it does not hold layout logic or markup of any size                                                      |
+| Kural                                 |                                                                                                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/ui/`                      | Yalnızca shadcn/ui çıktısı. Proje component'lerini buraya koymayın ve primitive'leri shadcn workflow'unun ürettiğinin ötesinde elle değiştirmeyin. |
+| Domain klasörleri                     | Kendi component'lerine sahiptir; bir board component'i ne kadar küçük olursa olsun `board/`'a aittir                                               |
+| `components/common/`                  | Domain'den bağımsız, domain'ler arası paylaşılan bileşikler — DTO yok, API çağrısı yok. `ConfirmDialog` / `FormDialog` `ui/`'da değil buradadır    |
+| Domain'ler arası paylaşılan component | Önce lokal tutmayı tercih edin. 3+ domain kullanıyorsa ya da 2 domain aksi halde önemsiz olmayan bir iskeleti tekrarlayacaksa `common/`'a taşıyın  |
+| Sayfa dosyaları                       | `page.tsx` component'leri bir araya getirir; herhangi bir boyutta layout logic'i veya markup tutmaz                                                |
 
-### Styling
+### Stil
 
-- Tailwind utility classes in the markup; no CSS modules, no styled-components.
-- Conditional classes go through the `cn()` helper, never string concatenation. `cn()`
-  (`apps/web/lib/utils.ts`) extends `tailwind-merge` with Kurul's type scale and the
-  `font-strong` weight, so a consumer's `text-*`/`font-*` override deduplicates against a
-  primitive's own default instead of both classes reaching the DOM.
-- Design tokens (colors, spacing, radius) come from the Tailwind theme — no arbitrary hex
-  values in components.
-- Two call sites keep a raw colour on purpose: components/ui/button.tsx's destructive
-  `text-white` and components/ui/select.tsx's chevron `stroke="%23888"`, both pinned and
-  measured in `RAW_COLOUR_CALL_SITES` (`apps/web/app/globals.contrast.test.ts`). The chevron
-  cannot read a token at all: it is drawn into the control's own background as a `data:` URI,
-  where `var()` is not resolved. Anything outside those two is a defect.
-- One call site keeps `outline-none` on purpose: `components/ui/dialog.tsx`'s `DialogContent` and
-  `SheetContent`, whose Radix content wrappers take focus by script when they open, not by Tab, an
-  arrow key or a link, so there is no keyboard journey for the single focus mark to interrupt.
-  Guarded the same way as the raw-colour exceptions: `apps/web/app/globals-css-layers.test.ts`
-  scans the whole tree for `outline-none` / `outline-hidden` and fails if the result is anything
-  other than this one named, reasoned exception.
-- Author CSS in `apps/web/app/globals.css` goes inside `@layer base` unless there is a written
-  reason not to, stated next to the rule. An unlayered rule outranks every cascade layer whatever
-  its specificity, so an unlayered `*` selector repaints the utilities Tailwind emits into
-  `@layer utilities` and a class written in the markup stops meaning what it says. The
-  `:focus-visible` outline was the one rule that carried such a reason; it moved into `base` once
-  the controls stopped carrying focus rings and `outline-none` of their own, and no rule carries
-  one now. Guarded by `apps/web/app/globals-css-layers.test.ts`.
-- Every `text-*`, `bg-*`, `border-*`, `font-*`, `shadow-*` and `rounded-*` class must resolve
-  against `@theme inline` or Tailwind's built-in scale. A class with no counterpart compiles to
-  no CSS at all: nothing errors, the element just inherits and the mistake is invisible in review.
-  `apps/web/app/theme-classes.test.ts` compiles the tree through Tailwind and fails on any class
-  that emits nothing.
+- Markup'ta Tailwind utility class'ları; CSS modülleri yok, styled-components yok.
+- Koşullu class'lar string concatenation değil, `cn()` helper'ından geçer. `cn()`
+  (`apps/web/lib/utils.ts`) `tailwind-merge`'ü Kurul'un tip ölçeği ve `font-strong` ağırlığıyla
+  genişletir; böylece bir tüketicinin `text-*`/`font-*` override'ı, primitifin kendi
+  varsayılanıyla tekilleşir, ikisi birden DOM'a ulaşmaz.
+- Design token'ları (renkler, spacing, radius) Tailwind theme'inden gelir — component'lerde
+  keyfi hex değerleri yok.
+- İki çağrı noktası bilerek ham renk taşır: components/ui/button.tsx'in destructive
+  `text-white`'ı ve components/ui/select.tsx'in chevron `stroke="%23888"`'i; ikisi de
+  `RAW_COLOUR_CALL_SITES` (`apps/web/app/globals.contrast.test.ts`) içinde sabitlenmiş ve
+  ölçülmüş durumda. Chevron bir token'ı hiç okuyamaz: kontrolün kendi background'una bir
+  `data:` URI olarak çizilir ve orada `var()` çözülmez. Bu ikisinin dışındaki her şey bir
+  defect'tir.
+- Tek bir çağrı noktası bilerek `outline-none` taşır: `components/ui/dialog.tsx`'in
+  `DialogContent` ve `DialogDrawerContent`'i; Radix content wrapper'ları açıldıklarında focus'u
+  Tab, ok tuşu veya bir link değil script taşır, yani tek focus işaretinin böleceği bir klavye
+  yolculuğu yoktur. Ham renk istisnalarıyla aynı şekilde korunur:
+  `apps/web/app/globals-css-layers.test.ts` ağacın tamamını `outline-none` / `outline-hidden`
+  için tarar ve sonuç adı konmuş, gerekçelendirilmiş bu tek istisnadan başka bir şeyse kırmızıya
+  döner.
+- `apps/web/app/globals.css` içindeki yazar CSS'i, kuralın yanına yazılmış bir gerekçe yoksa
+  `@layer base` içine girer. Katmansız bir kural özgüllüğünden bağımsız olarak her cascade
+  katmanını yener; bu yüzden katmansız bir `*` seçici, Tailwind'in `@layer utilities` içine
+  ürettiği yardımcı sınıfları yeniden boyar ve markup'ta yazılan class söylediği şeyi ifade
+  etmeyi bırakır. `:focus-visible` outline'ı böyle bir gerekçe taşıyan kuraldı; kontroller kendi
+  focus ring'lerini ve `outline-none`'larını bıraktığı anda `base` içine taşındı. Bilerek katmansız
+  kalanlar da var: forced-colors yedekleri yardımcı sınıfların üstünde durmak zorundadır,
+  `board-scroller`'ın sürükleme sırasında snap'i bırakması da öyle (gerekçesi `globals.css`'te
+  kuralın yanında yazılı). `apps/web/app/globals-css-layers.test.ts` bu kuralı her satır için
+  taramaz, seçili kuralların katmanını sabitler: `*` border-color yedeği, `:focus-visible`
+  outline'ı ve geçersiz alan için yeniden renklendirmesi `base` içinde, forced-colors yedekleri
+  `utilities`'in üstünde kalmak zorundadır.
+- Her `text-*`, `bg-*`, `border-*`, `font-*`, `shadow-*` ve `rounded-*` class'ının
+  `@theme inline` içinde ya da
+  Tailwind'in yerleşik ölçeğinde bir karşılığı olmalı. Karşılığı olmayan class hiç CSS üretmez:
+  hata da vermez, element yalnızca miras alır ve yanlışlık review'da görünmez.
+  `apps/web/app/theme-classes.test.ts` ağacı Tailwind üzerinden derler ve hiçbir şey üretmeyen her
+  class'ta kırmızıya döner.
 
-## Shared types (`packages/shared-types`)
+## Paylaşılan tipler (`packages/shared-types`)
 
-Anything that crosses the API boundary is declared **once**, in
-`@kurul/shared-types`, and imported by both sides:
+API sınırını geçen her şey **bir kez**, `@kurul/shared-types` içinde deklare edilir ve
+her iki taraftan da import edilir:
 
-- DTO/response shapes
-- Enums (`Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot`)
-- Socket.io event names and payload types
+- DTO/response şekilleri
+- Enum'lar (`Priority`, `MemberRole`, `InvitationStatus`, `LabelColorSlot`)
+- Socket.io event isimleri ve payload tipleri
 
-Better Auth organization **access-control roles** live in `@kurul/auth-access`
-(peer-depends on `better-auth`). Import roles from there — do not copy
-`permissions` statements between `apps/api` and `apps/web`.
+Better Auth organization **access-control rolleri** `@kurul/auth-access` içindedir
+(`better-auth` peer dependency). Rolleri oradan import edin — `permissions`
+açıklamalarını `apps/api` ile `apps/web` arasında kopyalamayın.
 
 ```ts
-// Right
+// Doğru
 import type { TaskResponse, Priority } from '@kurul/shared-types';
-import { ac, roles } from '@kurul/auth-access';
+import { ac, organizationRoles } from '@kurul/auth-access';
 
-// Wrong — a redeclared shape that will silently drift
+// Yanlış — sessizce sapacak yeniden deklare edilmiş bir şekil
 interface Task {
   id: string;
   title: string;
@@ -282,73 +329,82 @@ interface Task {
 }
 ```
 
-Never redeclare, never duplicate, never "just add the one field locally". If the frontend
-needs a shape the backend does not return, that is an API change, not a local type.
+Asla yeniden deklare etmeyin, asla çoğaltmayın, asla "sadece bir alanı lokal olarak
+ekleyeyim" demeyin. Frontend, backend'in döndürmediği bir şekle ihtiyaç duyuyorsa, bu bir
+API değişikliğidir, lokal bir tip değil.
 
-## Imports
+## Import'lar
 
-Preferred order (convention; not currently machine-enforced by `eslint-plugin-import`):
+Tercih edilen sıra (konvansiyon; şu an `eslint-plugin-import` ile makine zorlaması yok):
 
 ```ts
-// 1. Node builtins
+// 1. Node built-in'leri
 import { randomUUID } from 'node:crypto';
 
-// 2. External packages
+// 2. Dış paketler
 import { Injectable, NotFoundException } from '@nestjs/common';
 
-// 3. Workspace packages
+// 3. Workspace paketleri
 import type { TaskResponse } from '@kurul/shared-types';
 
-// 4. Absolute internal (path alias)
-import { PrismaService } from '@/prisma/prisma.service';
+// 4. Mutlak dahili (path alias; yalnızca apps/web'de tanımlı)
+import { cn } from '@/lib/utils';
 
-// 5. Relative
+// 5. Göreli
 import { CreateTaskDto } from './dto/create-task.dto';
 ```
 
-- Use `import type` for type-only imports.
-- Prefer the `@/` path alias over `../../..` chains beyond one level up.
+- Yalnızca tip için import'larda `import type` kullanın.
+- `apps/web`'de bir seviyeden fazla `../` zinciri yerine `@/` alias'ını kullanın; `apps/api`'de
+  alias yoktur, dahili import göreli yazılır (`../prisma/prisma.service`).
 
-### Barrel files
+### Barrel dosyaları
 
-Use them sparingly.
+Bunları ölçülü kullanın.
 
-- **Acceptable:** the single public entry point of `packages/shared-types` or
-  `packages/auth-access`; a module's `dto/index.ts`.
-- **Avoid:** barrels inside `apps/api` module folders and across `components/`. They create
-  import cycles, defeat tree-shaking, slow down the TypeScript server, and make it easy to
-  import past a module boundary without noticing.
-- Never re-export a module's internals through a barrel to make cross-module imports
-  convenient — that is the boundary rule being broken with extra steps.
+- **Kabul edilebilir:** `packages/shared-types` veya `packages/auth-access`'in tek public
+  giriş noktası; bir modülün `dto/index.ts`'i.
+- **Kaçının:** `apps/api` modül klasörleri içinde ve `components/` genelinde barrel'lar.
+  Import döngüleri yaratırlar, tree-shaking'i bozarlar, TypeScript sunucusunu
+  yavaşlatırlar ve farkına varmadan bir modül sınırının ötesine import etmeyi
+  kolaylaştırırlar.
+- Cross-module import'ları kolaylaştırmak için bir modülün iç kısımlarını asla bir
+  barrel üzerinden yeniden export etmeyin — bu, sınır kuralının fazladan adımlarla
+  çiğnenmesidir.
 
-## Formatting and linting
+## Formatting ve linting
 
-| Tool           | Role                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Prettier       | All formatting. Config is committed; no editor-local overrides.                                                                                                                                                                                                                                                                                                                                                        |
-| ESLint         | Flat config: `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, plus `apps/web` plugins (`eslint-plugin-react-hooks`, `@next/eslint-plugin-next`, `eslint-plugin-jsx-a11y` recommended). Nest and `eslint-plugin-import` are not wired — keep import order by convention. `jsx-a11y` still peers on eslint ^3–9; root `pnpm.peerDependencyRules.allowedVersions` allows eslint 10 until upstream catches up. |
-| `tsc --noEmit` | Typecheck, run in CI separately from lint                                                                                                                                                                                                                                                                                                                                                                              |
+| Araç                | Rol                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prettier            | Tüm formatting. Config commit edilir; editor-local override yok.                                                                                                                                                                                                                                                                                                                                                                      |
+| ESLint              | Flat config: `@eslint/js`, `typescript-eslint`, `eslint-config-prettier`, artı `apps/web` plugin'leri (`eslint-plugin-react-hooks`, `@next/eslint-plugin-next`, `eslint-plugin-jsx-a11y` recommended). Nest ve `eslint-plugin-import` bağlı değil — import sırası konvansiyonla tutulur. `jsx-a11y` hâlâ eslint ^3–9 peer'ı istiyor; kök `pnpm.peerDependencyRules.allowedVersions` upstream yakalayana kadar eslint 10'a izin verir. |
+| `tsc --noEmit`      | Typecheck, CI'da lint'ten ayrı çalışır                                                                                                                                                                                                                                                                                                                                                                                                |
+| Husky + lint-staged | Yerelde pre-commit: staged `*.ts` / `*.tsx` dosyalarına `eslint --fix --max-warnings 0` ve `prettier --write`; `*.{mjs,cjs,js,json,md,yml,yaml,css}` dosyalarına `prettier --write`. Tip denetimi ve testler pre-commit'te koşmaz                                                                                                                                                                                                     |
 
 ```bash
-pnpm lint          # ESLint check
-pnpm lint --fix    # ESLint autofix
+pnpm lint          # ESLint kontrol
+pnpm lint --fix    # ESLint otomatik düzeltme
 pnpm format        # Prettier write
-pnpm format:check  # Prettier check (CI gate)
-pnpm typecheck     # shared package builds + tsc --noEmit
+pnpm format:check  # Prettier check (CI kapısı)
+pnpm typecheck     # shared paket build + tsc --noEmit
 ```
 
-- CI fails on lint errors, format drift (`format:check`), and type errors. Warnings are not
-  allowed to accumulate: a rule is either an error or it is removed.
-- **Style is not reviewed by humans.** If a reviewer wants a formatting change, the fix is a
-  lint rule PR, not a review comment.
-- Do not commit generated output (`dist/`, `.next/`, Prisma client) or disable rules
-  file-wide without a comment explaining the reason.
+- CI, lint hatalarında, format sapmasında (`format:check`) ve type hatalarında başarısız
+  olur. Uyarıların birikmesine izin verilmez: bir kural ya bir hatadır ya da kaldırılır.
+- ESLint bugün şunları **zorlamaz**, yalnızca konvansiyondur: non-null assertion'dan kaçınma
+  (`no-non-null-assertion` yalnız `strict` preset'te; bu repo `recommended` kullanır), export
+  edilen fonksiyonlarda açık return tipi, `eslint-disable` için açıklama yorumu ve import sırası.
+  `no-explicit-any` ise `error`'dır (`eslint.config.mjs`).
+- **Stil insanlar tarafından review edilmez.** Bir reviewer bir formatting değişikliği
+  istiyorsa, düzeltme bir review yorumu değil bir lint kuralı PR'ıdır.
+- Üretilen çıktıyı (`dist/`, `.next/`, Prisma client) commit etmeyin veya nedeni açıklayan
+  bir yorum olmadan kuralları dosya genelinde devre dışı bırakmayın.
 
-## See also
+## Ayrıca bakınız
 
-- [architecture.md](architecture.md) — module map and layering
-- [api-conventions.md](api-conventions.md) — REST, DTO naming, error format
-- [testing.md](testing.md) — test placement and expectations
-- [git-strategy.md](git-strategy.md) — commits and PR process
-- [architecture.md](architecture.md#2-monorepo-layout) — directory layout these rules assume
-- [../CONTRIBUTING.md](../CONTRIBUTING.md) — contribution process
+- [architecture.md](architecture.md) — modül haritası ve katmanlaşma
+- [api-conventions.md](api-conventions.md) — REST, DTO adlandırması, hata formatı
+- [testing.md](testing.md) — test yerleşimi ve beklentiler
+- [git-strategy.md](git-strategy.md) — commit'ler ve PR süreci
+- [architecture.md](architecture.md#2-monorepo-yerleşimi) — bu kuralların varsaydığı dizin yerleşimi
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — katkı süreci

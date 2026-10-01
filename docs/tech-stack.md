@@ -1,142 +1,235 @@
-# Tech Stack
+# Teknoloji Stack'i
 
-The technology chosen for each layer of Kurul, with a short rationale and the alternative it was weighed against.
+Kurul'un her katmanı için seçilen teknoloji, kısa bir gerekçe ve karşılaştırıldığı
+alternatif.
 
-> 🌐 English (canonical) | [Türkçe](tr/tech-stack.md)
+**Pin'ler.** Aşağıdaki major'lar ve ürün seçimleri kalıcı kararlardır. Tam sürümler kayar;
+bugün neyin kurulu olduğu için kök ve app `package.json` / `pnpm-lock.yaml` kaynağıdır.
+Mimari şekil: [architecture.md](architecture.md).
 
-**Pins.** Majors and product choices below are the lasting decisions. Exact versions drift;
-treat root and app `package.json` / `pnpm-lock.yaml` as source of truth for what is installed
-today. Architecture shape: [architecture.md](architecture.md).
+## İçindekiler
 
-## Contents
-
-- [1. Summary](#1-summary)
-- [2. Rationale by layer](#2-rationale-by-layer)
-- [3. Deliberately not included](#3-deliberately-not-included)
-- [4. Open-source references](#4-open-source-references)
-- [5. Decision records](#5-decision-records)
-
----
-
-## 1. Summary
-
-| Layer                  | Choice                                 | Alternative considered                |
-| ---------------------- | -------------------------------------- | ------------------------------------- |
-| Backend                | NestJS 11 + TypeScript                 | Fastify (lighter), Django             |
-| Database               | PostgreSQL 18                          | —                                     |
-| Cache / PubSub / Queue | Redis 8 (AGPLv3)                       | Valkey (BSD-3, Linux Foundation fork) |
-| ORM                    | Prisma 7                               | Drizzle ORM                           |
-| API                    | REST (initially)                       | GraphQL (later)                       |
-| Realtime               | Socket.io + `@socket.io/redis-adapter` | `ws` (lighter, no features)           |
-| Frontend               | Next.js 16 + React + TypeScript        | —                                     |
-| Styling                | Tailwind CSS                           | —                                     |
-| UI kit                 | shadcn/ui                              | Radix UI (raw)                        |
-| Drag & drop            | @dnd-kit                               | pragmatic-drag-and-drop               |
-| Charts                 | Recharts                               | Chart.js, Apache ECharts              |
-| Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (maintenance mode) |
-| Email                  | `nodemailer` over SMTP                 | Provider API (Resend, SendGrid, …)    |
-| File uploads           | `multer` + `file-type` magic bytes     | Trusting the declared `Content-Type`  |
-| Reverse proxy          | Caddy (one origin, automatic HTTPS)    | nginx, Traefik                        |
-| Deployment             | Docker Compose                         | Kubernetes (once scale demands it)    |
-
-Architecture (monorepo + modular monolith) is covered separately in [architecture.md](architecture.md).
+- [1. Özet](#1-özet)
+- [2. Katman bazlı gerekçeler](#2-katman-bazlı-gerekçeler)
+- [3. Bilinçli olarak dahil edilmeyenler](#3-bilinçli-olarak-dahil-edilmeyenler)
+- [4. Açık kaynak referansları](#4-açık-kaynak-referansları)
+- [5. Karar kayıtları](#5-karar-kayıtları)
 
 ---
 
-## 2. Rationale by layer
+## 1. Özet
+
+| Katman                 | Seçim                                  | Değerlendirilen alternatif              |
+| ---------------------- | -------------------------------------- | --------------------------------------- |
+| Backend                | NestJS 11 + TypeScript                 | Fastify (daha hafif), Django            |
+| Veritabanı             | PostgreSQL 18                          | —                                       |
+| Cache / PubSub / Queue | Redis 8 (AGPLv3)                       | Valkey (BSD-3, Linux Foundation fork'u) |
+| ORM                    | Prisma 7                               | Drizzle ORM                             |
+| API                    | REST (başlangıçta)                     | GraphQL (sonradan)                      |
+| Realtime               | Socket.io + `@socket.io/redis-adapter` | `ws` (daha hafif, özellik yok)          |
+| Frontend               | Next.js 16 + React + TypeScript        | —                                       |
+| Stil                   | Tailwind CSS                           | —                                       |
+| UI kit                 | shadcn/ui                              | Radix UI (ham)                          |
+| Drag & drop            | @dnd-kit                               | pragmatic-drag-and-drop                 |
+| Grafik                 | Recharts                               | Chart.js, Apache ECharts                |
+| Auth                   | Better Auth (organization plugin)      | Auth.js / NextAuth (bakım modunda)      |
+| E-posta                | SMTP üzerinden `nodemailer`            | Sağlayıcı API'si (Resend, SendGrid, …)  |
+| Dosya yükleme          | `multer` + `file-type` magic byte'ları | Beyan edilen `Content-Type`'a güvenmek  |
+| Reverse proxy          | Caddy (tek origin, otomatik HTTPS)     | nginx, Traefik                          |
+| Deployment             | Docker Compose                         | Kubernetes (ölçek gerektirdiğinde)      |
+
+Mimari (monorepo + modüler monolit) ayrı olarak [architecture.md](architecture.md)'de ele
+alınıyor.
+
+---
+
+## 2. Katman bazlı gerekçeler
 
 ### Backend — NestJS 11 + TypeScript
 
-Both commercial reference points run this way: ClickUp on TypeScript/Node.js/NestJS/PostgreSQL, Linear fully on Node.js + TypeScript with PostgreSQL and Redis. **NestJS 11** is the pinned major (latest stable as of Phase 0; NestJS 12's ESM migration was still in draft). NestJS's module system keeps a many-module product (auth, workspace, board, task, dashboard, notification) orderly when a single developer or a small team is building it. Sharing a language with the frontend is what makes `packages/shared-types` possible, which pays off on every data model change. Most open-source alternatives (Plane, Taiga) chose Django for fast CRUD plus a free admin panel — a good trade when realtime sync is not the priority, and the wrong one here.
+İki ticari referans noktası da bu yolda ilerliyor: ClickUp TypeScript/Node.js/NestJS/
+PostgreSQL üzerinde, Linear ise tamamen Node.js + TypeScript üzerinde, PostgreSQL ve Redis
+ile. **NestJS 11** pinlenen major'dır (Faz 0 itibarıyla son kararlı; NestJS 12 ESM
+migration'ı hâlâ draft'tı). NestJS'in modül sistemi, tek bir geliştirici veya küçük bir ekip tarafından
+geliştirilirken çok modüllü bir ürünü (auth, workspace, board, task, dashboard,
+notification) düzenli tutuyor. Frontend ile aynı dili paylaşmak `packages/shared-types`'ı
+mümkün kılan şey — ki bu her veri modeli değişikliğinde karşılığını veriyor. Açık kaynak
+alternatiflerin çoğu (Plane, Taiga) hızlı CRUD ve ücretsiz bir admin panel için Django'yu
+seçti — realtime senkronizasyon öncelik değilse iyi bir takas, ama burada yanlış tercih
+olurdu.
 
-### Database — PostgreSQL + Redis
+### Veritabanı — PostgreSQL + Redis
 
-Uncontroversial: ClickUp, Linear, Plane, Taiga, and Focalboard all sit on Postgres. JSON columns cover flexible metadata (custom fields, activity payloads) while relational integrity covers the task/board graph. Redis then serves four needs with one tool: notification queue, session store, rate limiting, and the Socket.io pub/sub adapter.
+Tartışmasız: ClickUp, Linear, Plane, Taiga ve Focalboard'ın hepsi Postgres üzerinde
+oturuyor. JSON kolonları esnek metadata'yı (custom field'lar, aktivite payload'ları)
+karşılarken ilişkisel bütünlük task/board grafiğini karşılıyor. Redis ise tek bir araçla
+dört ihtiyacı karşılıyor: Socket.io pub/sub adapter'ı, BullMQ kuyrukları (due-soon
+bildirim taraması ve retention temizliği), auth rate limiting sayaçları ve yükleme bütçesi
+sayaçları; session'lar Better Auth'un Prisma adapter'ı üzerinden PostgreSQL'de yaşar.
 
-Both versions are pinned on purpose. **PostgreSQL 18** is the current major; the previous one is supported for years yet, but a major bump after v0.1 ships costs every self-hoster a `pg_dump`/restore — the official image refuses to start against a `PGDATA` volume initialized by a different major ([development.md](development.md#upgrading-and-backups)). Doing it now, with no data in existence, is free. **Redis 8** is a licensing choice as much as a version one: the 7.4–7.8 band is RSALv2/SSPLv1 only, which is source-available and not OSI open source, and Redis 8 restored an OSI option — AGPLv3, the same licence Kurul ships under. A self-hoster who redistributes the stack inherits no licence question they did not ask for. Valkey (BSD-3-Clause, the Linux Foundation fork of Redis 7.2.4) is protocol-compatible and remains a one-line image swap if a permissive licence is ever needed downstream.
+Her iki versiyon da bilerek sabitlenmiştir. **PostgreSQL 18** mevcut major sürüm; öncekisi
+hâlâ yıllarca destekleniyor, ama v0.1 çıktıktan sonra bir major atlama her self-hoster'a bir
+`pg_dump`/restore maliyetlendiriyor — resmi imaj, farklı bir major tarafından initialize
+edilmiş bir `PGDATA` volume'üne karşı başlamayı reddediyor
+([development.md](development.md#yükseltme-ve-yedekleme)). Bunu şimdi, hiçbir veri yokken
+yapmak bedava. **Redis 8** bir versiyon kadar bir lisans tercihi de: 7.4–7.8 bandı yalnızca
+RSALv2/SSPLv1, ki bu source-available ve OSI açık kaynak değil, ve Redis 8 bir OSI seçeneğini
+geri getirdi — AGPLv3, Kurul'un kendisinin altında dağıtıldığı lisansla aynı. Stack'i
+yeniden dağıtan bir self-hoster, sormadığı bir lisans sorusu miras almıyor. Valkey
+(BSD-3-Clause, Linux Foundation'ın Redis 7.2.4 fork'u) protokol uyumlu ve aşağı akışta
+izinli bir lisans gerekirse tek satırlık bir imaj değişimi olarak duruyor.
 
 ### ORM — Prisma
 
-Drizzle and Prisma are the two dominant TypeScript ORMs in 2026 and both are production-ready. Drizzle offers SQL-level control and the smallest footprint (~7.4kb); Prisma offers a schema-first workflow, a mature ecosystem, and tooling such as Prisma Studio — and since Prisma 7 dropped its Rust dependency, the old bundle-size objection is largely gone. Prisma wins here because its migration story is more guided, which saves debugging time when working alone. Drizzle's performance edge lives in the ORM layer, and a 5–50 ms database round trip dwarfs it in practice.
+Drizzle ve Prisma, 2026'da baskın iki TypeScript ORM'i ve ikisi de üretime hazır. Drizzle
+SQL seviyesinde kontrol ve en küçük footprint'i (~7.4kb) sunuyor; Prisma ise şema-öncelikli
+bir iş akışı, olgun bir ekosistem ve Prisma Studio gibi tooling sunuyor — Prisma 7 Rust
+bağımlılığını kaldırdığından beri eski bundle boyutu itirazı da büyük ölçüde ortadan kalktı.
+Prisma burada kazanıyor çünkü migration hikâyesi daha rehberli, bu da tek başına
+çalışırken hata ayıklama süresinden tasarruf ettiriyor. Drizzle'ın performans avantajı ORM
+katmanında yaşıyor ve pratikte 5–50 ms'lik veritabanı round trip'i bunu gölgede bırakıyor.
 
 ### Realtime — Socket.io + Redis adapter
 
-For self-hosted infrastructure, Socket.io with `@socket.io/redis-adapter` is the standard answer: the adapter broadcasts events across every server instance, which is a hard requirement for horizontal scaling. Raw `ws` has lower overhead but leaves room management and reconnection logic to you — and a Kanban board needs both. Managed services (Ably, Pusher, Liveblocks) solve a serverless problem that does not apply when we run our own servers.
+Self-hosted altyapı için `@socket.io/redis-adapter` ile Socket.io standart cevap:
+adapter, event'leri her sunucu instance'ına yayıyor, ki bu yatay ölçeklenme için kesin bir
+gereklilik. Ham `ws` daha düşük overhead'e sahip ama oda yönetimini ve yeniden bağlanma
+mantığını sana bırakıyor — bir Kanban board'unun ise ikisine de ihtiyacı var. Yönetilen
+servisler (Ably, Pusher, Liveblocks) kendi sunucularımızı çalıştırdığımızda geçerli olmayan
+bir serverless problemini çözüyor.
 
 ### Drag & drop — @dnd-kit
 
-`react-beautiful-dnd` is deprecated — Atlassian withdrew from it. Kurul uses the **classic `@dnd-kit` line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinned): MIT, ~6 KB core, accessible (keyboard and screen reader), framework-agnostic, and the most widely deployed React drag-and-drop library. It is also **frozen** — no release since December 2024, docs-site repo archived in February 2026, maintainer effort moved to a pre-1.0 rewrite (`@dnd-kit/react`) with a different API that we are not adopting. Atlassian's `pragmatic-drag-and-drop` (Apache-2.0) is actively released and is the fallback, at the cost of hand-writing collision detection. Frozen-but-stable beats moving-and-pre-1.0 for a solo maintainer at 50–200 cards per board; the full argument and the re-evaluation trigger are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md). The critical companion rule is ordering: positions are stored as floats and reordered by **fractional indexing**, never as renumbered integers.
+`react-beautiful-dnd` deprecated — Atlassian projeden çekildi. Kurul **klasik `@dnd-kit`
+hattını** kullanıyor (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0, pinlenmiş): MIT,
+~6 KB çekirdek, erişilebilir (klavye ve ekran okuyucu), framework-agnostik ve en yaygın
+kullanılan React drag-and-drop kütüphanesi. Aynı zamanda **donmuş** — Aralık 2024'ten beri
+sürüm yok, dokümantasyon sitesi repository'si Şubat 2026'da arşivlendi, bakım çabası farklı
+bir API'ye sahip 1.0 öncesi bir yeniden yazıma (`@dnd-kit/react`) kaydı; onu benimsemiyoruz.
+Atlassian'ın `pragmatic-drag-and-drop`'u (Apache-2.0) aktif sürüm çıkarıyor ve fallback,
+collision detection'ı elle yazma maliyetiyle. Solo bir maintainer için, board başına
+50–200 kartta donmuş-ama-sabit, hareketli-ve-1.0-öncesine karşı kazanıyor; tam argüman ve
+yeniden değerlendirme tetikleyicisi
+[`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'de. Kritik eşlik eden
+kural sıralama: position'lar float olarak saklanır ve **fractional indexing** ile yeniden
+sıralanır, asla yeniden numaralandırılmış tam sayılar olarak değil.
 
-### Charts — Recharts
+### Grafik — Recharts
 
-The safest default for a React dashboard: broad ecosystem adoption, a comprehensible component API, SVG rendering, MIT licensed, and it composes well with shadcn/ui. It is not the lightest option, and the cost worth recording is the dependency surface rather than a byte count: Recharts v3 declares `@reduxjs/toolkit`, `react-redux`, `immer`, and `victory-vendor` (d3 modules) as runtime dependencies, so adopting it pulls Redux Toolkit into an app that otherwise has no state library. Revisit if the chart count grows, if a bundle budget tightens, or if that dependency graph starts conflicting with app-level state choices — a Canvas-based library (Chart.js, Apache ECharts) is the fallback.
+Bir React dashboard'u için en güvenli varsayılan: geniş ekosistem benimsenmesi, anlaşılır
+bir component API'si, SVG rendering, MIT lisansı ve shadcn/ui ile iyi uyum. En hafif seçenek
+değil, ve kaydetmeye değer maliyet bir byte sayısı değil bağımlılık yüzeyi: Recharts v3,
+`@reduxjs/toolkit`, `react-redux`, `immer` ve `victory-vendor`'ı (d3 modülleri) runtime
+bağımlılığı olarak deklare ediyor, dolayısıyla onu benimsemek başka hiçbir state
+kütüphanesi olmayan bir uygulamaya Redux Toolkit'i sokuyor. Grafik sayısı büyürse, bir
+bundle bütçesi daralırsa veya o bağımlılık grafiği uygulama-seviyesi state seçimleriyle
+çatışmaya başlarsa yeniden gözden geçirin — Canvas tabanlı bir kütüphane (Chart.js, Apache
+ECharts) fallback.
 
 ### Auth — Better Auth
 
-Multi-tenant workspaces are the heart of this product, so auth is a load-bearing choice. Better Auth is the strongest self-hosted option for new projects in 2026 — more capable than NextAuth, free, actively maintained — and Auth.js/NextAuth is in maintenance mode with Better Auth positioned as its successor. The decisive factor is the **organization plugin**: multi-tenant organizations, invitations, member roles, and permissions out of the box, which would take weeks to build. In product language those map 1:1 to **Workspace** / **WorkspaceMember** / invitations — see [`decisions/0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace). Self-hosting keeps data sovereignty in-house with no dependency on a managed service like Clerk. Note that Better Auth ships backend logic only — login and register UI is ours to write.
+Multi-tenant workspace'ler bu ürünün kalbinde, dolayısıyla auth yükü ağır bir seçim.
+Better Auth, 2026'da yeni projeler için en güçlü self-hosted seçenek — NextAuth'tan daha
+yetenekli, ücretsiz, aktif bakımda — ve Auth.js/NextAuth bakım modunda, Better Auth ise
+onun halefi konumunda. Belirleyici faktör **organization plugin**: kutudan çıkar çıkmaz
+multi-tenant organizasyonlar, davetler, üye rolleri ve izinler — bunu sıfırdan yazmak
+haftalar sürerdi. Ürün dilinde bunlar 1:1 olarak **Workspace** / **WorkspaceMember** /
+davetlere eşlenir — bkz. [`decisions/0004-auth-better-auth.md`](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
+Self-hosting, Clerk gibi yönetilen bir servise bağımlılık olmadan veri
+egemenliğini içeride tutuyor. Better Auth'un yalnızca backend logic sağladığını, login ve
+register UI'ının bizim yazmamız gerektiğini unutma.
 
-### Email — nodemailer over SMTP
+### E-posta — SMTP üzerinden nodemailer
 
-Kurul sends two classes of email: transactional (the verification link an invitee needs before `better-auth`'s hardened invitation-acceptance check will let them join a workspace, see [`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md), and the invitation itself) and notification (assignment, mention and due-soon, one message per `Notification` row, behind a per-user switch on `/me`). Both go through the same module and the same variables. `nodemailer` talks plain SMTP, configured only through `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` — no provider SDK, so self-hosters point it at whatever mail server they already run instead of creating a new vendor account. `docker-compose.dev.yml` runs [Mailpit](https://mailpit.axllent.org/) as a local SMTP catch-all so development never sends real mail; see [development.md#smtp-and-mailpit](development.md#smtp-and-mailpit).
+Kurul iki sınıf e-posta gönderiyor: işlemsel olanlar (`better-auth`'un sağlamlaştırılmış
+davet-kabul kontrolünün bir davet edilenin workspace'e katılmasına izin vermeden önce
+ihtiyaç duyduğu doğrulama linki, bkz.
+[`decisions/0013-invitation-email-verification.md`](decisions/0013-invitation-email-verification.md),
+ve davetin kendisi) ve bildirim e-postaları (atama, mention ve due-soon; her `Notification`
+satırı için bir mesaj, `/me` üzerindeki kullanıcı başına anahtarın arkasında). İkisi de aynı
+modülden ve aynı değişkenlerden geçer.
+`nodemailer` düz SMTP konuşur, yalnızca `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` /
+`SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` üzerinden yapılandırılır — sağlayıcı SDK'sı yok,
+dolayısıyla self-hoster'lar yeni bir vendor hesabı oluşturmak yerine zaten çalıştırdıkları
+herhangi bir mail sunucusuna yönlendirirler. `docker-compose.dev.yml`, lokal geliştirmenin
+asla gerçek mail göndermemesi için lokal bir SMTP catch-all olarak
+[Mailpit](https://mailpit.axllent.org/) çalıştırır; bkz.
+[development.md#smtp-ve-mailpit](development.md#smtp-ve-mailpit).
 
 ### Frontend — Next.js 16
 
-**Next.js 16** (App Router) is the pinned major for `apps/web`. Tailwind, shadcn/ui, classic `@dnd-kit`, and Recharts sit on top; details and trade-offs are in [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md).
+`apps/web` için pinlenen major **Next.js 16** (App Router). Tailwind, shadcn/ui, klasik
+`@dnd-kit` ve Recharts bunun üstünde oturur; ayrıntılar ve trade-off'lar
+[`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md)'de.
 
 ### i18n — next-intl
 
-`next-intl` is wired from Phase 1 — user-facing strings go through `useTranslations()` /
-`messages/<locale>.json` rather than being hardcoded. Locale resolution is
-`User.locale → locale cookie → Accept-Language → 'en'` ([ADR 0018](decisions/0018-localization-strategy.md));
-**Settings → Language** can set a preference or “Match my browser”. Two catalogs ship, `en` and
-`tr`, and `messages/catalog.test.ts` fails the build on a key one of them has and the other does
-not, so parity is a gate rather than a claim. A third language needs no new mechanism: a catalog
-file plus one row in each of the two `Record<Locale, …>` copy tables (`MAIL_COPY` in
-`apps/api/src/mail/mail-templates.ts` and the board-template catalogue in
-`apps/api/src/common/board-templates.ts`), both of which are compile errors until they exist.
-Only a translator is missing, which is why the row stays under
-[Beyond MVP](../ROADMAP.md#beyond-mvp).
+`next-intl`, Faz 1'den beri kurulu — kullanıcıya görünen metinler hardcode edilmek yerine
+`useTranslations()` / `messages/<locale>.json` üzerinden geçer. Locale çözümü
+`User.locale → locale cookie → Accept-Language → 'en'`
+([ADR 0018](decisions/0018-localization-strategy.md)); **Ayarlar → Dil** tercih veya
+“Tarayıcımı izle” seçebilir. İki katalog sevkediliyor, `en` ve `tr`; `messages/catalog.test.ts`,
+birinde olup diğerinde olmayan bir anahtarda build'i düşürüyor, yani eşitlik bir iddia değil bir
+kapı. Üçüncü bir dil yeni bir mekanizma istemiyor: bir katalog dosyası, artı iki
+`Record<Locale, …>` metin tablosunun her birine birer satır (`apps/api/src/mail/mail-templates.ts`
+içindeki `MAIL_COPY` ve `apps/api/src/common/board-templates.ts` içindeki board template
+kataloğu); ikisi de var olana kadar derleme hatası. Eksik olan yalnızca bir çevirmen, satırın
+[MVP ötesi](../ROADMAP.md#mvp-ötesi) altında kalma sebebi de bu.
 
-### File uploads — `multer` + `file-type`
+### Dosya yükleme — `multer` + `file-type`
 
-Two endpoints take `multipart/form-data`: an attachment upload and a Trello import. `multer` reads both, registered per module rather than globally so each carries its own byte ceiling — an attachment ceiling is a disk one, an import ceiling is a heap one, and an import must keep working on an instance with attachments switched off. `file-type` reads the **magic bytes** of an uploaded file, because the declared `Content-Type` and the filename extension both come from the caller and neither is evidence; the type written to the row and later to the download header is the sniffed one ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Plain text has no magic number and is the one deliberately narrow exception, spelled out in [api-conventions.md](api-conventions.md#file-uploads-and-downloads).
+`multipart/form-data` alan iki uç var: ek yükleme ve Trello import'u. İkisini de `multer`
+okuyor; global değil modül başına kayıtlı, çünkü her biri kendi byte tavanını taşıyor — ek
+tavanı bir disk tavanı, import tavanı bir heap tavanı, ve import ek'leri kapalı bir instance'ta
+da çalışmak zorunda. `file-type` yüklenen dosyanın **magic byte**'larını okur: beyan edilen
+`Content-Type` de dosya uzantısı da çağırandan gelir ve ikisi de kanıt değildir; satıra ve
+sonra indirme header'ına yazılan tip, sniff edilmiş olandır
+([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)). Düz metnin magic number'ı
+yoktur ve bilinçli olarak dar tutulmuş tek istisnadır; ayrıntısı
+[api-conventions.md](api-conventions.md#dosya-yükleme-ve-indirme) içinde.
 
 ### Deployment — Docker Compose
 
-Seven services always: the four that carry the product (`api`, `web`, `postgres`, `redis`) plus `proxy` (Caddy, the only one publishing a port, terminating TLS and serving the whole stack from one origin), `migrate` (a one-shot `prisma migrate deploy`) and `backup` (a `pg_dump` sidecar that also archives the attachment volume). An eighth, `demo-reset`, sits behind the `demo` Compose profile and starts only with `--profile demo`. This matches the existing self-managed Linux server setup. The path to Kubernetes stays open for when scale demands it (both ClickUp and Linear ended up there), but Compose on a single host is the right size for now.
+Her zaman yedi servis: ürünü taşıyan dördü (`api`, `web`, `postgres`, `redis`) artı `proxy`
+(Caddy; port yayınlayan tek servis, TLS'i sonlandırır ve tüm stack'i tek origin'den sunar),
+`migrate` (tek seferlik `prisma migrate deploy`) ve `backup` (`pg_dump` sidecar'ı; ek volume'ünü
+de arşivler). Sekizincisi, `demo-reset`, `demo` Compose profilinin arkasında duruyor ve yalnızca
+`--profile demo` ile başlıyor. Bu, mevcut self-managed Linux sunucu kurulumuyla eşleşiyor. Ölçek gerektirdiğinde Kubernetes'e giden yol açık kalıyor (hem
+ClickUp hem Linear sonunda oraya vardı), ama şimdilik tek bir host'ta Compose doğru
+büyüklük.
 
 ---
 
-## 3. Deliberately not included
+## 3. Bilinçli olarak dahil edilmeyenler
 
-| Technology              | Why not now                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Kafka                   | ClickUp uses it, but at 20M+ user scale. Redis pub/sub is more than enough for the MVP; it can be added later                                                                                                                                                                                                                                       |
-| GraphQL                 | Linear uses it. REST is faster to start with; revisit when API consumers diversify                                                                                                                                                                                                                                                                  |
-| Elasticsearch           | Full-text search can start with PostgreSQL's built-in FTS                                                                                                                                                                                                                                                                                           |
-| Kubernetes              | Docker Compose on one host is sufficient. Migrate when traffic requires it                                                                                                                                                                                                                                                                          |
-| MinIO / S3              | Attachments ship on **local disk behind a `StorageBackend` port**, not on object storage ([ADR 0022](decisions/0022-attachment-storage.md)). An `S3StorageBackend` is deferred to a trigger, not to a schedule: the first operator report of a deployment where local disk is not durable — an ephemeral container host, or a multi-replica install |
-| Local-first sync engine | Linear's largest technical investment. Very high complexity — start server-first                                                                                                                                                                                                                                                                    |
-
----
-
-## 4. Open-source references
-
-Projects worth studying for architecture and data modelling:
-
-| Project     | Backend              | Frontend | Note                                          |
-| ----------- | -------------------- | -------- | --------------------------------------------- |
-| Plane       | Django               | Next.js  | The most popular OSS PM tool, AGPL-3.0        |
-| Huly        | TypeScript / Node.js | Svelte   | Full TS, but carries Rush monorepo complexity |
-| Taiga       | Django               | React    | Agile/Scrum focused, MPL-2.0                  |
-| OpenProject | Ruby on Rails        | Angular  | Oldest / enterprise, GPL-3.0                  |
-| Focalboard  | Go                   | React    | Simple Kanban, no longer actively maintained  |
+| Teknoloji               | Neden şimdi değil                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kafka                   | ClickUp kullanıyor, ama 20M+ kullanıcı ölçeğinde. Redis pub/sub MVP için fazlasıyla yeterli; sonradan eklenebilir                                                                                                                                                                                                                                                     |
+| GraphQL                 | Linear kullanıyor. REST'le başlamak daha hızlı; API tüketicileri çeşitlendiğinde yeniden değerlendirilir                                                                                                                                                                                                                                                              |
+| Elasticsearch           | Tam metin arama PostgreSQL'in yerleşik FTS'iyle başlayabilir                                                                                                                                                                                                                                                                                                          |
+| Kubernetes              | Tek bir host'ta Docker Compose yeterli. Trafik gerektirdiğinde geçiş yapılır                                                                                                                                                                                                                                                                                          |
+| MinIO / S3              | Ekler **yerel diskte, bir `StorageBackend` port'unun arkasında** geliyor; object storage üzerinde değil ([ADR 0022](decisions/0022-attachment-storage.md)). `S3StorageBackend` bir takvime değil, bir tetikleyiciye ertelendi: yerel diskin dayanıklı olmadığı bir dağıtımın ilk operatör raporu — kalıcı olmayan bir container host, ya da çok replikalı bir kurulum |
+| Local-first sync engine | Linear'ın en büyük teknik yatırımı. Çok yüksek karmaşıklık — server-first ile başla                                                                                                                                                                                                                                                                                   |
 
 ---
 
-## 5. Decision records
+## 4. Açık kaynak referansları
 
-Stack and product ADRs are indexed in [decisions/README.md](decisions/README.md). Start there
-rather than duplicating the table here.
+Mimari ve veri modelleme için incelemeye değer projeler:
 
-Related: [architecture.md](architecture.md)
+| Proje       | Backend              | Frontend | Not                                              |
+| ----------- | -------------------- | -------- | ------------------------------------------------ |
+| Plane       | Django               | Next.js  | En popüler OSS PM aracı, AGPL-3.0                |
+| Huly        | TypeScript / Node.js | Svelte   | Tam TS, ama Rush monorepo karmaşıklığını taşıyor |
+| Taiga       | Django               | React    | Agile/Scrum odaklı, MPL-2.0                      |
+| OpenProject | Ruby on Rails        | Angular  | En eski / enterprise, GPL-3.0                    |
+| Focalboard  | Go                   | React    | Basit Kanban, artık aktif bakımda değil          |
+
+---
+
+## 5. Karar kayıtları
+
+Stack ve ürün ADR'leri [decisions/README.md](decisions/README.md) indeksinde. Tabloyu burada
+çoğaltmak yerine oradan başlayın.
+
+İlgili: [architecture.md](architecture.md)

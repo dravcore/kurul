@@ -114,10 +114,7 @@ function caddyLimit(rule: ProxyRule): number {
 }
 
 /** `client_max_body_size` inside one `location` block of the documented nginx contract. */
-function nginxLimit(
-  doc: 'docs/self-hosting.md' | 'docs/tr/self-hosting.md',
-  rule: ProxyRule,
-): number {
+function nginxLimit(doc: 'docs/self-hosting.md', rule: ProxyRule): number {
   const text = read(doc);
   const opener = PROXY_RULES[rule].nginx;
   const start = text.indexOf(opener);
@@ -154,24 +151,14 @@ describe('the two-layer upload limit', () => {
     );
   });
 
-  it('leaves the same room in the Turkish mirror', () => {
-    const proxyLimit = nginxLimit('docs/tr/self-hosting.md', '/api/*');
-    expect(proxyLimit).toBeGreaterThan(DEFAULT_ATTACHMENT_MAX_BYTES);
-    expect(proxyLimit - DEFAULT_ATTACHMENT_MAX_BYTES).toBeGreaterThan(
-      MEASURED_MULTIPART_ENVELOPE_BYTES,
-    );
-  });
-
   it('keeps the two proxy numbers equal to each other, so replacing Caddy changes nothing', () => {
     // The bundled proxy and the published nginx row are the *same* layer described twice. They
     // have to agree with each other even though neither agrees with the API's number, and
     // nothing above would notice one of them drifting — each is only compared to the API.
     const caddy = caddyLimit('/api/*');
     const nginx = nginxLimit('docs/self-hosting.md', '/api/*');
-    const nginxTr = nginxLimit('docs/tr/self-hosting.md', '/api/*');
 
     expect(nginx).toBe(caddy);
-    expect(nginxTr).toBe(caddy);
   });
 
   /**
@@ -270,17 +257,10 @@ describe('the two-layer auth body limit', () => {
     );
   });
 
-  it('is bounded in the Turkish mirror at or above the API constant', () => {
-    expect(nginxLimit('docs/tr/self-hosting.md', '/auth/*')).toBeGreaterThanOrEqual(
-      AUTH_BODY_MAX_BYTES,
-    );
-  });
-
   it('keeps the two proxy numbers equal to each other, so replacing Caddy changes nothing', () => {
     const caddy = caddyLimit('/auth/*');
 
     expect(nginxLimit('docs/self-hosting.md', '/auth/*')).toBe(caddy);
-    expect(nginxLimit('docs/tr/self-hosting.md', '/auth/*')).toBe(caddy);
   });
 
   it('stays far below the upload ceiling: the two rules are different limits on purpose', () => {

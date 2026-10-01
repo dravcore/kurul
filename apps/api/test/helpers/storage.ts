@@ -9,7 +9,8 @@ import { join } from 'node:path';
  * codebase has no precedent for one — `LogMailSender` is also a production fallback. Nothing in
  * `apps/api` wrote to disk before this, so this helper *is* the convention rather than a copy of
  * one, and it sits beside `test/helpers/db.ts` because it answers the same question: what does
- * this spec own and clean up itself (`docs/testing.md:259-261`).
+ * this spec own and clean up itself (`docs/testing.md`, "Test yazma": "Geçici dizin de state
+ * sayılır").
  */
 export async function createTempStorageDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'kurul-storage-'));

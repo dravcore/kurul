@@ -1,60 +1,37 @@
-# 0007. License: AGPL-3.0
+# 0007. Lisans: AGPL-3.0
 
-**Status:** Accepted
-**Date:** 2026-08-08
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-08
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0007-license-agpl.md)
+> **Devamı:** aşağıda açık bırakılan ticari model [0028](0028-open-contributions-hosted-service.md)'de karara bağlandı: AGPL-3.0 kalıyor, iş modeli ise çift lisanslama değil (onu 0014 önermişti, 0028 terk etti), Dravcore'un işlettiği isteğe bağlı bir barındırma servisi. 0028 bu kaydı tamamlıyor, yerini almıyor.
 
-> **Follow-up:** the commercial model left open below is settled in
-> [0028](0028-open-contributions-hosted-service.md): AGPL-3.0 stays, and the business is an
-> optional hosted service run by Dravcore rather than dual licensing (which 0014 proposed and
-> 0028 abandoned). 0028 complements this record; it does not supersede it.
+## Bağlam
 
-## Context
+Kurul, üçüncü bir tarafça alınıp katkıda bulunma zorunluluğu olmadan kapalı kaynak bir SaaS olarak yeniden satılması makul biçimde mümkün olan, açık kaynak bir proje yönetim aracı. Lisans, bu sonucu engellerken maintainer'lar için sürdürülebilir bir iş modeline gerçekçi bir yol bırakmalı.
 
-Kurul is an open-source project management tool that could plausibly be
-taken by a third party and resold as closed-source SaaS without any
-obligation to contribute back. The license must prevent that outcome while
-leaving a realistic path to a sustainable business model for the maintainers.
-
-## Decision
+## Karar
 
 **AGPL-3.0**.
 
-## Rationale
+## Gerekçe
 
-- AGPL-3.0 closes the network-use loophole that plain GPL leaves open: running
-  modified code as a network service isn't "distribution" under GPL, so GPL
-  alone doesn't force a SaaS operator to release their changes. AGPL's
-  network-use clause does.
-- Precedent: Plane, the most popular OSS project-management tool, also chose
-  AGPL-3.0.
-- AGPL keeps an open-core path available — an AGPL community edition alongside
-  separately licensed enterprise features — without foreclosing that model.
-- Relicensing or relaxing AGPL later requires consent from every contributor
-  whose code remains in the codebase. That makes it effectively a one-way
-  door, so it has to be right from day one rather than "fixed" later.
+- AGPL-3.0, düz GPL'in açık bıraktığı network-use boşluğunu kapatıyor: değiştirilmiş kodu bir network servisi olarak çalıştırmak GPL altında "dağıtım" sayılmıyor, dolayısıyla GPL tek başına bir SaaS operatörünü değişikliklerini yayınlamaya zorlamıyor. AGPL'in network-use maddesi bunu yapıyor.
+- Emsal: en popüler OSS proje yönetim aracı Plane de AGPL-3.0'ı seçti.
+- AGPL, açık bir open-core yolunu mümkün kılıyor — bu modeli dışlamadan, ayrı lisanslı enterprise özelliklerin yanında bir AGPL community edition'ı.
+- AGPL'i sonradan yeniden lisanslamak veya gevşetmek, kod tabanında kalan kodu olan her katkıda bulunandan onay gerektiriyor. Bu da onu fiilen tek yönlü bir kapı yapıyor, dolayısıyla sonradan "düzeltmek" yerine ilk günden doğru olması gerekiyor.
 
-## Consequences
+## Sonuçlar
 
-- Closed-source resale of Kurul by competitors or cloud providers is not
-  permitted without releasing their modifications.
-- The open-core path (AGPL core + proprietary enterprise add-ons) stays open
-  for the future if that business model is pursued.
-- AGPL's copyleft strength can deter some enterprise adopters and contributors
-  who are wary of its network-use clause — a real cost weighed against the
-  protection it provides.
-- Combining AGPL community code with any future proprietary enterprise
-  features requires careful architectural separation (and likely a CLA) to
-  avoid tainting the proprietary code.
-- Changing course later requires tracking down and getting sign-off from every
-  past contributor — in practice, close to impossible once the contributor
-  base grows.
+- Kurul'un rakipler veya bulut sağlayıcıları tarafından kapalı kaynak olarak yeniden satılması, değişikliklerini yayınlamadan mümkün değil.
+- Open-core yolu (AGPL çekirdek + proprietary enterprise eklentileri) bu iş modeli izlenirse gelecek için açık kalıyor.
+- AGPL'in copyleft gücü, network-use maddesinden çekinen bazı enterprise benimseyicileri ve katkıda bulunanları caydırabilir — sağladığı korumaya karşı tartılan gerçek bir maliyet.
+- AGPL community kodunu gelecekteki herhangi bir proprietary enterprise özellikle birleştirmek, proprietary kodu kirletmekten kaçınmak için dikkatli bir mimari ayrım (ve muhtemelen bir CLA) gerektiriyor.
+- İleride yön değiştirmek, geçmişteki her katkıda bulunanı bulup onay almayı gerektiriyor — katkıda bulunan tabanı büyüdükçe pratikte neredeyse imkansıza yaklaşıyor.
 
-## Alternatives considered
+## Değerlendirilen Alternatifler
 
-| Alternative                                | Why not                                                                                                                 |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| MIT / Apache-2.0 (permissive)              | Allows closed-source SaaS resale with no obligation to contribute back — undermines the open-source sustainability goal |
-| Plain GPL-3.0                              | Leaves the network-use/SaaS loophole open — a hosted fork wouldn't have to release its source                           |
-| Proprietary / source-available (e.g., BSL) | Forecloses a genuine open-source community contribution model from day one                                              |
+| Alternatif                                | Neden değil                                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| MIT / Apache-2.0 (permissive)             | Katkıda bulunma zorunluluğu olmadan kapalı kaynak SaaS yeniden satışına izin veriyor — açık kaynak sürdürülebilirlik hedefini baltalıyor |
+| Düz GPL-3.0                               | Network-use/SaaS boşluğunu açık bırakıyor — hosted bir fork kaynağını yayınlamak zorunda kalmazdı                                        |
+| Proprietary / source-available (örn. BSL) | Daha ilk günden gerçek bir açık kaynak topluluk katkı modelini dışlıyor                                                                  |

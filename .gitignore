@@ -7,7 +7,7 @@ node_modules/
 .env.local
 .env.*.local
 # Object-storage credentials for the backup sidecar's off-host copy, read by the `backup`
-# service only (docs/self-hosting.md#off-host-copies). Same reason as .env: it holds secrets.
+# service only (docs/self-hosting.md#host-dışı-kopyalar). Same reason as .env: it holds secrets.
 rclone.env
 rclone.conf
 

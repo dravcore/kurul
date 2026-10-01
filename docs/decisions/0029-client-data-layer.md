@@ -1,189 +1,202 @@
-# 0029. The Client Data Layer Stays Hand-Rolled; the Flip Trigger Is the Third Generation Counter
+# 0029. İstemci Veri Katmanı El Yapımı Kalıyor; Geçiş Tetikleyicisi Üçüncü Generation Sayacı
 
-**Status:** Accepted
-**Date:** 2026-08-23
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-23
+**Güncellendi:** 2026-10-01 — (1) Karar'daki tetikleyici komutun bugünkü ölçümü, `apps/web` kaynak
+ağacında (derleme çıktısı `.next` ve `node_modules` hariç; yani
+`--include='*.ts' --include='*.tsx' --exclude-dir=.next --exclude-dir=node_modules` ile):
+`grep -rn "GenerationRef" apps/web` sekiz satır döndürür (iki dosya, iki sayaç: `moveGenerationRef`
+ve `switchGenerationRef`; ADR'nin eklendiği commit'in kaynak ağacında da sekiz satırdı);
+`grep -rln "GenerationRef" apps/web` iki dosya, `grep -rn "GenerationRef = useRef" apps/web` iki
+satır döndürür. `.next` derleme çıktısı olan bir checkout'ta aynı komutlar o çıktıyı da taradığı
+için daha fazla satır sayar. (2) Kural 4'ün ("Socket payload'ları id'dir; istemci yeniden çeker")
+tek istisnası `task:moved`'dır: payload `columnId` ve `position` da taşır ve istemci bunları
+doğrudan yerel satıra yazar (`apps/web/components/board/use-board-realtime.ts`).
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0029-client-data-layer.md)
+## Bağlam
 
-## Context
+`apps/web`'in bir veri çekme kütüphanesi yok. Hiç olmadı ve şimdiye kadar bunun nedenini kimse
+yazmadı; sonuç olarak her yeni ekran soruyu sıfırdan yeniden tartıştı ve cevap kimin yazdığına
+bağlı kaldı. Bu ADR katmanın gerçekte ne olduğunu kayda geçirir, uyduğu kuralları belirtir ve
+onu tersine çevirecek tek sayıyı sabitler.
 
-`apps/web` has no data-fetching library. It has never had one, and until now nothing wrote
-down why, which meant every new screen re-argued the question from scratch and the answer
-depended on who was writing it. This ADR records what the layer actually is, states the rules
-it runs by, and fixes the one number that would flip it.
+Bugün var olan şey, dört parça halinde:
 
-What exists today, in four pieces:
+- **`lib/api.ts`**, tipli bir `fetch` sarmalayıcısıdır: `api.get/post/patch/delete`, artı bir
+  reddi doğru cümleye çeviren `apiStatus` ve `resolveApiMessage`. Hiçbir cache, retry ya da
+  dedupe taşımaz. Bu kasıtlıdır: HTTP semantiği ve hata eşlemesi, API sözleşmesinin sabitlediği
+  parçalardır ([api-conventions.md](../api-conventions.md)) ve durağandırlar.
+- **`lib/use-api-resource.ts`**, okuma ilkelidir (primitive): bir `AbortSignal`, bir `loading`,
+  bir `error`, bir `failed`, `reload`, ve yerel düzenlemeler için bir `setData`. **Bir değerin
+  bir kez gelmesini** modeller ve `fetcher` kimliği onun tüm geçersiz kılma (invalidation)
+  hikâyesidir. `null` bir fetcher, bir ekranın workspace id'sini öğrenmeden önce beklemesinin
+  yoludur. `useResourceField`, bir setter'ı çok listeli bir kaynağın tek bir alanına daraltır,
+  böylece birlikte çekilen dört liste tek bir abort ve tek bir failure olarak kalır. Yaklaşık on
+  beş modül bunu kullanıyor.
+- **Board hook deseni.** `BoardView` kendi başına hiçbir fetch işlemi yapmaz; her biri tek bir
+  sorumluluk taşıyan küçük hook'lardan oluşur ve bu ADR'nin eşlik eden refactor'ü o deseni bir
+  seviye daha aşağı taşır: `useBoardCaches` (listeler ve onları yansıtan iki ref), `useBoardFetch`
+  (okumalar), `useBoardLoad` (skeleton, error, retry), `useBoardPanelTask` (deep-link'lenen
+  satır), `useBoardData` (composer), ardından `useBoardMutations`, `useBoardRealtime`,
+  `useBoardTaskDnd` ve `useBoardDialogs`.
+- **Socket.io, satır değil id taşır.** `use-board-socket.ts` ve `use-notification-socket.ts` bir
+  odaya katılır, handler'larını bir ref'te tutar (böylece kararsız bir callback yeniden abone
+  olmaz) ve bir katılımı bir resync isteğiyle onaylar (ack). Payload'lar id'dir
+  ([ADR 0005](0005-realtime-socketio.md)), dolayısıyla oluşturulan ya da güncellenen bir görev
+  **yeniden çekilir**; bu yüzden istemcinin sunucudan gelen entity'ler için bir merge stratejisine
+  ve alan düzeyinde çakışma kurallarına ihtiyacı yoktur.
 
-- **`lib/api.ts`** is a typed `fetch` wrapper: `api.get/post/patch/delete`, plus `apiStatus`
-  and `resolveApiMessage` for turning a rejection into the right sentence. It carries no cache,
-  no retry and no dedupe. That is deliberate: HTTP semantics and error mapping are the parts
-  the API contract pins down ([api-conventions.md](../api-conventions.md)), and they are stable.
-- **`lib/use-api-resource.ts`** is the read primitive: one `AbortSignal`, one `loading`, one
-  `error`, one `failed`, `reload`, and a `setData` for local edits. It models **one value
-  arriving once**, and the `fetcher` identity is the whole of its invalidation story. A `null`
-  fetcher is how a screen holds off before it knows its workspace id. `useResourceField`
-  narrows a setter to one field of a multi-list resource, so four lists fetched together stay
-  one abort and one failure. About fifteen modules use it.
-- **The board hook pattern.** `BoardView` owns no fetching of its own; it composes small hooks
-  that each own one concern, and this ADR's companion refactor extends that pattern one level
-  down: `useBoardCaches` (the lists and the two refs that mirror them), `useBoardFetch` (the
-  reads), `useBoardLoad` (skeleton, error, retry), `useBoardPanelTask` (the deep-linked row),
-  `useBoardData` (the composer), then `useBoardMutations`, `useBoardRealtime`,
-  `useBoardTaskDnd` and `useBoardDialogs`.
-- **Socket.io, carrying ids and not rows.** `use-board-socket.ts` and
-  `use-notification-socket.ts` join a room, hold their handlers in a ref so an unstable callback
-  does not re-subscribe, and ack a join with a resync request. Payloads are ids
-  ([ADR 0005](0005-realtime-socketio.md)), so a created or updated task is **refetched**, which
-  is why the client needs no merge strategy for server-pushed entities and no field-level
-  conflict rules.
+### Bu kararın dayandığı sayım
 
-### The census this decision turns on
+"Reconciliation deseninin kopyaları", ROADMAP satırının kısaltmasıdır ve saymak için fazla
+gevşektir; bu yüzden kod tabanı üç farklı tanımla üç kez okundu.
 
-"Copies of the reconciliation pattern" is the ROADMAP row's shorthand, and it is too loose to
-count with, so the codebase was read three times with three different definitions.
+**Tam optimistic yazımlar** (snapshot al, tahmin edilen değeri yerelde yaz, sunucunun cevabını
+üzerine merge et, başarısızlıkta snapshot'ı geri yükle). **Üç tane:**
 
-**Full optimistic writes** (snapshot, write the predicted value locally, merge the server's
-answer over it, restore the snapshot on failure). **Three:**
+| Site                                                                 | Ne tahmin ediyor                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `use-board-mutations.ts` `commitTaskMove`                            | Sürüklenen kartın kolonu ve pozisyonu                               |
+| `task-panel-fields.tsx` `save` (bölünmeden önce `task-panel.tsx`'ti) | Görevin başlığı ve açıklaması                                       |
+| `use-task-checklists.ts` `toggleItem`                                | Bir checklist tik'i, artı yeniden sayılan `checklistSummary` rozeti |
 
-| Site                                                                   | What it predicts                                                |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `use-board-mutations.ts` `commitTaskMove`                              | The dragged card's column and position                          |
-| `task-panel-fields.tsx` `save` (was `task-panel.tsx` before the split) | The task's title and description                                |
-| `use-task-checklists.ts` `toggleItem`                                  | One checklist tick, plus the recounted `checklistSummary` badge |
+Yanlarında iki yakın-vaka daha var; kimse yanlışlıkla sayıya dahil etmesin diye adlandırmaya
+değer: `task-properties-panel.tsx` içindeki `patchTask` bir snapshot'ı geri yükler ama asla
+önceden yazmaz, `workspace-provider.tsx` içindeki `onSwitch` ise `activeId`'yi önceden yazar ama
+geri dönecek bir snapshot'ı yoktur.
 
-Two near-misses sit next to them and are worth naming so nobody counts them by accident:
-`task-properties-panel.tsx` `patchTask` restores a snapshot but never pre-writes, and
-`workspace-provider.tsx` `onSwitch` pre-writes `activeId` but has no snapshot to go back to.
+**Bir sunucu satırını id'yle yerel bir listeye merge etmek**, hiçbir yerel tahmin olmadan. **On
+iki tane:** `use-board-realtime.ts` `upsertRemoteTask`, `use-board-fetch.ts` içindeki
+`drainTasks`'ın sayfa merge'i, `use-board-panel-task.ts`'in `onSuccess` fold'u, `board-view.tsx`
+`applyTaskPatch` ve `onColumnSaved`, `use-task-metadata.ts` `loadMoreComments`,
+`notifications-list.tsx` ve `use-notification-menu.ts` `openNotification`, `members-settings.tsx`
+iki kez, `board-list.tsx` `onRenamed`, ve `workspace-provider.tsx` `renameActiveWorkspace`.
 
-**Merge-a-server-row-into-a-local-list-by-id**, with no local prediction at all. **Twelve:**
-`use-board-realtime.ts` `upsertRemoteTask`, `use-board-fetch.ts` `drainTasks`'s page merge,
-`use-board-panel-task.ts`'s `onSuccess` fold, `board-view.tsx` `applyTaskPatch` and
-`onColumnSaved`, `use-task-metadata.ts` `loadMoreComments`, `notifications-list.tsx` and
-`use-notification-menu.ts` `openNotification`, `members-settings.tsx` twice,
-`board-list.tsx` `onRenamed`, and `workspace-provider.tsx` `renameActiveWorkspace`.
+**Generation ile sayılan yazımlar** (çözüldüğünde, state'e dokunmasına izin verilmeden önce hâlâ
+en güncel istek olup olmadığını sormak zorunda olan bir istek). **İki tane:**
+`use-board-mutations.ts` içindeki `moveGenerationRef` ve `workspace-provider.tsx` içindeki
+`switchGenerationRef`; ikincisi kendi yorumunda birinciyi kopyaladığını söylüyor.
 
-**Generation-counted writes** (a request that, on resolving, has to ask whether it is still
-the latest one before it is allowed to touch state). **Two:** `use-board-mutations.ts`
-`moveGenerationRef` and `workspace-provider.tsx` `switchGenerationRef`, the second of which
-says in its own comment that it is copying the first.
+Bu üç sayı taban çizgisidir. On iki alarm verici değil: id ile anahtarlanmış bir merge dört
+satırdır ve doğruluğu yereldir. Üç de alarm verici değil. Önemli olan iki, ve bir sonraki bölüm
+nedenini anlatıyor.
 
-Those three numbers are the baseline. Twelve is not alarming: an id-keyed merge is four lines
-and its correctness is local. Three is not alarming either. Two is the one that matters, and
-the next section says why.
+## Karar
 
-## Decision
+**İstemci veri katmanı el yapımı kalıyor, ve geçiş tetikleyicisi üçüncü generation sayacı.**
 
-**The client data layer stays hand-rolled, and the flip trigger is the third generation
-counter.**
+`grep -rn "GenerationRef" apps/web` bugün iki sonuç döndürüyor. **Üç döndürdüğünde, web
+uygulaması React Query'yi benimser.** Tartışma yok, yeniden ölçüm yok, bu belirli sayacın
+kaçınılabilir olup olmadığına dair bir değerlendirme yok.
 
-`grep -rn "GenerationRef" apps/web` returns two hits today. **When it returns three, the web
-app adopts React Query.** No debate, no re-measurement, no judgement call about whether this
-particular counter was avoidable.
+Bu, ROADMAP satırının "reconciliation deseninin üçüncü kopyası" ifadesinin keskinleştirilmiş
+hali; ve olduğu gibi değil keskinleştirilmiş olarak benimseniyor, çünkü gevşek okumada
+tetikleyici zaten ateşlenmiş durumda: bugün üç tam optimistic yazım var ve katman gayet iyi.
+Deseni parçalarına ayırmak, sayıyı anlamlı kılan şey. Ucuz kısım şekildir: snapshot al, tahmin
+et, merge et, geri al; yaklaşık yirmi satır, çağrı noktasında açık ve hata modu içinde yaşadığı
+bileşende görünür. Pahalı kısım ise etrafındaki eşzamanlılık muhasebesidir: gelen bir cevaba hâlâ
+inanmaya izin verilip verilmediğine karar vermek. Bu akıl yürütme incedir, sessizce yanlış
+yapılması kolaydır (yanlış cevap bir çökme değil, doğru görünen bayat bir değerdir) ve tam olarak
+bir query kütüphanesinin sizin için üstlendiği şeydir. İki elle yazılmış örnek bir tesadüftür. Üç
+ise bir politikadır.
 
-That is the ROADMAP row's "third copy of the reconciliation pattern" sharpened, and it is
-sharpened rather than adopted verbatim because on the loose reading the trigger has already
-fired: there are three full optimistic writes today and the layer is fine. Splitting the
-pattern into its parts is what makes the count mean something. The cheap part is the shape:
-snapshot, predict, merge, roll back, about twenty lines, obvious at the call site, and its
-failure mode is visible in the component it lives in. The expensive part is the concurrency
-bookkeeping around it: deciding whether a response that has arrived is still allowed to be
-believed. That reasoning is subtle, it is easy to get quietly wrong (the wrong answer is not a
-crash, it is a stale value that looks correct), and it is the exact thing a query library owns
-for you. Two hand-written instances is a coincidence. Three is a policy.
+Katmanın uyduğu kurallar, bir sonraki ekranın bunları yeniden türetmemesi için:
 
-The rules the layer runs by, so the next screen does not re-derive them:
+1. **Bir kez gelen tek bir değer olan okuma `useApiResource` üzerinden geçer.** Yeni, özel bir
+   `AbortController` artı `loading` artı `error` üçlüsü yok. Her `setState`'in etrafındaki
+   `if (signal.aborted)` koruması unutulması kolay olan kısımdır ve onu unutmak önceki
+   workspace'in satırlarını yeni görünüme yazar.
+2. **Farklı zamanlarda gelen birden fazla değer olan okuma el yapımı kalır ve bunu bir yorumda
+   söyler.** Bugün tam olarak bir tane var: board yükleme, burada frame ve ilk görev sayfası
+   birlikte skeleton'ın ne zaman kalkacağına karar verirken kalan sayfalar zaten çizilmiş bir
+   board'un arkasında akmaya devam eder. `useBoardLoad`'ın docstring'i bu argümanı taşır. İkinci
+   böyle bir okuma bir tetikleyici değildir ama aynı paragrafı hak etmelidir.
+3. **Yazımlar, dokundukları state'in yanındaki bir hook'ta yaşar**, paylaşılan bir mutation
+   registry'sinde değil. Optimistic bir ön-yazım opt-in'dir ve her biri gerçekleştireceği
+   rollback'i belirtir. Görünür bir gecikme sorunu olmayan bir yazım bunu almaz:
+   `use-task-attachments.ts` kasıtlı olarak yalnızca await'ten sonra uygulanır ve docstring'i
+   kendisini checklist toggle'ıyla karşılaştırır.
+4. **Socket payload'ları id'dir; istemci yeniden çeker.** İstemci tarafında entity cache yok,
+   normalization yok, hook'lar arası cache key'i yok. Realtime katmanını merge kurallarından
+   arınık tutan şey budur, ve on iki id ile anahtarlanmış merge'in her birinin, kimsenin
+   okuyamadığı paylaşılan bir reducer yerine dörder satır olmasının nedeni de budur.
+5. **Yeni bir `*GenerationRef` tetikleyicidir, bir kod incelemesi yorumu değil.** Üçüncüsüne
+   ihtiyaç duyan kişi onu yazmak yerine React Query migration'ını açar.
 
-1. **A read that is one value arriving once goes through `useApiResource`.** No new bespoke
-   `AbortController` plus `loading` plus `error` triple. The `if (signal.aborted)` guard around
-   each `setState` is the part that is easy to forget, and forgetting it writes the previous
-   workspace's rows into the new view.
-2. **A read that is several values arriving at different times stays hand-rolled, and says so
-   in a comment.** There is exactly one today: the board load, where the frame and the first
-   task page together decide when the skeleton comes down while the remaining pages stream in
-   behind an already-painted board. `useBoardLoad`'s docstring carries that argument. A second
-   such read is not a trigger, but it must earn the same paragraph.
-3. **Writes live in a hook beside the state they touch**, not in a shared mutation registry.
-   An optimistic pre-write is opt-in and each one states the rollback it will perform. A write
-   with no visible latency problem does not get one: `use-task-attachments.ts` applies strictly
-   after the await, on purpose, and its docstring contrasts itself with the checklist toggle.
-4. **Socket payloads are ids; the client refetches.** No client-side entity cache, no
-   normalization, no cross-hook cache keys. This is what keeps the realtime layer free of merge
-   rules, and it is the reason the twelve id-keyed merges are each four lines rather than a
-   shared reducer nobody can read.
-5. **A new `*GenerationRef` is the trigger, not a code review comment.** Whoever needs the
-   third one opens the React Query migration instead of writing it.
+**Tetiklendiğinde maliyet**, tetikleyicinin bir alarm değil bir plan olması için şimdiden
+belirtiliyor: `@tanstack/react-query` eklenir, `lib/api.ts` fetcher olarak değişmeden kalır,
+`useApiResource`'ın imzası `useQuery` üzerinde yeniden uygulanır (böylece tüketicileri çağrı
+noktalarına dokunmadan geçiş yapar), üç optimistic yazım `onMutate`/`onError` rollback'iyle
+`useMutation`'a taşınır, ve board'un streaming drain'i sayfa başına manuel bir `setQueryData`
+olarak bırakılır, çünkü bir kütüphane geldi diye o şekil ifade edilebilir hale gelmez. Bir
+rewrite değil, tek odaklı bir değişiklik olarak tahmin ediliyor; beklemenin güvenli olmasının
+diğer nedeni de bu.
 
-**Cost when triggered**, stated now so the trigger is a plan and not an alarm: add
-`@tanstack/react-query`, keep `lib/api.ts` unchanged as the fetcher, re-implement
-`useApiResource`'s signature on top of `useQuery` so its consumers migrate without touching
-their call sites, move the three optimistic writes to `useMutation` with `onMutate`/`onError`
-rollback, and leave the board's streaming drain as a manual `setQueryData` per page, because
-that shape does not become expressible just because a library arrived. Estimated at one focused
-change, not a rewrite, which is the other reason waiting is safe.
+## Gerekçe
 
-## Rationale
+**Neden şimdi React Query değil.** Dürüst sebep, satın alındığı iki şeyin burada henüz sorun
+olmaması. Cache'i bileşenler arası dedupe ve bir staleness politikasıdır, ve bu uygulamada mount
+edilmiş iki bileşen arasında paylaşılan neredeyse hiç okuma yok: board kendi listelerine sahip,
+panel kendi dört metadata listesine sahip, ayarlar ekranlarının her biri birer tane sahip.
+Mutation makinesi optimistic-update ergonomisidir, ve üç çağrı noktası, her gelecekteki
+katkıcının yeni bir ekran eklemeden önce öğrenmesi gereken yeni bir zihinsel modeli amorti etmez.
+Buna karşılık gerçek maliyetler var: şu anda düz bileşenler render eden suite'ler için test
+ağacında bir `QueryClientProvider`, ~13 kB gzip'lenmiş, ve herhangi bir kademeli migration
+sırasında kalacak `useApiResource` çağrılarının yanında "bu veri nerede yaşıyor" sorusuna ikinci
+bir cevap.
 
-**Why not React Query now.** The honest reason is that the two things it is bought for are not
-problems here yet. Its cache is a cross-component dedupe and a staleness policy, and this app
-has almost no read shared between two mounted components: the board owns its lists, the panel
-owns its four metadata lists, the settings screens each own one. Its mutation machinery is
-optimistic-update ergonomics, and three call sites do not amortise a new mental model that
-every future contributor has to learn before they can add a screen. Against that sit real
-costs: a `QueryClientProvider` in the test tree for suites that currently render plain
-components, ~13 kB gzipped, and a second answer to "where does this data live" alongside the
-`useApiResource` calls that would remain during any incremental migration.
+**Neden tetikleyici bir tarih ya da dosya boyutu değil de bir sayaç.** Bir tarih, kod tabanı
+değişse de değişmese de sona erer. Bir satır sayısı yanlış şeyi ölçer; bu PR'nin eşlik eden
+refactor'ünün gösterdiği gibi: `use-board-data.ts` 381 satırdan 158'e indi ama mantığının tek bir
+satırı bile basitleşmedi, çünkü satırlar üst üste yığılmış dört sorumluluktu, çok büyük olan tek
+bir sorumluluk değil. Bir generation sayacı ise tam tersine, biri gerçek istek eşzamanlılığıyla
+karşılaştığında ve onu elle çözmeye karar verdiğinde ortaya çıkar. Grep'lenebilir, herkes
+tarafından tek bir komutla sayılabilir, ve tartışılarak küçültülemez.
 
-**Why the trigger is a counter and not a date or a file size.** A date expires whether or not
-the codebase changed. A line count measures the wrong thing, as this PR's companion refactor
-shows: `use-board-data.ts` went from 381 lines to 158 without one line of its logic getting
-simpler, because the lines were four concerns stacked, not one concern that was too big. A
-generation counter, by contrast, appears exactly when someone has hit real request concurrency
-and has decided to solve it by hand. It is greppable, it is countable by anyone in one command,
-and it cannot be argued down.
+**Neden el yapımı katman yalnızca ucuz değil, kendi şartlarında savunulabilir.** Her iki ilkel
+de zaten takımların genelde bir kütüphane benimseyerek doğru yapmaya çalıştığı şeyi yapıyor.
+`useApiResource`, `loading`/`error`'ı effect'in başından değil, istek kimliği değiştiğinde render
+sırasında ayarlar; bu da bir tüketicinin önceki isteğin hatasının yanında `loading === false`
+okuduğu bütün bir tek-frame yalan sınıfını ortadan kaldırır. Board yüklemesi sonuncu değil ilk
+sayfada açılır. Her iki socket hook'u da `connected`'ı yalnızca oda gerçekten katılıldığında
+çevirir, böylece bağlanıp odaya kabul edilmeyen bir socket canlı görünmez. Bunların hiçbiri bir
+query kütüphanesiyle de bedava değil; bunlar migration'dan değişmeden çıkacak uygulama mantığı.
 
-**Why the hand-rolled layer is defensible on its own terms and not just cheap.** Both
-primitives already do the thing teams usually adopt a library to get right. `useApiResource`
-sets `loading`/`error` during render when the request identity changes rather than from the top
-of the effect, which removes a whole class of one-frame lies where a consumer reads
-`loading === false` next to the previous request's error. The board load reveals on the first
-page instead of the last. Both socket hooks flip `connected` only once the room is actually
-joined, so a socket that connected and was denied the room does not look live. None of that is
-free with a query library either; it is application logic that would survive the migration
-unchanged.
+## Sonuçlar
 
-## Consequences
+- **Aktivite akışının önü açıldı.** Beyond MVP satırındaki
+  [Realtime push of the activity feed](../../ROADMAP.md#mvp-ötesi) bu ADR'yi bekliyordu, ve
+  beklediği şey "bunu hangi katmanda inşa edeceğim" sorusunun cevabıydı. Artık zaten var olan ve
+  yeni bir state eklemeyen deyimle inşa edilebilir: panelin yorum yolu bunu zaten yapıyor.
+  `use-board-realtime.ts`'in `onCommentAdded`'ı seçili görev için `metaRefreshKey`'i artırır, bu
+  key `useTaskMetadata`'nın fetcher kimliğinin bir parçasıdır, ve değişen bir fetcher kimliği
+  `useApiResource`'ın reload olarak ele aldığı şeydir. Board odasında push edilen bir aktivite
+  olayı aynı key üzerinden aynı şeyi yapar. Yapmaması **gereken** şey, yalnızca ekleme yapılan ve
+  sunucu tarafından sıralanan bir akış için dördüncü bir optimistic yazım ya da üçüncü bir
+  generation sayacı getirmektir; eğer buna ihtiyacı olduğu ortaya çıkarsa, bu tetikleyicinin
+  ateşlenmesi demektir ve akış migration'ı bekler.
+- Kural 1, `useApiResource`'ı yeni okuma ekranları için varsayılan cevap yapar; bu bir kolaylık
+  olduğu kadar katkıcılar üzerinde bir kısıtlamadır: incelemede özel bir fetch üçlüsü artık
+  karşılaştırılacağı bir belgeye sahip.
+- Katman bilinen boşluklarını korur; sonradan keşfedilmek yerine adlandırılmış: bileşenler arası
+  istek dedupe'u yok, pencere odaklandığında refetch yok, arka plan staleness'ı yok. Bunlardan
+  herhangi biri istendiğinde yerel ve dar kapsamlı olarak çözüldü; `lib/use-poll-fallback.ts`'in
+  ne olduğu da bu.
+- Testler provider'sız kalır. Board ve görev suite'leri bileşenleri ve hook'ları doğrudan render
+  eder; case'ler arasında kurulacak ya da sıfırlanacak bir client yoktur.
+- Üç optimistic yazım özel kalır, ve her biri rollback yolu için kendi testine ihtiyaç duymaya
+  devam edecek. Bu, bu kararın kabul edilmiş tekrarlayan maliyeti, ve tetikleyicinin izlediği
+  maliyet de bu.
 
-- **The activity feed is unblocked.** The Beyond MVP row
-  [Realtime push of the activity feed](../../ROADMAP.md#beyond-mvp) was waiting on this ADR, and
-  what it was waiting for is an answer to "which layer do I build this in". It can now be built
-  with the idiom that already exists and adds no new state: the panel's comment path already
-  does it. `use-board-realtime.ts`'s `onCommentAdded` bumps `metaRefreshKey` for the selected
-  task, that key is part of `useTaskMetadata`'s fetcher identity, and a changed fetcher identity
-  is what `useApiResource` treats as a reload. An activity event pushed on the board room does
-  the same thing through the same key. What it must **not** do is introduce a fourth optimistic
-  write or a third generation counter for a feed that is append-only and server-ordered; if it
-  turns out to need one, that is the trigger firing and the feed waits for the migration.
-- Rule 1 makes `useApiResource` the default answer for new read screens, which is a constraint
-  on contributors as much as a convenience: a bespoke fetch triple in review now has a document
-  to be measured against.
-- The layer keeps its known gaps, named rather than discovered later: no cross-component request
-  dedupe, no refetch on window focus, no background staleness. Where any of those has been
-  wanted it was solved locally and narrowly, which is what `lib/use-poll-fallback.ts` is.
-- Tests stay provider-free. The board and task suites render components and hooks directly, with
-  no client to construct or reset between cases.
-- The three optimistic writes stay bespoke, and each will keep needing its own test for the
-  rollback path. That is the accepted recurring cost of this decision, and it is the cost the
-  trigger is watching.
+## Değerlendirilen alternatifler
 
-## Alternatives considered
-
-| Alternative                                               | Why not                                                                                                                                                                                                  |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Adopt React Query now                                     | Buys a cross-component cache the app has almost no shared reads to fill, and mutation ergonomics for three call sites; costs a provider in every test tree and a second data-flow idiom during migration |
-| SWR instead                                               | Same trade at a smaller size, and it has less to say about the mutation half, which is the only half showing strain                                                                                      |
-| A global store (Zustand, Redux) for board and task state  | Moves server state into client state, which is the category error the socket layer was designed around: the API stays authoritative and payloads carry ids                                               |
-| A normalized entity cache written in-house                | Adopts the hardest part of a query library and none of its testing, docs or community; strictly worse than flipping the trigger                                                                          |
-| Server Components plus Next's `fetch` cache for the board | The board is a live, dragged, socket-updated surface behind a session cookie; nothing here is cacheable per request or renderable once                                                                   |
-| A generic in-house `useMutation` wrapper now              | Three call sites whose optimistic shapes differ (a list reorder, two field patches, a recounted summary) would each need an escape hatch, leaving the abstraction plus the special cases                 |
-| Trigger on a file-size or call-site count instead         | Counts symptoms of layering, not of difficulty; `use-board-data.ts` shrank by 58% in this same PR with no logic change                                                                                   |
-| No trigger, revisit "when it hurts"                       | That is the state this ADR exists to end: the question was re-argued per screen and answered by whoever asked                                                                                            |
+| Alternatif                                                             | Neden olmadı                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Şimdi React Query'yi benimsemek                                        | Uygulamanın doldurmak için neredeyse hiç paylaşılan okuması olmayan bir bileşenler arası cache satın alır, ve üç çağrı noktası için mutation ergonomisi; her test ağacında bir provider'a ve migration sırasında ikinci bir veri akışı deyimine mal olur |
+| Bunun yerine SWR                                                       | Daha küçük boyutta aynı takas, ve gerginlik gösteren tek yarı olan mutation yarısı hakkında söyleyecek daha az şeyi var                                                                                                                                  |
+| Board ve görev state'i için global bir store (Zustand, Redux)          | Sunucu state'ini istemci state'ine taşır; bu tam olarak socket katmanının etrafında tasarlandığı kategori hatasıdır: API otoriter kalır ve payload'lar id taşır                                                                                          |
+| İç kaynaklı, normalize edilmiş bir entity cache                        | Bir query kütüphanesinin en zor parçasını benimser ama test, doküman ya da topluluğunun hiçbirini almaz; tetikleyiciyi çevirmekten kesinlikle daha kötü                                                                                                  |
+| Board için Server Components artı Next'in `fetch` cache'i              | Board bir session cookie'sinin arkasında canlı, sürüklenen, socket ile güncellenen bir yüzey; burada hiçbir şey istek başına cache'lenebilir ya da bir kez render edilebilir değil                                                                       |
+| Şimdiden genel, iç kaynaklı bir `useMutation` sarmalayıcısı            | Optimistic şekilleri farklı olan üç çağrı noktası (bir liste yeniden sıralama, iki alan patch'i, yeniden sayılan bir özet) her biri için bir kaçış kapısına ihtiyaç duyar; geriye soyutlama artı özel durumlar kalır                                     |
+| Bunun yerine bir dosya boyutu ya da çağrı noktası sayısı tetikleyicisi | Katmanlaşmanın belirtilerini sayar, zorluğun belirtilerini değil; `use-board-data.ts` bu aynı PR'de mantık değişmeden %58 küçüldü                                                                                                                        |
+| Tetikleyici yok, "acıttığında" yeniden gözden geçir                    | Bu ADR'nin sona erdirmek için var olduğu durum tam olarak bu: soru ekran başına yeniden tartışıldı ve soranın cevabı geçerli oldu                                                                                                                        |

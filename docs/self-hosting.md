@@ -1,133 +1,149 @@
-# Self-hosting Kurul on your own domain
+# Kurul'u kendi domain'inizde barındırma
 
-Put Kurul on a server, on your domain, with HTTPS and working email. Everything below is
-one page on purpose; budget about an hour, most of it waiting for DNS.
+Kurul'u bir sunucuya, kendi domain'inize, HTTPS ve çalışan e-posta ile kurun. Aşağıdakilerin
+tamamı bilinçli olarak tek sayfa; çoğu DNS beklemekle geçen yaklaşık bir saat ayırın.
 
-> 🌐 English (canonical) | [Türkçe](tr/self-hosting.md)
+Build adımı yok. `docker compose pull` her sürüm için yayınlanan imajları indirir ve aynı imaj
+her domain'de çalışır — API URL'i imajın içine derlenmiş değildir (gerekçesi için bkz.
+[Neden yeniden build gerekmiyor](#neden-yeniden-build-gerekmiyor)).
 
-There is no build step. `docker compose pull` fetches images published for every release, and
-the same image works on every domain — the API URL is not compiled into it (see
-[Why there is no rebuild](#why-there-is-no-rebuild) if you want the reasoning).
+> **v0.2.0 ya da daha eskisini mi kuruyorsunuz? Bunun yerine `git clone` kullanın.** v0.2.0
+> ve öncesi sürümler yalnızca `api` ve `web` imajlarını yayınladı; bu sayfanın çektiği üçüncü
+> imaj olan `kurul-migrate`, v0.3.0'dan itibaren var. Aşağıdaki indirme adımı build edilecek
+> bir kaynak ağacı getirmediği için v0.2.0'da bu sayfadaki adımlar stack'i başlatamaz:
+> [Sorun giderme](#sorun-giderme) bölümünde gösterildiği gibi clone'dan kurun ve v0.3.0'dan
+> itibaren bu sayfaya dönün.
 
-> **Installing v0.2.0 or older? Use `git clone` instead.** Releases up to and including
-> v0.2.0 published only the `api` and `web` images; the third one this page pulls,
-> `kurul-migrate`, exists from v0.3.0 onward. The download step below fetches no source tree to
-> build it from, so on v0.2.0 the steps on this page cannot start the stack: install from a
-> clone as shown in [Troubleshooting](#troubleshooting), and come back to this page from v0.3.0
-> on.
+## Gerekenler
 
-## What you need
+- Public IP'si olan, Docker Engine 24+ ve Compose eklentisi kurulu bir sunucu. Küçük bir ekip
+  için iki CPU ve 2 GB RAM yeterli — bu 2 GB'ın nasıl harcandığı için bkz.
+  [Sunucu boyutlandırma](#sunucu-boyutlandırma).
+- Kontrolünüzdeki bir domain ve o sunucuya **açık 80 ve 443 (TCP) portları**. İkisi de zorunlu:
+  Let's Encrypt doğrulamayı 80 üzerinden yapar, tarayıcılar 443'ü kullanır. 443/UDP (HTTP/3)
+  isteğe bağlıdır: kapalıysa tarayıcılar HTTP/2'ye düşer, bir şey bozulmaz.
+- Bir SMTP hesabı. Kurul'da davetlerin kabul edilebilmesi için giden e-posta şart —
+  nedeni ve atlarsanız ne olduğu için bkz. [E-posta](#e-posta-smtp).
+- Gelen trafikte SSH, 80 ve 443 (TCP; isteğe bağlı olarak 443/UDP) dışında hiçbir şeye izin
+  vermeyen bir host firewall'ı. Bu stack'in çalıştırdığı geri kalan her şey zaten kendiliğinden
+  public internetin dışında kalır: `docker-compose.yml` içinde `ports:` tanımı olan tek servis
+  `proxy`, dolayısıyla Postgres, Redis, API ve web uygulamasına yalnızca Docker'ın iç ağı
+  üzerinden erişilebilir. Bunu kendi
+  makinenizde `docker compose ps` ile doğrularsınız — `proxy` dışındaki her satır, önünde
+  `0.0.0.0:` eşlemesi olmayan çıplak bir container portu (`4000/tcp`, `5432/tcp`, …)
+  göstermeli.
 
-- A server with a public IP, Docker Engine 24+ and the Compose plugin. Two CPUs and 2 GB of
-  RAM is enough for a small team — see [Server sizing](#server-sizing) for how that 2 GB is
-  actually spent.
-- A domain you control, with **ports 80 and 443 open** to that server. Both are required:
-  Let's Encrypt validates over port 80, browsers use 443.
-- An SMTP account. Kurul needs outgoing mail before anyone can accept an invitation — see
-  [Email](#email-smtp) for why, and what happens if you skip it.
-- A host firewall that allows nothing inbound beyond SSH, 80 and 443. Everything else this
-  stack runs stays off the public internet on its own: `proxy` is the only service in
-  `docker-compose.yml` with a `ports:` entry, so Postgres, Redis, the API and the web app are
-  reachable only over Docker's internal network. `docker compose ps` is how you confirm that on
-  your own machine — every row except `proxy` should show a bare container port
-  (`4000/tcp`, `5432/tcp`, …) with no `0.0.0.0:` mapping in front of it.
+  Firewall yine de yerini hak ediyor; ona güvenmeden önce bilinmesi gereken bir neden var:
+  Linux'ta Docker portları kendi iptables kurallarını yazarak yayınlar ve bu kurallar ufw'nin
+  kurallarından **önce** değerlendirilir. Yayınladığınız bir container portu — diyelim
+  Postgres'e "geçici olarak" ulaşmak için bir `docker-compose.override.yml`'de — `ufw deny 5432`
+  yazılı olsa bile internete açıktır. Firewall, Docker'ın yönetmediği şeyleri korur; geri kalanı
+  koruyan şey `ports:` listesidir — bu stack'in o listeyi tek servise indirmesinin nedeni budur.
 
-  The firewall still earns its place, for one reason worth knowing before you trust it: on
-  Linux, Docker publishes ports by writing its own iptables rules, and those are consulted
-  _before_ ufw's. A container port you publish — in a `docker-compose.override.yml`, say, to
-  "temporarily" reach Postgres — is exposed to the internet even with `ufw deny 5432` in place.
-  The firewall protects the things Docker is not managing; the `ports:` list is what protects
-  the rest, which is why this stack keeps it to one service.
+## Sunucu boyutlandırma
 
-## Server sizing
+`docker-compose.yml`'deki her servis artık bir `mem_limit` taşıyor (OPS-05, 2026-08-18 audit).
+Bundan önce hiçbir şey bir container'ın alabileceği belleği sınırlamıyordu, dolayısıyla 2 GB
+bütçesine yaklaşan bir host'ta hangi process'in öleceğine _kernel_'in OOM killer'ı karar
+veriyordu — sadece bu stack'inkileri değil, host'taki her process'i puanlar ve gerçekte
+büyüyen container hangisiyse onun yerine Postgres'i esirgemek için hiçbir sebebi yoktur. Bir
+`mem_limit`, bu kararı ait olduğu yere geri koyar: bir container yalnızca kendi tavanını aştığı
+için öldürülür ve başka bir servisin yaptığı hiçbir şey Postgres'i onunla birlikte
+düşüremez.
 
-Every service in `docker-compose.yml` carries a `mem_limit` (OPS-05, 2026-08-18 audit). Before
-this, nothing capped how much memory any one container could take, so on a host near its 2 GB
-budget the _kernel_ OOM killer picked which process died — it scores every process on the host,
-not just this stack's, and has no reason to spare Postgres over whichever container actually
-grew. A `mem_limit` puts that decision back where it belongs: a container is only ever killed
-for outgrowing its own ceiling, and nothing another service does can take Postgres down with it.
+| Servis       | `mem_limit` | Bu sayının nedeni                                                                                                                                                                                           |
+| ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `postgres`   | 512m        | Küçük bir ekibin board'unun çalışma kümesi (working set) için cömert bir taban; `/dev/shm` 256m'ye çıkarıldı, aşağıya bakın                                                                                 |
+| `api`        | 512m        | `REQUEST_BODY_MAX_BYTES` JSON gövdeyi heap'e, `ATTACHMENT_MAX_BYTES` (`.env.example`) yüklemeyi heap **dışı** bir `Buffer`'a tamponlar; ölçülen tepe yükleme başına `ATTACHMENT_MAX_BYTES`'ın ~1,5–2,2 katı |
+| `web`        | 512m        | Aynı Next.js SSR process'i, `api` ile aynı "seçilmemiş tavan" sorunu                                                                                                                                        |
+| `migrate`    | 512m        | `api` ile aynı: aynı build stage, aynı Prisma CLI, yalnızca startup'ta bir kez                                                                                                                              |
+| `backup`     | 256m        | `pg_dump` buffer'lamak yerine stream eder; bu, process overhead'i ve attachment `tar`'ını kapsar                                                                                                            |
+| `redis`      | 128m        | Yalnızca auth rate-limit ve yükleme bayt sayaçları, BullMQ zamanlayıcıları (due-soon, cleanup) ve Socket.io pub/sub; asla oturum, bildirim ya da board verisi; `maxmemory` 100mb, aşağıya bakın             |
+| `proxy`      | 128m        | TLS sonlandırır ve proxy'ler; gövdeler `api`'ninki gibi buffer'lanmak yerine Caddy'den geçer                                                                                                                |
+| `demo-reset` | 256m        | Yalnızca `demo` profilinde; birkaç yüz satır yazar ve hiçbirini tutmaz, V8 heap'i `--max-old-space-size=192` ile sabit; aşağıdaki 2048 MB toplamına girmez                                                  |
 
-| Service    | `mem_limit` | Why this number                                                                                  |
-| ---------- | ----------- | ------------------------------------------------------------------------------------------------ |
-| `postgres` | 512m        | Generous baseline for a small-team board's working set; `/dev/shm` raised to 256m, see below     |
-| `api`      | 512m        | `REQUEST_BODY_MAX_BYTES` / `ATTACHMENT_MAX_BYTES` (`.env.example`) both buffer into its heap     |
-| `web`      | 512m        | Same Next.js SSR process, same "no ceiling chosen" problem as `api`                              |
-| `migrate`  | 512m        | Matches `api`: same build stage, same Prisma CLI, just once at startup                           |
-| `backup`   | 256m        | `pg_dump` streams rather than buffering; this covers process overhead and the attachments `tar`  |
-| `redis`    | 128m        | Cache, sessions, rate limits, notifications only, never board data; `maxmemory` 100mb, see below |
-| `proxy`    | 128m        | Terminates TLS and proxies; bodies pass through Caddy rather than buffering into it              |
+`api` ve `web`, 512m tavanlarının %75'i olan `NODE_OPTIONS=--max-old-space-size=384`'ü de
+ayarlar — böylece V8'in heap'i, Node'un kendi container-belleği sezgisine bırakılmak yerine
+açıkça sabitlenir. `mem_limit`'in altında kalan 128m'lik boşluk, tek başına bir heap tavanının
+kapsamadığı şeyler içindir (thread stack'leri, native buffer'lar, code space): V8, cgroup'un
+sert limitine varmadan önce kendi yakalanabilir "JavaScript heap out of memory" hatasına çarpar
+— bu da çıplak bir `SIGKILL` yerine `docker compose logs api` (ya da `web`) içinde bir satır
+olarak görünür. Bu yalnız heap içindeki büyümeyi yakalar: yüklemelerin tamponları heap dışıdır
+ve `--max-old-space-size` onları sınırlamaz; yoğun bir yükleme dalgasında aşılan ilk sınır
+V8'inki değil cgroup'unkidir ve sonuç logda bir satır değil, çıplak bir `SIGKILL`'dir.
+`api`'nin `mem_limit`'ini boyutlandırırken eşzamanlı yükleme sayısı × 2,2 × `ATTACHMENT_MAX_BYTES`
+değerini hesaba katın.
 
-`api` and `web` also set `NODE_OPTIONS=--max-old-space-size=384` — 75% of their 512m ceiling —
-so V8's heap is pinned explicitly rather than left to Node's own container-memory heuristic. The
-remaining 128m of headroom below `mem_limit` is for what a heap ceiling alone doesn't cover
-(thread stacks, native buffers, code space): V8 hits its own catchable "JavaScript heap out of
-memory" before the cgroup's hard limit does, which shows up as a line in `docker compose logs
-api` (or `web`) instead of a bare `SIGKILL`.
+`redis` de 128m'sinin içinde aynı muameleyi görür: komut satırında
+`--maxmemory 100mb --maxmemory-policy noeviction` vardır, yani dolan bir Redis, cgroup tarafından
+öldürülüp döngü halinde yeniden başlatılmak yerine yazmalara
+`OOM command not allowed when used memory > 'maxmemory'` ile cevap verir
+(`docker compose logs api` içinde bir satır; API'nin rate limiter'ları — auth ve yükleme bayt
+bütçesi — Redis hata verirken process belleğine düşer). `noeviction`, due-soon taraması ile saklama
+süpürmesinin (`cleanup`) zamanlayıcılarını bu Redis'te tutan BullMQ'nun şart koştuğu politikadır:
+evict edilen bir zamanlayıcı kaydı sessizce hiç çalışmayan bir iştir, dolayısıyla dolu bir Redis
+anahtar düşürmek yerine yazmayı reddeder. `postgres` `shm_size: 256m` taşır çünkü Docker'ın
+`/dev/shm`'i varsayılan olarak 64 MB'dır ve Postgres paralel worker'lar ile hash join'ler için
+dinamik paylaşımlı belleği oraya ayırır; bitmesi, ağır bir dashboard sorgusunda
+`could not resize shared memory segment ... No space left on device` olarak görünür. İkisi de
+tablodaki tavanların üstüne bellek değildir: bir `/dev/shm` sayfası container'ın cgroup'una
+diğer her sayfa gibi yazılır ve `maxmemory`, Docker'ın Redis'e uyguladığı limitin altında
+Redis'in kendine uyguladığı bir limittir.
 
-`redis` gets the same treatment inside its 128m: `--maxmemory 100mb --maxmemory-policy
-noeviction` on its command line, so a Redis that fills up answers writes with
-`OOM command not allowed when used memory > 'maxmemory'` (a line in `docker compose logs api`;
-the API's rate limiters fall back to process memory while Redis is erroring, and a cache miss is
-a cache miss) instead of being killed by the cgroup and restarted in a loop. `noeviction` is
-what BullMQ, whose notification and retention queues live in this Redis, requires: an evicted
-job is a job that silently never runs, so a full Redis refuses writes rather than dropping keys.
-`postgres` carries `shm_size: 256m` because Docker's `/dev/shm` is 64 MB by default and Postgres
-allocates dynamic shared memory for parallel workers and hash joins there; running out surfaces
-as `could not resize shared memory segment ... No space left on device` on a heavy dashboard
-query. Neither is memory on top of the ceilings in the table: a `/dev/shm` page is charged to
-the container's cgroup like any other, and `maxmemory` is a limit Redis enforces on itself under
-the one Docker enforces on it.
+`REDIS_MAXMEMORY`, `.env` içinde bu tavanı `docker-compose.yml`'e dokunmadan yükseltir; `redis`
+`mem_limit`'ini de onunla birlikte yükseltin ki Redis kendi limitine cgroup'unkinden önce
+çarpsın. Zaten çalışan bir instance'ta yükseltmeden önce dataset'in gerçekte nerede durduğunu
+kontrol edin:
+`docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" INFO memory' | grep used_memory_human`.
+`REDIS_PASSWORD` host kabuğunda değil `redis` container'ının ortamında tanımlı olduğu için komut
+tek tırnaklı bir `sh -c` içinde çalışır; yoksa host kabuğu değişkeni boş genişletir ve parolalı bir
+Redis `AUTH`'u reddeder. `noeviction` ile tavanın zaten üzerindeki bir dataset kendini geri
+küçültmez: yeterince key kendiliğinden expire olana kadar her yazmayı reddeder, kontrolün sayıdan
+önce gelmesinin nedeni budur.
 
-`REDIS_MAXMEMORY` in `.env` raises that ceiling without touching `docker-compose.yml`; raise the
-`redis` `mem_limit` alongside it so Redis still hits its own limit before the cgroup's. Before
-raising it on an instance that is already running, check where the dataset actually sits:
-`docker compose exec redis redis-cli -a "$REDIS_PASSWORD" INFO memory | grep used_memory_human`.
-With `noeviction`, a dataset already over the ceiling does not shrink itself back under it: it
-refuses every write until enough keys expire on their own, which is why the check has to come
-before the number, not after.
+Bunlar birer tavan, rezervasyon değil — `mem_limit`'inden az kullanan bir container hiçbir ek
+maliyete yol açmaz, ve özellikle `migrate`, `api` ile `web` başlamayı bitirmeden önce (başarıyla)
+çıkar, dolayısıyla onlarla hiçbir zaman gerçekten eşzamanlı değildir. Uzun süre çalışan servisler
+— `postgres`, `api`, `web`, `redis`, `proxy` ve `backup` — tavanlarına aynı anda vurmuş gibi
+toplarsak (diğerleri ayaktayken zaten çıkmış olan `migrate` hariç), bu 512 + 512 + 512 + 128 +
+128 + 256 = 2048 MB eder, ki bu da bu sayfanın her zaman istediği 2 GB'a tam olarak denk gelir.
+Gerçek trafik altında bundan daha az boşluğu olan bir host, bu sayıları yükseltmek için bir
+sebeptir (`docker-compose.yml` düz bir düzenleme, ya da bunları bir
+`docker-compose.override.yml` içinde override edin) veya kutunun kendi RAM'ini artırmak için —
+tavanı kaldırmak için değil; kaldırmanın neyi geri getirdiği için yukarıdaki notu görün.
 
-These are ceilings, not reservations — a container using less than its `mem_limit` costs nothing
-extra, and `migrate` in particular exits (successfully) before `api` and `web` finish starting,
-so it is never actually concurrent with them. Summed as if every long-running service hit its
-ceiling at once — `postgres` + `api` + `web` + `redis` + `proxy` + `backup`, excluding `migrate`,
-which by the time the others are up has already exited — that is 512 + 512 + 512 + 128 + 128 +
-256 = 2048 MB, which is exactly the 2 GB this page has always asked for. A host with less
-headroom than that under real traffic is a reason to raise these numbers (`docker-compose.yml`
-is a plain edit, or override them in a `docker-compose.override.yml`) or the box's own RAM, not
-to remove the ceiling — see the note above for what removing it gets you back.
-
-**Not verified by measurement**: these numbers come from the request/attachment ceilings already
-documented in `.env.example` and from V8's own heap-sizing conventions, not from running the
-stack under load at each limit. If a container is killed for hitting its `mem_limit` in
-practice, `docker compose ps` shows it exited (often `137`), and `docker compose logs <service>`
-is the place to start — raise that one service's limit rather than every service's.
+**Ölçümle doğrulanmadı**: bu sayılar `.env.example`'da zaten belgelenmiş request/attachment
+tavanlarından ve V8'in kendi heap boyutlandırma kurallarından geliyor, stack'in her limitte
+yük altında çalıştırılmasından değil. Bir container gerçekte `mem_limit`'ine çarptığı için
+öldürülürse, `docker compose ps` onun çıktığını gösterir (genelde `137`), ve
+`docker compose logs <servis>` başlanacak yerdir — her servisin değil, o tek servisin limitini
+yükseltin.
 
 ## 1. DNS
 
-Point the hostname at your server and let it propagate before you start the stack — Caddy asks
-for a certificate on its first boot, and a request that fails because DNS is not live yet
-counts against Let's Encrypt's rate limit.
+Hostname'i sunucunuza yönlendirin ve stack'i başlatmadan önce yayılmasını bekleyin — Caddy ilk
+açılışta sertifika ister ve DNS henüz canlı olmadığı için başarısız olan bir istek Let's
+Encrypt'in rate limit'ine sayılır.
 
 ```
 kurul.example.com.   A     203.0.113.10
-kurul.example.com.   AAAA  2001:db8::10      # only if the server has IPv6
+kurul.example.com.   AAAA  2001:db8::10      # yalnızca sunucunun IPv6'sı varsa
 ```
 
-Check it from somewhere that is not the server itself:
+Sunucunun kendisi dışında bir yerden doğrulayın:
 
 ```bash
 dig +short kurul.example.com
 ```
 
-## 2. Fetch the compose file and configure
+## 2. Compose dosyasını indirin ve yapılandırın
 
-The URLs below name a release tag, `v0.4.1`, and the same tag goes into `.env` as `TAG` a few
-lines further down. Fetch the files from the release you are going to run, not from `main`:
-`docker-compose.yml`, `docker/Caddyfile` and `scripts/backup.sh` are versioned with the images,
-and a compose file from a newer tree can name a service, a variable or an image the release you
-pinned never shipped. To install a different release, replace `v0.4.1` in every URL and in
-`TAG`.
+Aşağıdaki URL'ler bir release tag'i taşıyor, `v0.4.1`, ve aynı tag birkaç satır aşağıda `.env`'e
+`TAG` olarak giriyor. Dosyaları `main`'den değil, çalıştıracağınız sürümden indirin:
+`docker-compose.yml`, `docker/Caddyfile` ve `scripts/backup.sh` imajlarla birlikte sürümlenir
+ve daha yeni bir ağaçtan gelen bir compose dosyası, sabitlediğiniz sürümün hiç yayınlamadığı
+bir servisi, değişkeni ya da imajı adlandırabilir. Başka bir sürümü kurmak için her URL'deki ve
+`TAG`'deki `v0.4.1`'i değiştirin.
 
 ```bash
 mkdir -p /opt/kurul && cd /opt/kurul
@@ -141,151 +157,157 @@ curl -fsSL -o .env https://raw.githubusercontent.com/dravcore/kurul/v0.4.1/.env.
 chmod 600 .env
 ```
 
-`scripts/backup.sh` is not optional: the `backup` service in `docker-compose.yml` bind-mounts
-that exact path into its container, and without the file the scheduled backups that service
-exists to take never run. `chmod 600 .env` because the file is about to hold the database
-password, the session secret and the SMTP password; the `rclone.env` advice in
-[Off-host copies](#off-host-copies) is the same rule.
+`scripts/backup.sh` isteğe bağlı değil: `docker-compose.yml` içindeki `backup` servisi tam
+olarak o yolu container'ına bind-mount eder ve dosya yoksa o servisin var olma amacı olan
+zamanlanmış yedekler hiç alınmaz. `chmod 600 .env`, çünkü dosya birazdan veritabanı parolasını,
+oturum sırrını ve SMTP parolasını taşıyacak; [Host dışı kopyalar](#host-dışı-kopyalar)
+bölümündeki `rclone.env` tavsiyesi de aynı kural.
 
-Edit `.env`. For a Docker-only install these are the lines that matter — everything else in the
-file is either for the development loop or has a working default:
+`.env`'i düzenleyin. Yalnızca Docker ile kurulumda önemli olan satırlar şunlar — dosyadaki geri
+kalan her şey ya geliştirme döngüsü için ya da çalışan bir varsayılana sahip:
 
 ```bash
-TAG=v0.4.1                                  # the release the files above came from
+TAG=v0.4.1                                  # yukarıdaki dosyaların geldiği sürüm
 
-SITE_URL=https://kurul.example.com          # your domain, scheme included
+SITE_URL=https://kurul.example.com          # domain'iniz, şema dahil
 
-POSTGRES_PASSWORD=<openssl rand -hex 32>       # hex, not base64 — it goes inside a URL
-BETTER_AUTH_SECRET=<openssl rand -hex 32>      # session signing key
+POSTGRES_PASSWORD=<openssl rand -hex 32>       # base64 değil hex — bir URL'in içine giriyor
+BETTER_AUTH_SECRET=<openssl rand -hex 32>      # oturum imzalama anahtarı
 
-SMTP_HOST=smtp.example.com                     # see "Email" below
+SMTP_HOST=smtp.example.com                     # aşağıdaki "E-posta" bölümüne bakın
 SMTP_PORT=587
 SMTP_USER=kurul@example.com
-SMTP_PASSWORD=<your smtp password>
-SMTP_SECURE=false                              # true only for port 465
+SMTP_PASSWORD=<smtp parolanız>
+SMTP_SECURE=false                              # yalnızca 465 portu için true
 MAIL_FROM=Kurul <kurul@example.com>
 ```
 
-Generate both secrets with `openssl rand -hex 32`. `POSTGRES_PASSWORD` is embedded directly in
-a connection URL, which is why `-base64` is the wrong generator for it; the reason is written
-down once, in
-[development.md](development.md#database-and-cache-credentials). `BETTER_AUTH_SECRET` is only
-ever byte-compared and carries no such constraint, but generating it with `-hex` too means one
-generator to remember instead of a per-variable rule.
+İki gizli değeri de `openssl rand -hex 32` ile üretin. `POSTGRES_PASSWORD` doğrudan bir bağlantı
+URL'inin içine giriyor; `-base64`'ün onun için neden yanlış üretici olduğu tek bir yerde yazılı:
+[development.md](development.md#veritabanı-ve-cache-kimlik-bilgileri).
+`BETTER_AUTH_SECRET` bir bağlantı URL'ine girmiyor, yani bu kısıtı taşımıyor, ama onu da
+`-hex` ile üretmek, değişken başına ayrı bir kural yerine tek bir üreticiyi akılda tutmak demek.
 
-`SITE_URL` carries the scheme because that is what decides whether Caddy serves plain HTTP or
-obtains a certificate. `https://…` switches automatic HTTPS on. `http://localhost` (the
-default) is the local, no-domain install.
+`SITE_URL` şemayı taşır, çünkü Caddy'nin düz HTTP mi sunacağına yoksa sertifika mı alacağına
+karar veren şey odur. `https://…` otomatik HTTPS'i açar. `http://localhost` (varsayılan) ise
+domain'siz yerel kurulumdur.
 
-**Attachments need no line here.** `docker-compose.yml` sets `STORAGE_PATH` itself, to a
-directory inside the `attachment_data` volume, so a Compose install accepts file uploads out of
-the box — the `.env` copy of that variable is for the development loop only. The one value you
-may want to change is `ATTACHMENT_MAX_BYTES` (default `26214400`, 25 MiB), and if you do, read
-[the proxy contract below](#bringing-your-own-reverse-proxy) first: the reverse proxy carries a
-separate, deliberately higher ceiling that has to move with it.
+**Attachment'lar için burada bir satır gerekmiyor.** `docker-compose.yml` `STORAGE_PATH`'i
+kendisi, `attachment_data` volume'ünün içindeki bir dizine ayarlar; yani Compose kurulumu kutudan
+çıktığı hâliyle dosya yüklemeyi kabul eder — o değişkenin `.env`'deki kopyası yalnız geliştirme
+döngüsü içindir. Değiştirmek isteyebileceğiniz ilk değer `ATTACHMENT_MAX_BYTES` (varsayılan
+`26214400`, 25 MiB). Düşürecekseniz yalnız bu değer yeter; yükseltecekseniz ters proxy'nin tavanını
+da yükseltmeniz gerekir, o yüzden önce
+[aşağıdaki proxy sözleşmesini](#kendi-reverse-proxynizi-kullanmak) okuyun: ters proxy, onunla
+birlikte hareket etmesi gereken ayrı ve bilinçli olarak daha yüksek bir tavan taşıyor.
 
-**Attachment storage is capped by default, and it shares Postgres's disk.** The
-`attachment_data` volume lives on the same host filesystem as the database, so a full disk
-stops Postgres, not just uploads. Two variables cap the total
-([ADR 0027](decisions/0027-attachment-quotas.md), updated 2026-08-21):
-`ATTACHMENT_WORKSPACE_QUOTA_BYTES` (summed stored-file bytes per workspace) and
-`ATTACHMENT_INSTANCE_QUOTA_BYTES` (the whole instance). Unset, they are **2 GiB per workspace
-(`2147483648`) and 20 GiB per instance (`21474836480`)**; a written `0` lifts one entirely, and
-a negative value refuses to boot. Set the instance one below your volume's real headroom on
-any machine whose disk you care about. The API logs the effective numbers at start
-(`Attachment ceilings: … (default)` / `(env)` in `docker compose logs api`), and warns, rather
-than refusing, if the workspace quota is set above the instance quota. When sizing, know that
-the quotas are **soft** (simultaneous uploads can each overshoot by at most one file, so leave
-a few `ATTACHMENT_MAX_BYTES` of slack) and that deleted files keep their bytes until the
-nightly orphan sweep's grace period passes, so disk usage briefly exceeds what the quota
-accounts for. Link attachments store no bytes and never count. A rejected upload is a `413`
-whose JSON body carries `error: "Attachment Quota Exceeded"`, see
-[Telling the 413s apart](#telling-the-413s-apart).
+**Attachment depolaması varsayılan olarak sınırlıdır ve Postgres'in diskini paylaşır.**
+`attachment_data` volume'ü veritabanıyla aynı host dosya sisteminde yaşar; dolu bir disk yalnız
+yüklemeleri değil, Postgres'i durdurur. Toplamı iki değişken sınırlar
+([ADR 0027](decisions/0027-attachment-quotas.md), 2026-08-21'de güncellendi):
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` (workspace başına saklanan dosya baytlarının toplamı) ve
+`ATTACHMENT_INSTANCE_QUOTA_BYTES` (instance'ın tamamı). Ayarlanmadıklarında **workspace başına
+2 GiB (`2147483648`), instance başına 20 GiB (`21474836480`)** geçerlidir; yazılı bir `0` ilgili
+tavanı tamamen kaldırır, negatif değer açılışta reddedilir. Diskini önemsediğiniz her makinede
+instance olanını volume'ün gerçek boş alanının altına ayarlayın. API geçerli sayıları açılışta
+loglar (`docker compose logs api` içinde `Attachment ceilings: … (default)` / `(env)`) ve
+workspace kotası instance kotasının üstüne ayarlanmışsa reddetmek yerine uyarır.
+Boyutlandırırken bilin: kotalar **yumuşaktır** (eşzamanlı yüklemeler en fazla birer dosya
+aşabilir; birkaç `ATTACHMENT_MAX_BYTES` kadar pay bırakın) ve silinen dosyalar baytlarını gecelik
+orphan süpürmesinin bekleme süresi geçene kadar tutar; yani disk kullanımı, kota muhasebesini
+kısa süre aşabilir. Bağlantı ekleri bayt saklamaz ve hiç sayılmaz. Bir workspace'e
+`Workspace.planLimits` kolonunda kendi `storageBytes` tavanı verilmişse o workspace için
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` yerine o sayı geçerlidir
+([ADR 0032](decisions/0032-plan-limits.md)); `GET /workspaces/…/plan` çözümlenmiş tavanı ve güncel
+`usage.storageBytes`'ı döner. Reddedilen yükleme, JSON gövdesi `error: "Attachment Quota Exceeded"`
+taşıyan bir `413`'tür, bkz.
+[413'leri birbirinden ayırmak](#413leri-birbirinden-ayırmak).
 
-**Uploads are also budgeted in bytes per minute.** `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`
-(default `268435456`, 256 MiB, about ten max-size uploads) is the most one client IP may submit
-to the upload route in a fixed minute, charged from each request's `Content-Length` before the
-body is read (a multipart request without one is charged `ATTACHMENT_MAX_BYTES`). It exists
-because the per-route request throttle counts requests, which is the wrong unit for disk. `0`
-switches it off. It is keyed by the same client IP as every other limit, so it needs the
-`TRUST_PROXY` setting the bundled Compose file already carries to see through the proxy; the
-counters live in Redis and fall back to process memory while Redis is erroring. Over budget is
-a `429` whose JSON body carries `error: "Upload Budget Exceeded"` and a `Retry-After` header
+**Yüklemelerin dakikada bayt bütçesi de var.** `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (varsayılan
+`268435456`, 256 MiB, yaklaşık on tam boy yükleme) bir istemci IP'sinin sabit bir dakika içinde
+yükleme rotasına gönderebileceği en fazla bayttır; her isteğin `Content-Length`'i gövde
+okunmadan önce bütçeden düşülür (`Content-Length` taşımayan bir multipart istek
+`ATTACHMENT_MAX_BYTES` kadar düşülür). Var olma nedeni, rota başına istek throttle'ının istek
+saymasıdır; disk için yanlış birim budur. `0` kapatır. Diğer bütün limitlerle aynı istemci
+IP'sine göre anahtarlanır, dolayısıyla proxy'nin arkasını görmesi için pakete dahil Compose
+dosyasının zaten taşıdığı `TRUST_PROXY` ayarına ihtiyaç duyar; sayaçlar Redis'te yaşar, Redis
+hata verdiği sürece süreç belleğine düşer. Bütçe aşımı, JSON gövdesi
+`error: "Upload Budget Exceeded"` ve `Retry-After` başlığı taşıyan bir `429`'dur
 ([api-conventions.md](api-conventions.md#rate-limiting)).
 
-**Nothing else is capped unless you cap it.** Four variables put ceilings on _quantities_
-rather than bytes ([ADR 0032](decisions/0032-plan-limits.md)), and all four are unset in
-`.env.example`: `PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
-`PLAN_MAX_WORKSPACES` and `PLAN_MAX_USERS`. **Unset means unlimited**, which is what an
-instance that never touches this block runs: no counting query is issued at all. A written `0`
-also means unlimited; a negative or non-integer value refuses to boot, and the effective
-numbers are logged at start (`Plan ceilings: …`). These deliberately have no defaults where
-the attachment quotas do: a full disk takes the database down with it, while a tenth board
-costs one row. The bundled `docker-compose.yml` forwards all four to the `api` container; a
-compose file of your own has to do the same, because the container never reads `.env` itself.
+**Onun dışında hiçbir şey siz sınırlamadıkça sınırlı değil.** Dört değişken, bayt yerine
+_miktarlara_ tavan koyuyor ([ADR 0032](decisions/0032-plan-limits.md)), ve dördü de
+`.env.example`'da ayarsız: `PLAN_MAX_SEATS_PER_WORKSPACE`, `PLAN_MAX_BOARDS_PER_WORKSPACE`,
+`PLAN_MAX_WORKSPACES` ve `PLAN_MAX_USERS`. **Ayarlanmamış, sınırsız demek**, ve bu bloğa hiç
+dokunmayan bir instance'ın çalıştırdığı şey de bu: hiç sayım sorgusu atılmaz. Yazılı bir `0` da
+sınırsız demek; negatif ya da tam sayı olmayan bir değer açılışta reddedilir, ve geçerli sayılar
+başlangıçta loglanır (`Plan ceilings: …`). Attachment kotalarının aksine bunların hiç varsayılanı
+yok, ve bu bilerek: dolu bir disk veritabanını kendisiyle birlikte düşürür, onuncu bir board ise
+bir satıra mal olur. Paketlenmiş `docker-compose.yml` dördünü de `api` container'ına iletir;
+kendi compose dosyanız da aynısını yapmak zorunda, çünkü container `.env`'i kendisi asla okumaz.
 
-A **seat** is a member _or_ an invitation still waiting to be accepted, so an admin at the
-ceiling cannot queue up acceptances past it; revoking an invitation frees its seat at once, and
-an expired one frees itself. `PLAN_MAX_USERS` refuses **sign-up only**, never sign-in, so
-setting it below the number of accounts you already have locks nobody out. An over-limit write
-is a `403` whose JSON body carries `error: "Plan Limit Exceeded"` and a `planLimit` object with
-the code (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`, `PLAN_LIMIT_USERS`),
-the limit and the current count. One workspace can be given ceilings of its own in the
-`Workspace.planLimits` JSON column, which overrides these key by key; the app never writes it
-itself.
+Bir **seat**, bir üye _ya da_ hâlâ kabul edilmeyi bekleyen bir davettir, dolayısıyla tavandaki bir
+admin kabulleri onun ötesine kuyruğa alamaz; bir daveti iptal etmek o seat'i anında boşaltır, ve
+süresi dolan bir davet kendini boşaltır. `PLAN_MAX_USERS` yalnızca **sign-up'ı** reddeder, hiçbir
+zaman sign-in'i değil, dolayısıyla onu zaten sahip olduğunuz hesap sayısının altına ayarlamak
+kimseyi kilitlemez. Tavanı aşan bir yazma, JSON gövdesi `error: "Plan Limit Exceeded"` taşıyan bir
+`403` ve kodu (`PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES`,
+`PLAN_LIMIT_USERS`), limiti ve güncel sayımı taşıyan bir `planLimit` objesidir. Bir workspace'e
+`Workspace.planLimits` JSON kolonunda kendine ait tavanlar verilebilir, ki bu, bunları anahtar
+anahtar override eder; uygulama onu asla kendisi yazmaz.
 
-**Closing registration is a switch, not a ceiling.** `SIGNUP_ENABLED=false` refuses
-`POST /auth/sign-up/email` with a `403` whose JSON body carries `error: "Sign-up Disabled"`,
-whatever the account count is; unset or `true` keeps registration open, which is how every
-install ran before the switch existed. Like `PLAN_MAX_USERS` it refuses **sign-up only**:
-signing in, verifying an address and everything else under `/auth` stay open, so closing it
-never locks out the people already on the instance. `GET /config` publishes it as
-`signUpEnabled`, but that document requires a session: it is there for the signed-in screens
-that ask before offering something, and a signed-out register page learns the answer from the
-`403` its own submit receives instead. Prefer the switch to pinning `PLAN_MAX_USERS` at your
-current head count, which blocks your own invitees too and drifts the moment an account is
-deleted. There is no invite-only mode yet: an invited address still needs the door open to
-create its account, so until that lands, open it for the invitee and close it again. The
-switch is independent of `DEMO_MODE` ([Demo instance](#demo-instance)), which keeps
-registration open.
+**Kaydı kapatmak bir tavan değil, bir anahtardır.** `SIGNUP_ENABLED=false`, hesap sayısı ne
+olursa olsun `POST /auth/sign-up/email`'i JSON gövdesi `error: "Sign-up Disabled"` taşıyan bir
+`403` ile reddeder; ayarsız ya da `true` kaydı açık tutar, ki bu, anahtar var olmadan önce her
+kurulumun çalıştığı haldir. `PLAN_MAX_USERS` gibi yalnızca **sign-up'ı** reddeder: sign-in,
+adres doğrulama ve `/auth` altındaki diğer her şey açık kalır, dolayısıyla onu kapatmak
+instance'ta zaten olan kimseyi kilitlemez. `GET /config` onu `signUpEnabled` olarak yayınlar,
+ama o doküman bir oturum ister: bir şey önermeden önce soran, oturum açmış ekranlar içindir ve
+oturum açmamış bir kayıt sayfası cevabı kendi gönderiminin aldığı `403`'ten öğrenir. Anahtarı,
+`PLAN_MAX_USERS`'ı mevcut hesap sayınıza sabitlemeye tercih edin; o yol kendi davetlilerinizi
+de engeller ve bir hesap silindiği anda kayar. Henüz yalnızca-davetli bir mod yok: davet edilen
+bir adresin hesabını oluşturabilmesi için kapının açık olması gerekir, o mod gelene kadar
+davetli için açıp sonra yeniden kapatın. Anahtar, kaydı açık tutan `DEMO_MODE`'dan
+([Demo instance](#demo-instance)) bağımsızdır.
 
-**Trello import needs no line here either.** `TRELLO_IMPORT_MAX_BYTES` (default `20971520`,
-20 MiB) is the largest board export the importer will accept, and the bundled Compose file
-already passes it. Three things about it are worth knowing before you touch it. It is a
-**memory** ceiling, not a disk one: the upload is buffered and then `JSON.parse`d, and the parsed
-object graph is a multiple of the bytes that produced it — so raising this raises the API's peak
-heap by a multiple of the difference, not by the difference. It is **unrelated to
-`ATTACHMENT_MAX_BYTES`**, which is why it is a second variable rather than a reuse of the first.
-And it must stay **below the proxy's body limit** (26 MiB in the bundled `docker/Caddyfile`) with
-room for the multipart envelope, for exactly the reason the attachment limit does — see
-[the proxy contract below](#bringing-your-own-reverse-proxy). Importing works on an instance with
-no `STORAGE_PATH` at all: an import creates link attachments, which store no bytes.
+**Trello import'u için de burada bir satır gerekmiyor.** `TRELLO_IMPORT_MAX_BYTES` (varsayılan
+`20971520`, 20 MiB) importer'ın kabul edeceği en büyük board export'udur ve pakete dahil Compose
+dosyası onu zaten geçiriyor. Dokunmadan önce bilmeye değer üç şey var. Bu bir **bellek** tavanıdır,
+disk tavanı değil: yükleme belleğe alınıp `JSON.parse` ediliyor ve ayrıştırılmış nesne grafiği onu
+üreten baytların birkaç katı oluyor — yani bunu yükseltmek API'nin tepe heap kullanımını farkın
+kendisi kadar değil, farkın katı kadar yükseltir. `ATTACHMENT_MAX_BYTES` **ile ilgisi yoktur**;
+ikinci bir değişken olmasının, birincisinin yeniden kullanılmamasının sebebi budur. Ve multipart
+zarfına yer bırakacak şekilde **proxy'nin gövde limitinin altında** kalmak zorundadır (pakete dahil
+`docker/Caddyfile`'da 26 MiB) — attachment limitiyle tam olarak aynı sebepten; bkz.
+[aşağıdaki proxy sözleşmesi](#kendi-reverse-proxynizi-kullanmak). Import, `STORAGE_PATH`'in hiç
+ayarlanmadığı bir instance'ta da çalışır: import bağlantı attachment'ları yaratır, onlar da bayt
+saklamaz.
 
-Two more variables cap the _shape_ of the board rather than the bytes of the export:
-`TRELLO_IMPORT_MAX_CARDS` (default `50000`) and `TRELLO_IMPORT_MAX_LISTS` (default `5000`) refuse
-an export that carries more cards or lists than that, with a `400` and nothing written, before a
-single row is planned. `TRELLO_IMPORT_MAX_BYTES` alone does not bound this: a small card is a few
-dozen bytes, so an export well under the byte ceiling can still be far more rows than any board
-this import is meant to hold. Every name, description and URL the importer writes is also clamped
-to the same ceiling its own write path enforces everywhere else: a task title, a board name, a
-column name and so on each keep the same limit `CreateTaskDto`, `CreateBoardDto` and the other
-DTOs already apply on every other route; a card whose title had to be cut still imports, and the
-import report counts it as one of the rows that came across changed. The full list of clamped
-fields and their ceilings is in
-[ADR 0025's amendment](decisions/0025-trello-import-mapping.md#amendment-2026-08-26-field-length-ceilings-and-a-row-cap-sec-04),
-not repeated here.
+İki değişken daha var, bunlar export'un baytını değil board'un şeklini sınırlıyor:
+`TRELLO_IMPORT_MAX_CARDS` (varsayılan `50000`) ve `TRELLO_IMPORT_MAX_LISTS` (varsayılan `5000`),
+export'un taşıdığı kart veya liste sayısı bu değerleri geçerse tek bir satır bile planlanmadan
+`400` döner ve hiçbir şey yazılmaz. `TRELLO_IMPORT_MAX_BYTES` tek başına bunu sınırlamaz: küçük
+bir kart birkaç düzine bayt olabilir, yani bayt tavanının çok altında kalan bir export yine de bu
+import'un taşımak için var olduğu board'dan çok daha fazla satır taşıyabilir. Importer'ın yazdığı
+her ad, açıklama ve URL de kendi yazma yolunun başka her yerde uyguladığı aynı uzunlukla sınırlanır
+(bir görev başlığı, bir board adı, bir sütun adı ve benzerleri, her biri `CreateTaskDto`,
+`CreateBoardDto` ve geri kalanının zaten uyguladığı tavanı korur); başlığı kesilmek zorunda kalan
+bir kart yine de import edilir ve import raporu bunu değişerek gelen satırlardan biri olarak sayar.
+Kısıtlanan alanların tam listesi ve tavanları
+[ADR 0025'in değişikliğinde](decisions/0025-trello-import-mapping.md#değişiklik-2026-08-26-alan-uzunluğu-tavanları-ve-satır-sayısı-tavanı-sec-04)
+yer alır, burada tekrarlanmıyor.
 
-## 3. Start it
+## 3. Başlatın
 
 ```bash
 docker compose pull
 docker compose up -d
-docker compose ps -a     # see below for what "right" looks like
+docker compose ps -a     # "doğru" görüntünün nasıl olduğu aşağıda
 ```
 
-`ps -a`, not a plain `ps`: `migrate` is a one-shot job that has already exited by the time you
-look, and a plain `ps` lists running containers only, so it omits the row you most want to
-check. A healthy stack reads like this:
+Düz `ps` değil `ps -a`: `migrate` tek seferlik bir iştir ve siz bakana kadar çoktan çıkmıştır;
+düz `ps` yalnızca çalışan container'ları listelediği için tam da kontrol etmek isteyeceğiniz
+satırı atlar. Sağlıklı bir stack şöyle görünür:
 
 ```
 api        Up 27 seconds (healthy)
@@ -297,200 +319,208 @@ redis      Up 34 seconds (healthy)
 web        Up 22 seconds (healthy)
 ```
 
-`Exited (0)` on `migrate` is success — migrations applied, job done. A non-zero exit there is
-the one to chase (`docker compose logs migrate`), and `api` will not have started at all.
-`proxy` shows no `(healthy)` at all because it declares no healthcheck. `backup` does declare
-one — it watches for a fresh dump in `/backups` — but its `start_period` is generous (10
-minutes) so a database still taking its first `pg_dump` reads as `(health: starting)`, not
-unhealthy; give it time and check again with `docker compose ps backup`.
+`migrate` satırındaki `Exited (0)` başarı demektir — migration'lar uygulandı, iş bitti. Peşine
+düşülmesi gereken, sıfırdan farklı bir çıkış kodudur (`docker compose logs migrate`); o durumda
+`api` zaten hiç başlamamış olur. `proxy` yanında `(healthy)` hiç yazmaz, çünkü hiç healthcheck
+tanımlamaz. `backup` bir healthcheck tanımlar — `/backups` içinde taze bir dump arar — ama
+`start_period`'ı geniştir (10 dakika), yani ilk `pg_dump`'ını henüz alan bir veritabanı
+unhealthy değil `(health: starting)` görünür; zaman tanıyıp `docker compose ps backup` ile
+tekrar bakın.
 
-The first request to `https://kurul.example.com` may take a few seconds while Caddy
-completes the ACME challenge. Watch it happen if it does not:
+`https://kurul.example.com` adresine ilk istek, Caddy ACME doğrulamasını tamamlarken birkaç
+saniye sürebilir. Bu sürede bitmezse olan biteni izleyin:
 
 ```bash
 docker compose logs -f proxy
 ```
 
-Open the site, create the first account, and create a workspace. The first account is a normal
-account — Kurul has no separate installer or admin bootstrap step.
+Siteyi açın, ilk hesabı oluşturun ve bir workspace açın. İlk hesap sıradan bir hesaptır —
+Kurul'un ayrı bir kurulum sihirbazı veya admin bootstrap adımı yoktur.
 
-## 4. Check it actually works
+## 4. Gerçekten çalıştığını doğrulayın
 
 ```bash
 curl -sI https://kurul.example.com | head -1          # 307 → /login
 curl -s  https://kurul.example.com/api/health/ready   # {"status":"ok", …}
 ```
 
-Then, in the browser, open a board and drag a card. If the card moves for a second browser
-window without a refresh, the realtime WebSocket is connected through the proxy — which is the
-one part of the stack a naive reverse-proxy configuration tends to break silently.
+Sonra tarayıcıda bir board açıp bir kartı sürükleyin. Kart, ikinci bir tarayıcı penceresinde
+yenileme olmadan yer değiştiriyorsa realtime WebSocket proxy üzerinden bağlanmış demektir —
+ki bu, naif bir reverse-proxy yapılandırmasının sessizce bozduğu tek parçadır.
 
-Last, check the thing HTTPS was actually for. Sign in and look at the cookie you get back:
+Son olarak, HTTPS'in asıl amacı olan şeyi kontrol edin. Giriş yapın ve dönen çereze bakın:
 
 ```bash
 curl -si https://kurul.example.com/auth/sign-in/email \
   -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","password":"<your password>"}' | grep -i '^set-cookie'
+  -d '{"email":"siz@example.com","password":"<parolanız>"}' | grep -i '^set-cookie'
 ```
 
-You want to see the name prefixed and the attribute present:
+Adın ön ekli, niteliğin yerinde olmasını istiyorsunuz:
 
 ```
 set-cookie: __Secure-better-auth.session_token=…; Path=/; HttpOnly; Secure; SameSite=Lax
 ```
 
-`Secure` means the browser will refuse to send that token over plain HTTP, and `__Secure-`
-means it will refuse to _accept_ the cookie at all unless the connection was HTTPS. Neither is
-a setting you turn on: Better Auth derives both from the scheme of the URL it is configured
-with, which `docker-compose.yml` takes from `SITE_URL`. That makes the scheme in `SITE_URL` the
-single switch that decides whether session tokens are protected in transit — with
-`SITE_URL=http://…` the same request answers `set-cookie: better-auth.session_token=…;
-HttpOnly; SameSite=Lax`, no prefix and no `Secure`, and the session token crosses the network in
-clear text on every request. If you see the unprefixed form on a domain you believe is HTTPS,
-`SITE_URL` still has `http://` in it; fix it and `docker compose up -d`.
+`Secure`, tarayıcının o token'ı düz HTTP üzerinden **göndermeyi** reddedeceği; `__Secure-` ise
+bağlantı HTTPS değilse çerezi **kabul etmeyi bile** reddedeceği anlamına gelir. İkisi de elle
+açtığınız bir ayar değildir: Better Auth her ikisini de kendisine verilen URL'in şemasından
+türetir, `docker-compose.yml` de o URL'i `SITE_URL`'den alır. Yani `SITE_URL`'deki şema, oturum
+token'larının aktarım sırasında korunup korunmadığına karar veren tek anahtardır —
+`SITE_URL=http://…` ile aynı istek
+`set-cookie: better-auth.session_token=…; HttpOnly; SameSite=Lax` döner; ön ek de yok, `Secure` de
+yok ve oturum token'ı her istekte ağdan açık metin olarak geçer. HTTPS olduğunu düşündüğünüz bir
+domain'de ön eksiz biçimi görüyorsanız `SITE_URL` hâlâ `http://` ile başlıyordur; düzeltip
+`docker compose up -d` çalıştırın.
 
-### Calling the API from a script
+### API'yi bir script'ten çağırmak
 
-A script, a CI job or a backup check does not want a cookie. Open Settings, create a personal
-access token under "Personal access tokens", copy it (it is shown once), and send it as a
-Bearer header against the workspace it was created in:
+Bir script, bir CI işi ya da bir yedek kontrolü cookie ile uğraşmak istemez. Ayarlar'ı açın,
+"Kişisel erişim anahtarları" altında bir anahtar oluşturun, kopyalayın (yalnızca bir kez
+gösterilir) ve oluşturulduğu workspace'e karşı Bearer başlığı olarak gönderin:
 
 ```bash
 curl -s https://kurul.example.com/api/workspaces/<workspaceId>/boards \
   -H 'Authorization: Bearer kurul_pat_...'
 ```
 
-The token acts as you, in that one workspace, with whatever role you hold when the request
-arrives; revoking it from the same screen stops it immediately, and the workspace activity
-feed records both the creation and the revocation. What it can and cannot call, and why, is in
-[api-conventions.md](api-conventions.md#authentication). The same HTTPS argument applies twice
-over here: a token crosses the network on every request, so never use one against an
-`http://` `SITE_URL`.
+Anahtar o tek workspace'te, istek geldiği andaki rolünüzle sizin yerinize işlem yapar; aynı
+ekrandan iptal etmek onu anında durdurur ve workspace aktivite akışı hem oluşturmayı hem
+iptali kaydeder. Neyi çağırıp neyi çağıramayacağı ve nedeni
+[api-conventions.md](api-conventions.md#kimlik-doğrulama) içinde. HTTPS argümanı burada iki
+kat geçerli: anahtar her istekte ağdan geçer, bu yüzden `http://` bir `SITE_URL`'e karşı asla
+kullanmayın.
 
-## 5. Point a monitor at it
+## 5. Üzerine bir monitör koyun
 
-This is a step of the deployment, not an optional extra, and it is the last one because it is
-the first one that needs a running instance to watch. `restart: unless-stopped` brings a crashed
-container back; nothing in this stack tells you when the host is down, the disk filled, or
-Postgres stopped accepting connections. An external monitor is the only signal that survives the
-machine it is watching.
+Bu, dağıtımın isteğe bağlı bir eki değil, bir adımıdır; en sona kalmasının nedeni, izleyecek
+ayakta bir örneğe ihtiyaç duyan ilk adım olmasıdır. `restart: unless-stopped` çöken bir
+container'ı geri getirir; bu stack'te hiçbir şey size host'un kapandığını, diskin dolduğunu veya
+Postgres'in bağlantı kabul etmeyi bıraktığını söylemez. Harici bir monitör, izlediği makineden
+sağ çıkan tek sinyaldir.
 
-Monitor this URL:
+Şu URL'i izleyin:
 
 ```
 https://kurul.example.com/api/health/ready
 ```
 
-Two details in that URL are easy to get wrong, and both fail quietly.
+Bu URL'de yanlış yapılması kolay iki ayrıntı var ve ikisi de sessizce başarısız olur.
 
-**The `/api` prefix is required.** `/health/ready` without it is not the API — it matches the
-proxy's catch-all rule and lands on the web app, which answers `307` and redirects to `/login`.
-A monitor configured that way is red forever on a healthy instance, and if you widen its
-accepted status codes to stop the noise it becomes green forever instead, including during an
-outage.
+**`/api` ön eki zorunludur.** Onsuz `/health/ready` API değildir — proxy'nin catch-all kuralına
+düşer ve web uygulamasına varır; o da `307` verip `/login`'e yönlendirir. Böyle
+yapılandırılmış bir monitör, sapasağlam bir örnekte sonsuza dek kırmızıdır — gürültüyü kesmek
+için kabul edilen durum kodlarını genişletirseniz bu kez bir kesinti sırasında da dahil olmak
+üzere sonsuza dek yeşil olur.
 
-**`/health/ready`, not `/health`.** `/health` is a liveness probe: it answers `200` as long as
-Node is alive, deliberately including while the database is unreachable, because restarting the
-process cannot heal a database. `/health/ready` is the one that goes red when the product is
-actually broken, and its body names the dependency that failed:
+**`/health` değil `/health/ready`.** `/health` bir liveness probe'udur: Node ayakta olduğu
+sürece `200` döner, veritabanına ulaşılamadığı süre de bilerek buna dahildir — çünkü süreci yeniden
+başlatmak bir veritabanını iyileştiremez. Ürünün gerçekten bozulduğunda kırmızıya dönen
+`/health/ready`'dir ve gövdesi hangi bağımlılığın düştüğünü adıyla söyler:
 
 ```json
 { "status": "error", "checks": { "database": "down", "redis": "up" } }
 ```
 
-The full parameter list — 5-minute interval, 2 consecutive failures before alerting, accept only
-`200`, 10-second timeout, e-mail contact with the "back up" notification enabled — is in
-[Uptime monitoring](development.md#uptime-monitoring--set-this-up-it-is-the-one-that-catches-an-outage),
-along with the push-based alternative for an instance that is not reachable from the internet.
+Parametrelerin tamamı — 5 dakikalık aralık, alarmdan önce 2 ardışık başarısızlık, yalnızca
+`200` kabul, 10 saniyelik timeout, "geri geldi" bildirimi açık bir e-posta kontağı —
+[Uptime izleme](development.md#uptime-izleme--kesintiyi-asıl-yakalayan-bu-kurun)
+bölümünde; internetten erişilemeyen bir örnek için push tabanlı alternatif de orada.
 
-**Also watch backup freshness — `/api/health/ready` does not cover it.** The `backup` sidecar
-can stop producing dumps (a `pg_dump` that keeps failing, a volume that filled up) without ever
-touching the database connection the API's readiness probe checks, so that endpoint stays green
-through the whole outage. `backup`'s own Docker healthcheck is the signal instead: unhealthy
-means the newest `/backups/kurul-*.dump` is older than `2 × BACKUP_INTERVAL` (48 hours on the
-default 24h interval), which is the point at which the API's own retention sweep can no longer
-assume a recent dump exists to fall back on. Point your monitor's container-health check (most
-uptime tools that support Docker, or a cron `docker inspect` on the host) at it, or at minimum
-check it by hand periodically:
+**Yedek tazeliğini de izleyin — `/api/health/ready` bunu kapsamaz.** `backup` sidecar'ı,
+API'nin readiness probe'unun kontrol ettiği veritabanı bağlantısına hiç dokunmadan dump
+üretmeyi durdurabilir (sürekli başarısız olan bir `pg_dump`, dolan bir volume) — o zaman bu
+endpoint kesintinin tamamı boyunca yeşil kalır. Bunun yerine sinyal, `backup`'ın kendi Docker
+healthcheck'idir: unhealthy, `/backups/kurul-*.dump` içindeki en yeni dosyanın
+`2 × BACKUP_INTERVAL`'dan (varsayılan 24 saatlik aralıkta 48 saat) daha eski olduğu anlamına
+gelir — bu da API'nin kendi retention süpürmesinin artık yakın zamanlı bir dump'a
+güvenemeyeceği noktadır. (`BACKUP_REMOTE` ayarlıysa ölçüt bunun yerine en yeni **host dışı**
+kopyadır; bkz. [Host dışı kopyalar](#host-dışı-kopyalar).) Monitör aracınızın container-health
+kontrolünü (Docker'ı destekleyen çoğu uptime aracı, ya da host üzerinde bir cron
+`docker inspect`) buna yönlendirin, ya da en azından zaman zaman elle kontrol edin:
 
 ```bash
-docker compose ps backup                                        # "(healthy)" or "(unhealthy)"
+docker compose ps backup                                        # "(healthy)" veya "(unhealthy)"
 docker inspect --format '{{.State.Health.Status}}' kurul-backup-1
 ```
 
-An `(unhealthy)` `backup` does not need a restart — `restart: unless-stopped` does not act on
-health status, so the sidecar keeps running and retrying on its own — it needs
-`docker compose logs backup` read, because something (usually a failing `pg_dump`) is actually
-wrong and the next scheduled cycle inherits the same problem until that's fixed.
+`(unhealthy)` bir `backup`'ın yeniden başlatılmaya ihtiyacı yoktur — `restart: unless-stopped`
+health durumuna göre hareket etmez, sidecar kendi kendine çalışmaya ve denemeye devam eder —
+ihtiyacı olan şey `docker compose logs backup` okumaktır, çünkü gerçekten bir şey (genellikle
+başarısız olan bir `pg_dump`) yanlış gitmiştir ve düzeltilmediği sürece bir sonraki
+zamanlanmış döngü aynı sorunu devralır.
 
-Then fire it once on purpose, because an alerting setup that has never fired is a hypothesis:
+Sonra bilerek bir kez tetikleyin, çünkü hiç ateşlenmemiş bir alarm kurulumu bir güvence değil
+bir varsayımdır:
 
 ```bash
 docker compose stop postgres
 curl -s https://kurul.example.com/api/health/ready   # 503, "database":"down"
-# wait two intervals, expect the red alert
+# iki aralık bekleyin, kırmızı alarmı bekleyin
 docker compose start postgres
 curl -s https://kurul.example.com/api/health/ready   # 200, "database":"up"
-# expect the recovery mail
+# kurtarma e-postasını bekleyin
 ```
 
-`/health/ready` returning `503` while `/health` stays `200` during that window is the correct
-behaviour, not a bug — it is the difference the two endpoints exist to express.
+O pencerede `/health/ready`'nin `503`, `/health`'in `200` dönmesi hatalı değil doğru
+davranıştır — iki endpoint'in var olma nedeni tam da bu farkı ifade etmektir.
 
-## Email (SMTP)
+## E-posta (SMTP)
 
-Invitations are the one feature that hard-fails without SMTP: accepting an invitation requires
-a verified email address, and verification needs a delivered message
-([ADR 0013](decisions/0013-invitation-email-verification.md)). With `SMTP_HOST` unset the API
-still boots and logs the message instead of sending it, so a solo install works fine — but
-nobody can join your workspace. The Members screen says so in the product, too. Notification
-email (assignment, mention, due-soon) uses the same settings and simply stays off without
-them; once SMTP works, each user can switch it off for themselves under Settings.
+SMTP olmadan sert biçimde bozulan tek özellik davetlerdir: bir daveti kabul etmek doğrulanmış
+bir e-posta adresi gerektirir, doğrulama da iletilmiş bir mesaj
+([ADR 0013](decisions/0013-invitation-email-verification.md)). `SMTP_HOST` boşken API yine
+açılır ve mesajı göndermek yerine log'a yazar; yani tek kişilik kurulum sorunsuz çalışır — ama
+kimse workspace'inize katılamaz. Üyeler ekranı bunu üründe de söyler. Bildirim e-postaları
+(atama, mention, due-soon) aynı ayarları kullanır ve onlar olmadan yalnızca kapalı kalır; SMTP
+çalıştığında her kullanıcı bunları Ayarlar'dan kendisi için kapatabilir.
 
-**Password reset needs SMTP too, and fails quietly without it.** `POST /auth/request-password-reset`
-answers `200` whatever happens (it answers the same for an address that has no account, so
-nobody can enumerate accounts with it), and with `SMTP_HOST` unset the whole message, reset
-link included, goes to the API log instead of to the person:
+**Parola sıfırlama da SMTP ister ve o olmadan sessizce başarısız olur.**
+`POST /auth/request-password-reset` her durumda `200` döner (hesabı olmayan bir adres için de
+aynısını döner, böylece kimse bu uçla hesap listesi çıkaramaz) ve `SMTP_HOST` boşken mesajın
+tamamı, sıfırlama bağlantısı dahil, kişiye değil API log'una gider:
 
 ```
-Email not sent (no SMTP): from=Kurul <noreply@localhost> to=you@example.com subject=Reset your Kurul password
+Email not sent (no SMTP): from=Kurul <kurul@example.com> to=siz@example.com subject=Reset your Kurul password
 ...
-http://localhost:4000/auth/reset-password/<token>?callbackURL=http%3A%2F%2Flocalhost%3A3000%2Freset-password
+https://kurul.example.com/auth/reset-password/<token>?callbackURL=https%3A%2F%2Fkurul.example.com%2Freset-password
 ```
 
-That is workable on a solo install (copy the link out of `docker compose logs api` within the
-hour it is valid) and is not a recovery path for anyone else, because a locked-out user cannot
-read your logs. On a `DEMO_MODE` instance no reset mail is written even to the log for the demo
-account itself, whose password is published anyway.
+Tek kişilik bir kurulumda bu iş görür (bağlantıyı geçerli olduğu bir saat içinde
+`docker compose logs api` çıktısından kopyalarsınız), başkası için bir kurtarma yolu değildir:
+dışarıda kalmış bir kullanıcı sizin log'larınızı okuyamaz. `DEMO_MODE` açık bir kurulumda,
+parolası zaten yayımlanmış olan demo hesabı için sıfırlama postası log'a bile yazılmaz.
 
-Any SMTP provider works. Two things go wrong most often:
+Her SMTP sağlayıcısı çalışır. En sık iki şey ters gider:
 
-- **`SMTP_SECURE`.** `true` means implicit TLS, which is port 465 only. Port 587 and 25 use
-  STARTTLS and need `false`. Setting `true` on 587 hangs the connection.
-- **`MAIL_FROM` must be an address the provider lets you send as.** Most providers reject a
-  `From:` that does not match the authenticated account or a verified domain, and the rejection
-  looks like "invitations do nothing" rather than an error in the UI.
+- **`SMTP_SECURE`.** `true`, yalnızca 465 portunda geçerli olan implicit TLS demektir. 587 ve
+  25 portları STARTTLS kullanır ve `false` ister. 587'de `true` bağlantıyı askıda bırakır.
+- **`MAIL_FROM`, sağlayıcının adınıza göndermenize izin verdiği bir adres olmalı.** Çoğu
+  sağlayıcı, kimliği doğrulanmış hesapla veya doğrulanmış domain'le eşleşmeyen bir `From:`
+  başlığını reddeder; bu reddediliş arayüzde bir hata gibi değil, "davetler hiçbir şey
+  yapmıyor" gibi görünür.
 
-Send yourself an invitation as the test. If nothing arrives:
+Test olarak kendinize bir davet gönderin. Hiçbir şey gelmiyorsa:
 
 ```bash
 docker compose logs api | grep -i mail
 ```
 
-## Backups
+## Yedekler
 
-The `backup` service is already running: every `BACKUP_INTERVAL` seconds (24h by default) it
-writes **two** archives into the `backup_data` volume — a `pg_dump` of the database and a
-`.tar.gz` of the uploaded attachment files — and keeps `BACKUP_KEEP` of each series. Both
-archives of one cycle carry the **same timestamp**, which is how a restore knows which tar
-belongs to which dump. `BACKUP_KEEP` is a count, not an age, and a restart does not spend one:
-the sidecar skips its boot-time cycle while a dump younger than half of `BACKUP_INTERVAL`
-exists, so a reboot or a `docker compose up` after a `.env` edit leaves the history you had
-([the scheduled backup sidecar](development.md#the-scheduled-backup-sidecar)).
+`backup` servisi zaten çalışıyor: her `BACKUP_INTERVAL` saniyede bir (varsayılan 24 saat)
+`backup_data` volume'üne **iki** arşiv yazar — veritabanının `pg_dump`'ı ve yüklenmiş attachment
+dosyalarının `.tar.gz`'i — ve her seriden `BACKUP_KEEP` tanesini tutar. Bir döngünün iki arşivi
+de **aynı zaman damgasını** taşır; bir restore hangi tar'ın hangi dump'a ait olduğunu böyle
+bilir. `BACKUP_KEEP` bir sayıdır, yaş değil, ve bir yeniden başlatma bu sayıdan harcamaz:
+sidecar, `BACKUP_INTERVAL`'ın yarısından genç bir dump varken açılıştaki döngüsünü atlar,
+dolayısıyla bir reboot ya da `.env` düzenlemesinden sonraki `docker compose up` elinizdeki
+geçmişi olduğu gibi bırakır
+([zamanlanmış yedekleme sidecar'ı](development.md#zamanlanmış-yedekleme-sidecarı)).
 
-That covers "I deleted the wrong workspace". It does not cover a dead disk — the archives sit
-on the same host as the database. Copy them off the machine, **both halves of the newest
-cycle**, not just the dump:
+Bu, "yanlış workspace'i sildim" durumunu karşılar. Ölen bir diski karşılamaz — arşivler
+veritabanıyla aynı makinede durur. Onları makine dışına kopyalayın — yalnız dump'ı değil, **en
+yeni döngünün iki yarısını da**:
 
 ```bash
 docker run --rm -v kurul_backup_data:/backups -v "$PWD:/out" alpine \
@@ -499,41 +529,41 @@ docker run --rm -v kurul_backup_data:/backups -v "$PWD:/out" alpine \
          cp /backups/kurul-$stamp-files.tar.gz /out/ 2>/dev/null || true'
 ```
 
-A dump restored without its file archive brings every row back and leaves every uploaded file
-behind — and passes every verification step that was written before attachments existed. The
-drill in [Restoring from a backup](development.md#restoring-from-a-backup) checks the files too.
+Dosya arşivi olmadan geri yüklenen bir dump bütün satırları geri getirir ve yüklenmiş her
+dosyayı geride bırakır — üstelik attachment'lardan önce yazılmış her doğrulama adımından geçer.
+[Yedekten geri dönme](development.md#yedekten-geri-dönme) tatbikatı dosyaları da kontrol eder.
 
-Restore steps are in [Upgrading and backups](development.md#upgrading-and-backups).
+Geri yükleme adımları: [Yükseltme ve yedekleme](development.md#yükseltme-ve-yedekleme).
 
-### Off-host copies
+### Host dışı kopyalar
 
-Better than remembering to run that command: give the sidecar a remote and it pushes both
-archives itself, every cycle. Set `BACKUP_REMOTE` in `.env` to an
-[rclone](https://rclone.org/) remote path and each cycle then also uploads the pair, prunes the
-remote to the same `BACKUP_KEEP`, and records that it worked. **Leave `BACKUP_REMOTE` blank and
-nothing changes**, including the healthcheck: this is opt-in, and an install that never sets it
-runs exactly the loop described above.
+O komutu çalıştırmayı hatırlamaktan daha iyisi: sidecar'a bir remote verin, iki arşivi de her
+döngüde kendisi itsin. `.env` içindeki `BACKUP_REMOTE`'a bir [rclone](https://rclone.org/)
+remote yolu yazın; her döngü bundan sonra çifti yükler, remote'u aynı `BACKUP_KEEP` sayısına
+budar ve bunun başarıldığını kaydeder. **`BACKUP_REMOTE` boş kaldığında hiçbir şey değişmez**,
+healthcheck dahil: bu tamamen isteğe bağlıdır ve hiç ayarlamayan bir kurulum yukarıda anlatılan
+döngüyü aynen çalıştırır.
 
-| Variable                     | Default | Purpose                                                                                           |
-| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `BACKUP_REMOTE`              | blank   | rclone remote path, e.g. `s3:my-bucket/kurul`. Blank turns the whole off-host half off            |
-| `RCLONE_CONFIG_<NAME>_<KEY>` | -       | rclone's own env-var config, in `rclone.env` beside `docker-compose.yml`. `<NAME>` is your remote |
-| `RCLONE_CONFIG`              | -       | Path to a mounted `rclone.conf`, if you would rather keep credentials in a file than in env vars  |
+| Değişken                       | Varsayılan | Amaç                                                                                                                          |
+| ------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP_REMOTE`                | boş        | rclone remote yolu, örn. `s3:my-bucket/kurul`. Boş değer host dışı yarıyı tümüyle kapatır                                     |
+| `RCLONE_CONFIG_<AD>_<ANAHTAR>` | -          | rclone'un kendi env değişkeni yapılandırması, `docker-compose.yml` yanındaki `rclone.env` içinde. `<AD>` remote'unuzun adıdır |
+| `RCLONE_CONFIG`                | -          | Kimlik bilgilerini env yerine dosyada tutmak isterseniz, mount edilmiş `rclone.conf`'un yolu                                  |
 
-The credentials do **not** go in `.env`: rclone's env keys are named after your remote, so no
-fixed list of them can be declared in `docker-compose.yml`, and the `backup` service reads an
-optional `rclone.env` next to the compose file instead. That file is read by this one container
-only. `.env` is not read by any container either: Compose uses it for `${VAR}` interpolation and
-forwards an explicit list of keys to each service. For every setting the API reads, that list is
-the `environment:` block of the `api` service in [`docker-compose.yml`](../docker-compose.yml),
-and a key that is not in that block never reaches the API however it is set in `.env`. Create
-`rclone.env` with `chmod 600` and keep it out of git (`.gitignore` already lists it).
+Kimlik bilgileri `.env`'e **girmez**: rclone'un env anahtarları remote'un adına göre adlandığı
+için `docker-compose.yml` içinde sabit bir liste tanımlanamaz, bu yüzden `backup` servisi
+compose dosyasının yanındaki isteğe bağlı `rclone.env` dosyasını okur. O dosyayı yalnızca bu
+container okur. `.env`'i de hiçbir container okumaz: Compose onu `${VAR}` enterpolasyonu için
+kullanır ve her servise açık bir anahtar listesi iletir. API'nin okuduğu her ayar için o liste,
+[`docker-compose.yml`](../docker-compose.yml) içindeki `api` servisinin `environment:`
+bloğudur; o blokta olmayan bir anahtar `.env`'de nasıl ayarlanırsa ayarlansın API'ye ulaşmaz.
+`rclone.env`'i `chmod 600` ile oluşturun ve git'e sokmayın (`.gitignore` zaten listeliyor).
 
-An S3 example, end to end. `KURULOFF` is an arbitrary remote name; it just has to match the one
-in `BACKUP_REMOTE`:
+Uçtan uca bir S3 örneği. `KURULOFF` keyfi bir remote adıdır, yalnızca `BACKUP_REMOTE`
+içindekiyle aynı olması gerekir:
 
 ```bash
-# rclone.env, next to docker-compose.yml, chmod 600
+# rclone.env, docker-compose.yml'nin yanında, chmod 600
 RCLONE_CONFIG_KURULOFF_TYPE=s3
 RCLONE_CONFIG_KURULOFF_PROVIDER=AWS
 RCLONE_CONFIG_KURULOFF_ACCESS_KEY_ID=AKIA...
@@ -548,15 +578,15 @@ BACKUP_REMOTE=KURULOFF:my-backup-bucket/kurul
 
 ```bash
 docker compose up -d backup
-docker compose logs backup | grep off-host    # "pushed kurul-… to KURULOFF:…" per archive
+docker compose logs backup | grep off-host    # arşiv başına "pushed kurul-… to KURULOFF:…"
 ```
 
-Anything rclone speaks works the same way, with the same two lines: Backblaze B2
-(`_TYPE=b2`), any S3-compatible endpoint including MinIO and Cloudflare R2
-(`_TYPE=s3` plus `_ENDPOINT=`), SFTP (`_TYPE=sftp`), and so on. The key names are the config
-keys from [rclone's docs](https://rclone.org/docs/#config-file) uppercased. To use a
-`rclone.conf` file instead, mount it and point `RCLONE_CONFIG` at it (both lines in a
-`docker-compose.override.yml`, so an upgrade that replaces `docker-compose.yml` keeps them):
+rclone'un konuştuğu her hedef aynı iki satırla çalışır: Backblaze B2 (`_TYPE=b2`), MinIO ve
+Cloudflare R2 dahil S3 uyumlu her endpoint (`_TYPE=s3` artı `_ENDPOINT=`), SFTP (`_TYPE=sftp`)
+ve diğerleri. Anahtar adları [rclone dokümanındaki](https://rclone.org/docs/#config-file)
+config anahtarlarının büyük harflisidir. Bunun yerine bir `rclone.conf` kullanacaksanız dosyayı
+mount edip `RCLONE_CONFIG`'i ona yöneltin (iki satır da `docker-compose.override.yml` içinde
+olsun ki `docker-compose.yml`'yi değiştiren bir upgrade onları silmesin):
 
 ```yaml
 services:
@@ -567,249 +597,262 @@ services:
       RCLONE_CONFIG: /config/rclone.conf
 ```
 
-**rclone itself is downloaded on first use.** The sidecar runs a stock `postgres:18-alpine`
-image, so with `BACKUP_REMOTE` set the script fetches one pinned rclone release (about 20 MB,
-78 MB unpacked), checks it against a sha256 hard-coded in `scripts/backup.sh`, and caches it in
-the backup volume so later cycles and restarts reuse it. An
-`rclone` already on the container's `PATH` (your own image, a bind-mounted binary) is used
-instead and nothing is downloaded, which is also the answer for an air-gapped host.
+**rclone ilk kullanımda indirilir.** Sidecar stok bir `postgres:18-alpine` imajı çalıştırır,
+bu yüzden `BACKUP_REMOTE` ayarlıyken script sabitlenmiş bir rclone sürümünü indirir (yaklaşık
+20 MB, açılmış hâli 78 MB), `scripts/backup.sh` içine gömülü sha256 ile doğrular ve sonraki
+döngülerle yeniden başlatmalar tekrar kullansın diye yedek volume'ünde saklar. Container'ın
+`PATH`'inde zaten bir `rclone` varsa (kendi imajınız, mount edilmiş bir binary) o kullanılır ve
+hiçbir şey indirilmez; internete kapalı bir host'un cevabı da budur.
 
-**The healthcheck follows the remote.** With `BACKUP_REMOTE` set, `docker compose ps` reports
-this service healthy only while the newest **off-host** copy is under `2 × BACKUP_INTERVAL`
-old, so credentials that expired, a bucket policy that changed, or a network that has been
-down since Tuesday surface as an unhealthy container instead of as a surprise on restore day.
-Local archives keep being written and kept throughout: a failed upload never deletes one, and
-the `ERROR off-host:` line in the log says what failed.
+**Healthcheck remote'u takip eder.** `BACKUP_REMOTE` ayarlıyken `docker compose ps` bu servisi
+yalnızca en yeni **host dışı** kopya `2 × BACKUP_INTERVAL`'dan gençken healthy raporlar; süresi
+dolmuş kimlik bilgileri, değişmiş bir bucket policy'si veya salıdan beri kopuk bir ağ, restore
+gününde sürpriz olmak yerine unhealthy bir container olarak görünür. Yerel arşivler bu sırada
+yazılmaya ve saklanmaya devam eder: başarısız bir yükleme hiçbirini silmez ve logdaki
+`ERROR off-host:` satırı neyin başarısız olduğunu söyler.
 
-To **restore from the remote**, fetch the pair back into the backup volume first, then follow
-the ordinary [restore drill](development.md#restoring-from-a-backup) unchanged, which is the
-point of the two copies being byte-identical:
+**Remote'tan restore** için önce çifti yedek volume'üne geri çekin, sonra olağan
+[restore tatbikatını](development.md#yedekten-geri-dönme) hiç değiştirmeden uygulayın; iki
+kopyanın byte olarak aynı olmasının anlamı da budur:
 
 ```bash
-docker compose exec backup /backups/.rclone/rclone --config= \
-  lsf "$BACKUP_REMOTE"                 # pick a timestamp, both halves of it
-docker compose exec backup /backups/.rclone/rclone --config= \
-  copy "$BACKUP_REMOTE/kurul-<timestamp>.dump" /backups/
-docker compose exec backup /backups/.rclone/rclone --config= \
-  copy "$BACKUP_REMOTE/kurul-<timestamp>-files.tar.gz" /backups/
+docker compose exec backup sh -c '/backups/.rclone/rclone --config= lsf "$BACKUP_REMOTE"'   # bir zaman damgası seçin, iki yarısını da
+docker compose exec backup sh -c '/backups/.rclone/rclone --config= copy "$BACKUP_REMOTE/kurul-<zaman damgası>.dump" /backups/'
+docker compose exec backup sh -c '/backups/.rclone/rclone --config= copy "$BACKUP_REMOTE/kurul-<zaman damgası>-files.tar.gz" /backups/'
 ```
 
-`/backups/.rclone/rclone` is the downloaded copy; if you supplied your own rclone, that is just
-`rclone`, and `--config=` (which says "the config is env vars only") comes off when your
-credentials live in a mounted `rclone.conf`.
+`$BACKUP_REMOTE` host'ta değil `backup` container'ının ortamında tanımlıdır; bu yüzden komutlar
+tek tırnaklı `sh -c` içinde çalışır ve değişkeni container'ın kabuğu genişletir.
+`/backups/.rclone/rclone` indirilen kopyadır; kendi rclone'unuzu verdiyseniz o yalnızca
+`rclone` olur ve kimlik bilgileriniz mount edilmiş bir `rclone.conf`'ta yaşıyorsa
+("yapılandırma yalnızca env değişkenleri" demek olan) `--config=` kalkar.
 
-If the host itself is gone, run those two `copy` commands from any machine with rclone and the
-same credentials, and hand the archives to a fresh install's restore.
+Host'un kendisi gittiyse o iki `copy` komutunun rclone kısmını, rclone'u ve aynı kimlik
+bilgilerini taşıyan herhangi bir makinede çalıştırın ve arşivleri taze bir kurulumun restore
+adımına verin.
 
 ## Demo instance
 
-This section is for one job: running a **public demo** that anyone can sign into and that
-throws its contents away on a schedule. If you are self-hosting Kurul for your own team, skip
-it. Nothing here is on by default and none of it changes an ordinary install: `.env.example`
-ships `DEMO_MODE` and `DEMO_PASSWORD` blank, and blank is the ordinary install. Without the
-profile, `docker compose up -d` neither starts the sidecar nor asks for either value.
+Bu bölüm tek bir iş için: herkesin giriş yapabildiği ve içeriğini belirli aralıklarla çöpe atan
+bir **herkese açık demo** çalıştırmak. Kurul'u kendi ekibiniz için barındırıyorsanız burayı
+atlayın. Buradaki hiçbir şey varsayılan olarak açık değil ve hiçbiri sıradan bir kurulumu
+değiştirmiyor: `.env.example` `DEMO_MODE` ve `DEMO_PASSWORD`'ü boş gönderir ve boş olan zaten
+sıradan kurulumdur. Profile olmadan `docker compose up -d` ne sidecar'ı başlatır ne de bu iki
+değerden birini ister.
 
-Two things make a demo: `DEMO_MODE=true`, which changes how the API behaves, and the `demo`
-compose profile, which starts the sidecar that does the wiping. Both, or neither.
+Bir demoyu iki şey oluşturur: API'nin davranışını değiştiren `DEMO_MODE=true` ve silme işini
+yapan sidecar'ı başlatan `demo` compose profile'ı. Ya ikisi birden, ya hiçbiri.
 
 ```bash
 # .env
 DEMO_MODE=true
-DEMO_PASSWORD=pick-something-and-publish-it   # at least 8 characters
-DEMO_RESET_INTERVAL_MINUTES=60                # the default
-POSTGRES_DB=kurul_demo                        # see "the two locks" below
-REDIS_PASSWORD=...                            # recommended, see below
+DEMO_PASSWORD=birsey-secin-ve-yayinlayin      # en az 8 karakter
+DEMO_RESET_INTERVAL_MINUTES=60                # varsayılan
+POSTGRES_DB=kurul_demo                        # aşağıdaki "iki kilit" bölümüne bakın
+REDIS_PASSWORD=...                            # önerilir, aşağıya bakın
 ```
 
 ```bash
 docker compose --profile demo up -d
 ```
 
-The profile adds one container, `demo-reset`. It runs from the same `kurul-api` image as the
-API, so there is nothing extra to build or pull.
+Profile tek bir container ekler: `demo-reset`. API ile aynı `kurul-api` imajından çalışır, yani
+ayrıca build edilecek veya çekilecek bir şey yok.
 
-### What `DEMO_MODE=true` changes
+### `DEMO_MODE=true` neyi değiştirir
 
-| Behaviour                                       | Why                                                                                                                                                                                      |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A standing banner in the app naming the cadence | It is the only warning a visitor gets before an hour of their typing disappears. Dismissible for the browser tab, back on the next visit                                                 |
-| All outbound email goes to the log              | Whatever `SMTP_HOST` says. A demo anyone can sign up to must not be able to send mail to an address a stranger typed in                                                                  |
-| Account deletion and workspace deletion `403`   | The demo is one shared workspace. Deleting it, or the account that owns it, empties the demo for every other visitor until the next reset                                                |
-| `POST /auth/change-password` `403`              | The demo account's password is published, so any visitor could rotate it and lock everyone else out until the next reset writes `DEMO_PASSWORD` back. Same envelope as the two deletions |
-| `GET /config` publishes the reset schedule      | So the banner names the same cadence the sidecar sleeps for, rather than a number somebody typed twice                                                                                   |
+| Davranış                                               | Neden                                                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Uygulamada sıklığı söyleyen kalıcı bir bildirim şeridi | Bir ziyaretçinin, bir saatlik emeğinin silineceğine dair aldığı tek uyarı budur. Sekme boyunca kapatılabilir, sonraki ziyarette geri gelir                                                 |
+| Giden tüm e-posta log'a yazılır                        | `SMTP_HOST` ne derse desin. Herkesin kayıt olabildiği bir demo, bir yabancının yazdığı adrese posta gönderebiliyor olmamalı                                                                |
+| Hesap silme ve workspace silme `403` döner             | Demo tek bir paylaşılan workspace'tir. Onu ya da sahibi hesabı silmek, bir sonraki reset'e kadar demoyu diğer bütün ziyaretçiler için boşaltır                                             |
+| `POST /auth/change-password` `403` döner               | Demo hesabının şifresi yayınlanmıştır; herhangi bir ziyaretçi onu değiştirip, bir sonraki reset `DEMO_PASSWORD`'ü geri yazana kadar herkesi dışarıda bırakabilirdi. İki silmeyle aynı zarf |
+| `GET /config` reset takvimini yayınlar                 | Böylece bildirim şeridi, sidecar'ın gerçekten uyuduğu süreyi söyler; iki kez yazılmış bir sayıyı değil                                                                                     |
 
-Everything else is the product. Sign-up stays open (rate limits, not a switch, are the answer
-to abuse there, and `DEMO_MODE` never reads `SIGNUP_ENABLED`), revoking sessions and renaming
-the account stay open because both are a sign-in away from recovered, invitations can still be
-created and their links copied by hand, and uploads are bounded by the ordinary attachment
-quotas
-([ADR 0027](decisions/0027-attachment-quotas.md)). Set those low on a demo host rather than
-reaching for another switch.
+Geri kalan her şey ürünün kendisidir. Kayıt açık kalır (oradaki kötüye kullanımın cevabı bir
+anahtar değil, rate limit'tir, ve `DEMO_MODE` hiçbir zaman `SIGNUP_ENABLED`'ı okumaz),
+oturumları iptal etmek ve hesabı yeniden adlandırmak açık kalır çünkü ikisi de bir sign-in
+uzağında geri alınır, davetler yine oluşturulabilir ve bağlantıları elle kopyalanabilir,
+yüklemeler ise olağan attachment kotalarıyla sınırlıdır
+([ADR 0027](decisions/0027-attachment-quotas.md)). Bir demo host'ta başka bir anahtara uzanmak
+yerine bu kotaları düşük tutun.
 
-### The account
+### Hesap
 
-The reset creates one account, `demo@kurul.dev`, with the password you put in `DEMO_PASSWORD`.
-Publish both wherever you publish the demo link. There is no default password and there will
-not be one: a default baked into an open-source image is the same password on every demo host
-on the internet. Alongside it the dataset seeds a second person who has **no credentials at
-all**: they exist so the boards have comments and assignments that are not all the visitor's
-own, and there is no password for them to leak.
+Reset tek bir hesap oluşturur: `demo@kurul.dev`, şifresi `DEMO_PASSWORD`'e yazdığınız değer.
+Demo bağlantısını nerede yayınlıyorsanız ikisini de orada yayınlayın. Varsayılan bir şifre yok
+ve olmayacak: açık kaynak bir imaja gömülü varsayılan, internetteki her demo host'unda aynı
+şifre demektir. Yanında dataset, **hiçbir kimlik bilgisi olmayan** ikinci bir kişi de yaratır:
+board'larda yorum ve atamaların hepsi ziyaretçinin kendisine ait olmasın diye vardır ve sızacak
+bir şifresi yoktur.
 
-### The two locks on the reset
+### Reset'in üzerindeki iki kilit
 
-`node dist/demo/reset.js` deletes every row in the database before it writes anything. It
-refuses to run unless **both** of these hold:
+`node dist/demo/reset.js` bir şey yazmadan önce veritabanındaki her satırı siler. **İkisi
+birden** doğru değilse çalışmayı reddeder:
 
-1. `DEMO_MODE=true` is set in its own environment, and
-2. the database named in `DATABASE_URL` has `demo` in its name.
+1. Kendi ortamında `DEMO_MODE=true` ayarlı olmalı ve
+2. `DATABASE_URL`'in işaret ettiği veritabanının adında `demo` ya da `test` geçmeli (`test`,
+   e2e suite'inin kendi `kurul_test` veritabanında gerçek reset'i koşturabilmesi için var; demo
+   host'unuzda `kurul_demo` kullanın).
 
-That is why `POSTGRES_DB=kurul_demo` is in the snippet above. Two independent checks, from two
-different sources, so that pointing this at a real deployment takes two mistakes rather than
-one. `kurul`, `kurul_prod` and `postgres` all refuse.
+Yukarıdaki örnekte `POSTGRES_DB=kurul_demo` bu yüzden var. İki farklı kaynaktan gelen iki
+bağımsız kontrol; böylece bunu gerçek bir kuruluma çevirmek bir değil iki hata gerektirir.
+`kurul`, `kurul_prod` ve `postgres` reddedilir.
 
-### Sessions, and the minute after a reset
+### Oturumlar ve reset'ten sonraki bir dakika
 
-A reset deletes every session, so everyone signed in is signed out. The app handles that: the
-next navigation lands on the sign-in page with the page you were on kept as the return URL.
+Reset her oturumu siler, yani giriş yapmış herkesin oturumu kapanır. Uygulama bunu karşılar:
+sonraki gezinme, bulunduğunuz sayfa dönüş adresi olarak korunarak giriş ekranına düşer.
 
-For up to 60 seconds after a reset, a browser that was mid-session can still be recognised from
-its signed session cookie, which Kurul caches for that long to avoid a database read per
-request. In that window reads come back empty and a write can fail. It clears itself, it is the
-same window a deleted account has
-([ADR 0026](decisions/0026-account-deletion-anonymisation.md)), and on a demo the cost is the
-last thing somebody typed in the minute their hour ran out.
+Reset'ten sonraki 60 saniyeye kadar, oturumu açık olan bir tarayıcı imzalı oturum çerezinden
+tanınmaya devam edebilir; Kurul her istekte bir veritabanı okuması yapmamak için bu çerezi o
+kadar süre önbellekler. Bu aralıkta okumalar boş döner ve bir yazma başarısız olabilir. Kendi
+kendine geçer, silinmiş bir hesabın da aynı aralığı vardır
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)) ve bir demoda bedeli, birinin
+saati dolarken son bir dakikada yazdığı şeydir.
 
-### Watching it
+### İzleme
 
-`docker compose ps` is the check that matters. `demo-reset` reports **unhealthy** once no reset
-has succeeded for twice the interval, i.e. two missed cycles in a row, so one slow or skipped
-run does not flap it. Without that, a reset loop that had stopped resetting would report as simply
-"Up" while a launch-day link served whatever the last visitor left behind.
+Asıl kontrol `docker compose ps`. Aralığın iki katı boyunca başarılı bir reset olmazsa
+`demo-reset` **unhealthy** raporlar; yani üst üste iki kaçırılmış döngü, böylece yavaş ya da
+atlanmış tek bir çalıştırma onu oynatmaz. Bu olmasa, reset üretmeyi bırakmış bir döngü sadece "Up"
+görünürken lansman günü bağlantısı son ziyaretçinin bıraktığı şeyi servis ederdi.
 
 ```bash
 docker compose --profile demo logs demo-reset
 ```
 
-Point an uptime monitor at `https://your-domain/api/health/ready` as well, per
-[5. Point a monitor at it](#5-point-a-monitor-at-it). It is the same advice every install gets,
-and it is the thing that tells you the demo is down before someone on the internet does.
+Ayrıca `https://alan-adiniz/api/health/ready` adresine bir uptime monitörü koyun;
+[5. Üzerine bir monitör koyun](#5-üzerine-bir-monitör-koyun) bölümüne bakın. Bu, her kurulumun
+aldığı aynı tavsiye ve demonun düştüğünü internetteki birinden önce size söyleyen şey.
 
-### Also worth doing on a public demo
+### Herkese açık bir demoda ayrıca yapılması iyi olanlar
 
-- **Set `REDIS_PASSWORD`.** It is optional everywhere else because Redis is not published
-  outside the compose network. A host that strangers are pointed at is the one where the
-  defence-in-depth is worth the one line.
-- **Keep the attachment quotas low.** `ATTACHMENT_WORKSPACE_QUOTA_BYTES` and
-  `ATTACHMENT_INSTANCE_QUOTA_BYTES` are what bound how much a demo can be made to store between
-  resets; the reset deletes the rows, and the nightly sweep reclaims the bytes.
-- **Do not put anything real in it.** It is not a staging environment. It is a database that is
-  emptied every hour by a container that is designed to empty it.
+- **`REDIS_PASSWORD` ayarlayın.** Redis compose ağının dışına açılmadığı için başka her yerde
+  isteğe bağlı. Yabancıların yönlendirildiği bir host, bu tek satırlık ek savunmanın değdiği
+  yerdir.
+- **Attachment kotalarını düşük tutun, ama diski sınırladıklarını sanmayın.**
+  `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`, iki reset arasında bir
+  demoya ne kadar veri depolatılabileceğini sınırlar; reset satırları siler ve kotalar canlı
+  satırları saydığı için her reset'te boşalır. Baytlar ise gecelik süpürmenin bekleme süresi
+  (`BACKUP_KEEP × BACKUP_INTERVAL`, en az 24 saat, varsayılan 7 gün) dolana kadar diskte kalır;
+  yani demo host'unun disk kullanımını kotalar değil, o süre içinde yüklenebilecek bayt miktarı
+  belirler. Diski izleyin.
+- **İçine gerçek hiçbir şey koymayın.** Burası bir staging ortamı değil. Boşaltmak üzere
+  tasarlanmış bir container tarafından her saat boşaltılan bir veritabanı.
 
-## Upgrading
+## Upgrade
 
-A release is images plus files. `docker compose pull` refreshes the images and nothing else, so
-an install that only ever pulls keeps running the `docker-compose.yml`, `docker/Caddyfile` and
-`scripts/backup.sh` it was installed with, and every later release that added a service (the
-`demo` profile's `demo-reset`), a variable compose forwards (`BACKUP_REMOTE`, the attachment
-quotas) or a Caddy rule quietly does not reach it. The runbook re-fetches the files for that
-reason. Do the steps in this order, every time; none of them is long.
+Bir release imajlar artı dosyalardır. `docker compose pull` imajları yeniler, başka hiçbir şeyi
+değil; dolayısıyla yalnızca pull yapan bir kurulum, kurulduğu günkü `docker-compose.yml`,
+`docker/Caddyfile` ve `scripts/backup.sh` ile çalışmaya devam eder ve sonraki her release'in
+eklediği servis (`demo` profilinin `demo-reset`'i), compose'un ilettiği değişken
+(`BACKUP_REMOTE`, attachment kotaları) ya da Caddy kuralı ona sessizce ulaşmaz. Runbook
+dosyaları bu yüzden yeniden indirir. Adımları her seferinde bu sırayla yapın; hiçbiri uzun
+değil.
 
-1. **Read the release.** The [CHANGELOG](../CHANGELOG.md) section for the target version
-   carries every breaking change and every migration note, and
-   [Release notes for operators](#release-notes-for-operators) below points at the ones that
-   ask something of you before `pull`.
-2. **Take a backup now, and copy it off the host.** The sidecar's last cycle may be a day old;
-   this one is from right before the upgrade, which is the recovery point a rollback wants:
+1. **Release'i okuyun.** Hedef sürümün [CHANGELOG](../CHANGELOG.md) bölümü her kırıcı
+   değişikliği ve her migration notunu taşır; aşağıdaki
+   [Operatörler için sürüm notları](#operatörler-için-sürüm-notları) ise `pull`'dan önce sizden
+   bir şey isteyenleri gösterir.
+2. **Şimdi bir yedek alın ve host dışına kopyalayın.** Sidecar'ın son döngüsü bir gün eski
+   olabilir; bu, upgrade'in hemen öncesinden ve bir rollback'in isteyeceği kurtarma noktası tam
+   olarak bu:
 
    ```bash
    docker compose exec backup /bin/sh /usr/local/bin/backup.sh once
    ```
 
-   Then copy the pair out of the volume with the command in [Backups](#backups), or, with
-   `BACKUP_REMOTE` set, confirm the two `off-host: pushed` lines in
-   `docker compose logs backup`. Why both halves, and the by-hand variant that survives a
-   `docker compose down -v`: [Taking a dump by hand](development.md#taking-a-dump-by-hand).
+   Sonra çifti [Yedekler](#yedekler) bölümündeki komutla volume'den dışarı kopyalayın ya da
+   `BACKUP_REMOTE` ayarlıysa `docker compose logs backup` içindeki iki `off-host: pushed`
+   satırını doğrulayın. Neden iki yarısı da gerekli ve `docker compose down -v`'den sağ çıkan
+   elle alınan varyant: [Elle dump almak](development.md#elle-dump-almak).
 
-3. **Re-fetch the files at the new tag.** Run the `curl` lines from
-   [step 2 of the install](#2-fetch-the-compose-file-and-configure) again with the new version
-   in each URL, all except the `.env` one: `.env` is yours and stays. The other three files are
-   replaced outright, which is why a local change belongs in `.env` or in a
-   `docker-compose.override.yml` (as the [`rclone.conf` mount](#off-host-copies) and
-   [`TRUST_PROXY`](#bringing-your-own-reverse-proxy) already do) rather than in the files
-   themselves. `diff` the new compose file against the old one if you want to see what the
-   release changed before it runs.
-4. **Set `TAG`** in `.env` to the new version, the same string as in the URLs.
-5. **Pull and start:**
+3. **Dosyaları yeni tag'den yeniden indirin.**
+   [Kurulumun 2. adımındaki](#2-compose-dosyasını-indirin-ve-yapılandırın) `curl` satırlarını
+   her URL'de yeni sürümle yeniden çalıştırın, `.env` olanı hariç: `.env` sizindir ve kalır.
+   Diğer üç dosya olduğu gibi değiştirilir; yerel bir değişikliğin dosyaların kendisine değil
+   `.env`'e ya da bir `docker-compose.override.yml`'e ait olmasının nedeni bu
+   ([`rclone.conf` mount'u](#host-dışı-kopyalar) ve
+   [`TRUST_PROXY`](#kendi-reverse-proxynizi-kullanmak) zaten öyle yapıyor). Release'in neyi
+   değiştirdiğini çalışmadan önce görmek isterseniz yeni compose dosyasını eskisiyle
+   `diff`'leyin.
+4. **`TAG`'i** `.env`'de yeni sürüme ayarlayın, URL'lerdekiyle aynı string.
+5. **Pull ve başlatma:**
 
    ```bash
    docker compose pull
    docker compose up -d --wait
    ```
 
-   Migrations run automatically: the one-shot `migrate` service applies them before `api`
-   starts, and `--wait` returns once every long-running service reports healthy, non-zero if
-   one does not.
+   Migration'lar otomatik çalışır: tek seferlik `migrate` servisi onları `api` başlamadan önce
+   uygular ve `--wait`, uzun süreli her servis healthy raporladığında döner, biri raporlamazsa
+   sıfırdan farklı kodla.
 
-   A recreate is a pause, not an outage. `api` is given 30s (`stop_grace_period`) to finish
-   what it was doing before Docker kills it, and the bundled Caddy holds a request for up to
-   30s while an upstream is coming back instead of answering 502, retrying every 500ms. One
-   replica still means requests wait rather than being served elsewhere, and an upload already
-   streaming its body is not retried. A replacement reverse proxy needs its own equivalent to
-   behave the same way, and nginx open source has no one-to-one match: `proxy_next_upstream`
-   hands the request to the _next_ server in the upstream group, so a group with a single
-   `api` entry is never retried.
+   Yeniden oluşturma bir kesinti değil, bir duraklamadır. `api`, Docker onu öldürmeden önce
+   yaptığı işi bitirmek için 30s alır (`stop_grace_period`) ve pakete dahil Caddy, bir upstream
+   geri gelirken isteği 502 ile yanıtlamak yerine 30s'ye kadar tutar, her 500ms'de yeniden
+   dener. Tek replika hâlâ isteklerin başka yerde karşılanmak yerine beklemesi demektir ve
+   gövdesini göndermeye başlamış bir yükleme yeniden denenmez. Yerine konan bir reverse
+   proxy'nin aynı davranışı göstermesi için kendi karşılığına ihtiyacı vardır ve nginx open
+   source'ta birebir karşılığı yoktur: `proxy_next_upstream` isteği upstream grubundaki _bir
+   sonraki_ sunucuya devreder, dolayısıyla tek bir `api` girdisi olan grup hiç yeniden
+   denenmez.
 
-6. **Verify:**
+6. **Doğrulayın:**
 
    ```bash
-   docker compose ps -a                          # migrate: Exited (0); the rest healthy
+   docker compose ps -a                          # migrate: Exited (0); gerisi healthy
    curl -fsS https://kurul.example.com/api/health/ready
    ```
 
-   `-a`, or the one-shot `migrate` row is hidden. Then open the site and sign in once.
+   `-a`, yoksa tek seferlik `migrate` satırı gizlenir. Sonra siteyi açıp bir kez giriş yapın.
 
-7. **If it went wrong:** [Rollback](development.md#rollback) covers moving the images back to
-   the previous tag and when that alone is enough;
-   [Restoring from a backup](development.md#restoring-from-a-backup) is the drill for the
-   archive you took in step 2. Neither is repeated here on purpose: the steps are the same
-   whether an upgrade or anything else went wrong.
+7. **Ters giderse:** [Geri alma (rollback)](development.md#geri-alma-rollback) imajları önceki
+   tag'e geri almayı ve bunun tek başına ne zaman yettiğini anlatır;
+   [Yedekten geri dönme](development.md#yedekten-geri-dönme) ise 2. adımda aldığınız arşivin
+   tatbikatı. İkisi de bilerek burada tekrarlanmıyor: adımlar, ters giden bir upgrade de olsa
+   başka bir şey de olsa aynı.
 
-Pin a release with `TAG=v0.4.1` in `.env` rather than tracking `latest`: an upgrade should be
-a step you take deliberately, with the backup from step 2 in hand, not something the next
-`docker compose up` does to you.
+`latest`'i takip etmek yerine `.env`'de `TAG=v0.4.1` ile bir sürümü sabitleyin: upgrade, 2.
+adımdaki yedek elinizdeyken bilinçli attığınız bir adım olmalı, bir sonraki
+`docker compose up`'ın size yaptığı bir şey değil.
 
-### Release notes for operators
+### Operatörler için sürüm notları
 
-What a release changes in the files this page has you fetch, or expects of you before `pull`.
-The full entries live in `CHANGELOG.md`; this list only points at them.
+Bir release'in bu sayfanın indirttiği dosyalarda neyi değiştirdiği ya da `pull`'dan önce
+sizden ne beklediği. Girdilerin tamamı `CHANGELOG.md`'de; bu liste yalnızca onları gösterir.
 
-- **Next release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.5 ships a
-  migration the `migrate` service applies on the first `up`: it drops the `NOT NULL` and the
-  unique index from the `Account.issuer` column 0.4.0 added, which Better Auth no longer
-  writes. Nothing to run, and the backup in step 2 covers it. Rolling back to v0.4.1 afterwards
-  needs no schema change, but an account created after the upgrade cannot sign in on v0.4.1.
-- **0.4.0 ([CHANGELOG](../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1 ships a
-  migration the `migrate` service applies on the first `up`; nothing to run, but the backup in
-  step 2 is what covers it. `BACKUP_REMOTE` and the off-host copy need the `scripts/backup.sh`
-  and `docker-compose.yml` from step 3 (v0.3.0's script ignores the variable without an
-  error); setup in [Off-host copies](#off-host-copies). `TRUST_PROXY` is now read from `.env`
-  with a default of `1`: delete a `TRUST_PROXY=false` line an older `.env.example` left in your
-  `.env`, or the API behind Caddy stops seeing client addresses
-  ([details](#bringing-your-own-reverse-proxy)).
-- **0.3.0 ([CHANGELOG](../CHANGELOG.md#030---2026-08-22)):** attachment quotas gained
-  defaults; check your usage before upgrading, see
-  [Attachment quotas now have defaults](#attachment-quotas-now-have-defaults) below. Also the
-  first release that publishes `kurul-migrate`, so the first one this page's `curl` install
-  works on.
+- **Sonraki release ([Unreleased](../CHANGELOG.md#unreleased)):** Better Auth 1.7.5,
+  `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor: 0.4.0'ın eklediği ve
+  Better Auth'un artık yazmadığı `Account.issuer` sütunundan `NOT NULL` kısıtını ve benzersiz
+  indeksi kaldırıyor. Çalıştırılacak bir şey yok, onu 2. adımdaki yedek karşılıyor. Sonrasında
+  v0.4.1'e geri dönmek şema değişikliği gerektirmez, ama yükseltmeden sonra açılan bir hesap
+  v0.4.1'de oturum açamaz.
+- **0.4.0 ([CHANGELOG](../CHANGELOG.md#040---2026-08-27)):** Better Auth 1.7.1,
+  `migrate` servisinin ilk `up`'ta uyguladığı bir migration getiriyor; çalıştırılacak bir şey
+  yok, ama onu karşılayan 2. adımdaki yedek. `BACKUP_REMOTE` ve host dışı kopya, 3. adımdaki
+  `scripts/backup.sh` ve `docker-compose.yml`'i gerektirir (v0.3.0'ın script'i değişkeni hata
+  vermeden yok sayar); kurulumu [Host dışı kopyalar](#host-dışı-kopyalar) bölümünde.
+  `TRUST_PROXY` artık `.env`'den, varsayılanı `1` olarak okunuyor: daha eski bir
+  `.env.example`'ın `.env`'inizde bıraktığı `TRUST_PROXY=false` satırını silin, yoksa Caddy
+  arkasındaki API istemci adreslerini görmeyi bırakır
+  ([ayrıntı](#kendi-reverse-proxynizi-kullanmak)).
+- **0.3.0 ([CHANGELOG](../CHANGELOG.md#030---2026-08-22)):** attachment kotalarına
+  varsayılan geldi; upgrade'den önce kullanımınızı kontrol edin, bkz. aşağıdaki
+  [Attachment kotalarının artık varsayılanı var](#attachment-kotalarının-artık-varsayılanı-var).
+  Ayrıca `kurul-migrate`'i yayınlayan ilk sürüm, yani bu sayfadaki `curl` kurulumunun çalıştığı
+  ilk sürüm.
 
-### Attachment quotas now have defaults
+### Attachment kotalarının artık varsayılanı var
 
-`v0.3.0` and later cap attachment storage at 2 GiB per workspace and 20 GiB per instance
-when `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES` are unset (they
-used to mean unlimited). **A workspace already holding more than 2 GiB of files will get a
-`413` on its next upload** unless you set a higher number, or `0` for unlimited, before you
-upgrade. One query says where you stand; the first line is the instance, the second is per
-workspace:
+`v0.3.0` ve sonrası, `ATTACHMENT_WORKSPACE_QUOTA_BYTES` / `ATTACHMENT_INSTANCE_QUOTA_BYTES`
+ayarlanmadığında attachment depolamasını workspace başına 2 GiB, instance başına 20 GiB ile
+sınırlar (eskiden sınırsız demekti). **Halihazırda 2 GiB'den fazla dosya tutan bir workspace,
+bir sonraki yüklemesinde `413` alır**; bunu istemiyorsanız upgrade'den önce daha yüksek bir sayı
+ya da sınırsız için `0` yazın. Nerede durduğunuzu tek sorgu söyler; ilki instance'ın, ikincisi
+workspace başına toplam:
 
 ```bash
 docker compose exec postgres psql -U kurul -d kurul -c \
@@ -818,83 +861,83 @@ docker compose exec postgres psql -U kurul -d kurul -c \
   "SELECT w.slug, SUM(a.size) AS bytes FROM \"Attachment\" a JOIN \"Task\" t ON t.id = a.\"taskId\" JOIN \"Board\" b ON b.id = t.\"boardId\" JOIN \"Workspace\" w ON w.id = b.\"workspaceId\" WHERE a.kind = 'FILE' GROUP BY w.slug ORDER BY bytes DESC;"
 ```
 
-Compare the numbers against `2147483648` and `21474836480`. The same upgrade adds a per-IP
-upload byte budget (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, 256 MiB a minute by default), which
-only matters to a client that uploads more than ten max-size files a minute from one address.
+Komutlar varsayılan `POSTGRES_USER=kurul` ve `POSTGRES_DB=kurul` değerlerini varsayar; `.env`'de
+farklı bir şey kullanıyorsanız `-U` ve `-d` değerlerini ona göre değiştirin. Sayıları
+`2147483648` ve `21474836480` ile karşılaştırın. Aynı upgrade, IP başına bir yükleme
+bayt bütçesi de getiriyor (`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`, varsayılan dakikada 256 MiB);
+bu yalnızca tek adresten dakikada ondan fazla tam boy dosya yükleyen bir istemciyi ilgilendirir.
 
-### Coming from Kurultay (v0.1.0)
+### Kurultay'dan geliyorsanız (v0.1.0)
 
-The project was renamed before v0.2.0, and the rename reaches further than the label on the
-README: the Postgres role and database are now `kurul`, the published images are
-`ghcr.io/dravcore/kurul-api` and `-web`, and Compose derives its volume prefix from the install
-directory, which the instructions above now call `/opt/kurul`. An existing v0.1.0 install does
-not pick any of that up on its own, and `docker compose pull` against the old image names will
-simply keep serving you the old ones.
+Proje v0.2.0 öncesinde yeniden adlandırıldı ve bu, README'deki etiketten fazlasına dokunuyor:
+Postgres rolü ve veritabanı artık `kurul`, yayınlanan imajlar `ghcr.io/dravcore/kurul-api` ve
+`-web`, ve Compose volume önekini kurulum dizininden türettiği için yukarıdaki talimatların
+`/opt/kurul` demesi de bir fark yaratıyor. Mevcut bir v0.1.0 kurulumu bunların hiçbirini
+kendiliğinden almaz; eski imaj adlarına `docker compose pull` demek size eskisini vermeye devam
+eder.
 
-**There is no in-place upgrade path that renames a running database for you.** Do it in this
-order, with the stack down, and take the backup first — this is the one upgrade in this
-project's history that touches identifiers rather than schema.
+**Çalışan bir veritabanını sizin yerinize yeniden adlandıran bir yükseltme yolu yok.** Şu sırayla,
+stack kapalıyken yapın ve önce yedeği alın — bu, projenin geçmişinde şemaya değil **kimliklere**
+dokunan tek yükseltmedir.
 
 ```bash
 cd /opt/kurultay
 docker compose exec postgres pg_dump -U kurultay -Fc kurultay > /tmp/kurul-migration.dump
-docker compose down                     # NOT -v: the volumes are what you are keeping
+docker compose down                     # -v DEĞİL: volume'ler zaten koruduğunuz şey
 ```
 
-Then rename the directory and take the release's files, at the tag you are moving to, with the
-`curl` lines from [step 2 of the install](#2-fetch-the-compose-file-and-configure) (all but the
-`.env` one; yours stays):
+Sonra dizini yeniden adlandırın ve release'in dosyalarını, geçtiğiniz tag'den,
+[kurulumun 2. adımındaki](#2-compose-dosyasını-indirin-ve-yapılandırın) `curl` satırlarıyla
+alın (`.env` olanı hariç; sizinki kalır):
 
 ```bash
 cd /opt && mv kurultay kurul && cd kurul
 curl -fsSLO https://raw.githubusercontent.com/dravcore/kurul/v0.4.1/docker-compose.yml
-# then docker/Caddyfile and scripts/backup.sh the same way
+# sonra docker/Caddyfile ve scripts/backup.sh de aynı şekilde
 ```
 
-Edit `.env`: `POSTGRES_USER` and `POSTGRES_DB` become `kurul`, and the `DATABASE_URL`
-credentials and database segment change with them. Then create the new role and database
-against the volume you kept, and restore into it:
+`.env`'i düzenleyin: `POSTGRES_USER` ve `POSTGRES_DB` `kurul` olur, `DATABASE_URL`'in kimlik ve
+veritabanı bölümleri de onlarla birlikte değişir. Ardından koruduğunuz volume üzerinde yeni rolü
+ve veritabanını yaratıp restore edin:
 
 ```bash
 docker compose up -d postgres
-docker compose exec -T postgres psql -U kurultay -d kurultay   -c "CREATE ROLE kurul LOGIN PASSWORD '<your POSTGRES_PASSWORD>';"   -c 'CREATE DATABASE kurul OWNER kurul;'
+docker compose exec -T postgres psql -U kurultay -d kurultay   -c "CREATE ROLE kurul LOGIN PASSWORD '<POSTGRES_PASSWORD değeriniz>';"   -c 'CREATE DATABASE kurul OWNER kurul;'
 docker compose exec -T postgres pg_restore -U kurul -d kurul --no-owner < /tmp/kurul-migration.dump
 docker compose up -d
-curl -s https://your.domain/api/health/ready
+curl -s https://alan.adiniz/api/health/ready
 ```
 
-The old role and database can be dropped once the new stack has served real traffic for a day.
-Keep the dump until then; it is the only copy that predates the rename.
+Eski rol ve veritabanı, yeni stack bir gün gerçek trafik gördükten sonra düşürülebilir. Dump'ı o
+zamana kadar saklayın; yeniden adlandırma öncesine ait tek kopya odur.
 
-**Renaming the directory is what moves the volumes**, because Compose namespaces them by
-project name — `kurultay_postgres_data` becomes `kurul_postgres_data`. If you would rather not
-move them, set `COMPOSE_PROJECT_NAME=kurultay` in `.env` and the old volumes keep being used
-under their old names. That is supported and slightly confusing; either is fine, as long as you
-pick one deliberately.
+**Volume'leri taşıyan şey dizinin yeniden adlandırılmasıdır**, çünkü Compose onları proje adıyla
+isimlendirir — `kurultay_postgres_data`, `kurul_postgres_data` olur. Taşımak istemiyorsanız
+`.env`'e `COMPOSE_PROJECT_NAME=kurultay` yazın, eski volume'ler eski adlarıyla kullanılmaya devam
+eder. İkisi de desteklenir ve ikincisi biraz kafa karıştırıcıdır; yeter ki bilinçli seçin.
 
-## Verifying what you pulled
+## Çektiğiniz imajı doğrulamak
 
-`docker compose pull` trusts whatever ghcr.io hands it. Two things published with every release
-let you stop doing that: a **signature** that says this image came out of this repository's
-release workflow, and an **SBOM** that says what is inside it. Both are optional to use and
-neither protects anyone who never runs the commands below.
+`docker compose pull`, ghcr.io ne verirse ona güvenir. Her sürümle birlikte yayınlanan iki şey
+bunu bırakmanızı sağlar: bu imajın bu deponun release workflow'undan çıktığını söyleyen bir
+**imza** ve içinde ne olduğunu söyleyen bir **SBOM**. İkisini de kullanmak isteğe bağlıdır ve
+aşağıdaki komutları hiç çalıştırmayan kimseyi korumazlar.
 
-The base images underneath the stack, `postgres`, `redis` and `caddy` in `docker-compose.yml`
-and `node` in the api and web Dockerfiles, are pinned `tag@sha256:...` instead of a bare tag for
-a related reason: two builds of the same release then resolve the same bytes. Two separate
-Dependabot ecosystems keep each digest current: `docker-compose` bumps `postgres`, `redis` and
-`caddy` in the compose files, and `docker` bumps `node` in the two Dockerfiles; either way an
-upstream fix arrives as a reviewable pull request instead of silently, the next time something
-happens to rebuild. One side effect: `docker compose pull` on its own no longer picks up an
-upstream `postgres`/`redis`/`caddy` patch release between Kurul releases, since the tag it
-resolves is now fixed to a digest; that patch arrives with the next Kurul release that merges
-the Dependabot bump, not before.
+Yığının altındaki temel imajlar da, `docker-compose.yml` içindeki `postgres`, `redis`, `caddy`
+ve api ile web Dockerfile'larındaki `node`, benzer bir nedenle salt tag yerine `tag@sha256:...`
+ile sabitlenir: aynı sürümün iki ayrı derlemesi böylece aynı byte'ları çözümler. Her digest'i
+güncel tutan iki ayrı Dependabot ekosistemi var: `docker-compose`, compose dosyalarındaki
+`postgres`, `redis` ve `caddy`'yi günceller; `docker` ise iki Dockerfile'daki `node`'u günceller.
+Her iki durumda da üst akıştaki bir düzeltme, bir şeyin yeniden derlenmesini bekleyip sessizce
+gelmek yerine, gözden geçirilebilir bir pull request olarak gelir. Bunun bir yan etkisi var: tek
+başına `docker compose pull`, artık iki Kurul sürümü arasında çıkan bir `postgres`/`redis`/`caddy`
+yama sürümünü almaz, çünkü çözümlediği tag artık bir digest'e sabitlenmiştir; o yama,
+Dependabot'un digest güncellemesini birleştiren bir sonraki Kurul sürümüyle gelir.
 
-### Checking the signature
+### İmzayı kontrol etmek
 
-You need [cosign](https://github.com/sigstore/cosign) **3.0 or newer** — the signatures are
-written in the Sigstore bundle format that cosign 3 uses by default, and cosign 2 cannot read
-them.
+[cosign](https://github.com/sigstore/cosign) **3.0 veya üstü** gerekir — imzalar cosign 3'ün
+varsayılan olarak kullandığı Sigstore bundle formatında yazılır ve cosign 2 bunları okuyamaz.
 
 ```bash
 cosign verify \
@@ -903,20 +946,21 @@ cosign verify \
   ghcr.io/dravcore/kurul-api:v0.4.1
 ```
 
-Repeat it for `kurul-web` and `kurul-migrate`, which are signed the same way, and replace
-`v0.4.1` in both places when you verify another release. The version appears twice for two different reasons:
-once as the git ref the signing workflow ran on, and once as the image tag you are asking
-about.
+Aynısını, aynı şekilde imzalanan `kurul-web` ve `kurul-migrate` için tekrarlayın; başka bir
+sürümü doğrularken `v0.4.1`'i iki yerde de değiştirin. Sürüm iki kez geçiyor çünkü iki farklı şeyi
+anlatıyor: biri imzalayan workflow'un
+üzerinde çalıştığı git ref'i, diğeri sorduğunuz imaj tag'i.
 
-**The two `--certificate-*` flags are the entire check; do not drop them.** There is no signing
-key to guard here. The images are signed keylessly: the release workflow trades a GitHub OIDC
-token for a certificate valid for a few minutes, signs, and the certificate expires. What makes
-the result meaningful is not that a secret was kept, it is that the certificate records _which
-workflow, in which repository, at which git ref_ asked for it. Without `--certificate-identity`
-cosign will happily accept a validly-signed image from anybody at all — including someone who
-pushed a tag to their own fork of this repository.
+**Bütün kontrol bu iki `--certificate-*` bayrağıdır; onları atmayın.** Burada korunacak bir
+imzalama anahtarı yok. İmajlar keyless imzalanır: release workflow'u bir GitHub OIDC token'ını
+birkaç dakika geçerli bir sertifikayla takas eder, imzalar, sertifika sona erer. Sonucu anlamlı
+kılan bir sırrın saklanmış olması değil, sertifikanın _hangi depodaki hangi workflow'un hangi
+git ref'inde_ bunu istediğini kaydetmesidir. `--certificate-identity` olmadan cosign, geçerli
+imzalanmış herhangi birinin imajını seve seve kabul eder — bu deponun kendi fork'una tag atmış
+birininkini de.
 
-A successful run prints the checks it performed and a JSON claim naming the digest it verified:
+Başarılı bir çalıştırma yaptığı kontrolleri ve doğruladığı digest'i içeren bir JSON iddiası
+yazdırır:
 
 ```
 Verification for ghcr.io/dravcore/kurul-api:v0.4.1 --
@@ -926,28 +970,26 @@ The following checks were performed on each of these signatures:
   - The code-signing certificate was verified using trusted certificate authority certificates
 ```
 
-Anything else is a failure, and the two failures worth telling apart are `no signatures found`
-(this image was never signed — it predates this feature, or it is not the image you think it is)
-and `no matching CertificateIdentity found` (it _was_ signed, by someone or something other than
-the identity you asked for; the error prints the identity it actually found).
+Bunun dışındaki her şey bir hatadır ve birbirinden ayırmaya değer iki hata şunlar:
+`no signatures found` (bu imaj hiç imzalanmamış — bu özellikten eski, ya da sandığınız imaj
+değil) ve `no matching CertificateIdentity found` (imzalanmış, ama sorduğunuz kimlikten başka
+biri ya da başka bir şey tarafından; hata mesajı bulduğu kimliği yazdırır).
 
-Verification reaches out to Sigstore's public infrastructure for the trust root and the
-transparency log, so it wants outbound HTTPS. Run it from your laptop before you deploy if the
-server has none.
+Doğrulama, güven kökü ve transparency log için Sigstore'un genel altyapısına çıkar, yani dışarı
+HTTPS ister. Sunucunun interneti yoksa deploy etmeden önce kendi makinenizden çalıştırın.
 
-Both the tag and the digest work as the last argument, and on a host that has already pulled,
-the digest is the stricter question — it asks about the exact bytes on disk rather than about
-whatever the tag points at now:
+Son argüman olarak hem tag hem digest çalışır; imajı çoktan çekmiş bir makinede digest daha
+katı soruyu sorar — tag'in şu anda neyi gösterdiğini değil, diskteki baytları sorar:
 
 ```bash
 docker image inspect ghcr.io/dravcore/kurul-api:v0.4.1 --format '{{index .RepoDigests 0}}'
 ```
 
-### Where the SBOM lives
+### SBOM nerede
 
-On the [GitHub Release](https://github.com/dravcore/kurul/releases) for the version, as
-downloadable assets — one per image per architecture, because the two architectures genuinely
-do not contain the same packages:
+Sürümün [GitHub Release](https://github.com/dravcore/kurul/releases) sayfasında, indirilebilir
+asset olarak — imaj başına ve mimari başına bir tane, çünkü iki mimari gerçekten aynı paketleri
+içermiyor:
 
 ```
 kurul-api-v0.4.1-linux-amd64.spdx.json
@@ -958,315 +1000,353 @@ kurul-migrate-v0.4.1-linux-amd64.spdx.json
 kurul-migrate-v0.4.1-linux-arm64.spdx.json
 ```
 
-The format is SPDX 2.3 JSON, which is what `grype`, `trivy` and Dependency-Track all read
-without conversion:
+Format SPDX 2.3 JSON; `grype`, `trivy` ve Dependency-Track'in üçü de dönüştürmeden okur:
 
 ```bash
 gh release download v0.4.1 --repo dravcore/kurul --pattern '*.spdx.json'
 grype sbom:./kurul-api-v0.4.1-linux-amd64.spdx.json
 ```
 
-**The SBOM file itself is not signed** — the signature above covers the image, and the SBOM is a
-description of it produced by the same workflow run. For most people that is enough, because a
-tampered SBOM cannot make a tampered image verify. If you need the stronger property, do not
-trust the file: regenerate it yourself from the image you have already verified, with
-[syft](https://github.com/anchore/syft), and compare.
+**SBOM dosyasının kendisi imzalı değildir** — yukarıdaki imza imajı kapsar, SBOM ise aynı
+workflow çalıştırmasının ürettiği bir tarifidir. Çoğu kişi için bu yeterlidir, çünkü kurcalanmış
+bir SBOM kurcalanmış bir imajı doğrulatamaz. Daha güçlü garantiye ihtiyacınız varsa dosyaya
+güvenmeyin: zaten doğruladığınız imajdan [syft](https://github.com/anchore/syft) ile kendiniz
+yeniden üretip karşılaştırın.
 
 ```bash
 syft scan registry:ghcr.io/dravcore/kurul-api:v0.4.1 --platform linux/amd64 -o spdx-json
 ```
 
-## Bringing your own reverse proxy
+## Kendi reverse proxy'nizi kullanmak
 
-If you already run nginx, Traefik or another proxy and would rather not stack a second one,
-you can replace the `proxy` service — but the routing contract is not negotiable, because the
-web app is built against it. Three rules, in this order, all on one hostname:
+Zaten nginx, Traefik veya başka bir proxy çalıştırıyorsanız ve üstüne ikincisini koymak
+istemiyorsanız `proxy` servisini değiştirebilirsiniz — ancak yönlendirme sözleşmesi pazarlığa
+açık değildir, çünkü web uygulaması ona göre build edilir. Tek hostname altında, bu sırayla üç
+kural:
 
-| Path       | Goes to  | Prefix              | Max request body              |
-| ---------- | -------- | ------------------- | ----------------------------- |
-| `/auth/*`  | api:4000 | kept as-is          | **64 KiB** (`65536` bytes)    |
-| `/api/*`   | api:4000 | `/api` **stripped** | **26 MiB** (`27262976` bytes) |
-| everything | web:3000 | kept as-is          | proxy default is fine         |
+| Yol            | Nereye   | Prefix                | Azami istek gövdesi          |
+| -------------- | -------- | --------------------- | ---------------------------- |
+| `/auth/*`      | api:4000 | olduğu gibi korunur   | **64 KiB** (`65536` bayt)    |
+| `/api/*`       | api:4000 | `/api` **kaldırılır** | **26 MiB** (`27262976` bayt) |
+| geri kalan her | web:3000 | olduğu gibi korunur   | proxy varsayılanı yeterli    |
 
-`/api/*` must also pass WebSocket upgrades through — that is the realtime board feed.
+`/api/*` ayrıca WebSocket upgrade'lerini de geçirmelidir — realtime board akışı odur.
 
-**One route carries a secret in its path, so keep it out of the proxy's access log.**
-`GET /auth/reset-password/<token>` is a URL a real browser follows, and the token in it is live
-until the form on the other side is submitted. The API's own access log writes that path as
-`/auth/reset-password/:token` and never the token itself
-(`apps/api/src/common/logging/access-log.middleware.ts`), but a proxy in front logs the URL it
-was asked for. The bundled `docker/Caddyfile` configures no `log` directive and so writes no
-access log at all; nginx's default `combined` format logs `$request`, which is the whole URL. If
-you keep an access log on this hostname, filter or rewrite `/auth/reset-password/*` in it, and
-until you do, treat that log as something that holds live credentials.
+**Bir route sırrını yolunda taşır, onu proxy'nin access log'undan uzak tutun.**
+`GET /auth/reset-password/<token>`, gerçek bir tarayıcının izlediği bir URL'dir ve içindeki
+token, karşı taraftaki form gönderilene kadar canlıdır. API'nin kendi access log'u bu yolu
+`/auth/reset-password/:token` olarak yazar, token'ın kendisini asla
+(`apps/api/src/common/logging/access-log.middleware.ts`); ama öndeki proxy, kendisinden istenen
+URL'i olduğu gibi log'lar. Paketlenmiş `docker/Caddyfile` hiçbir `log` direktifi tanımlamaz, yani
+hiç access log yazmaz; nginx'in varsayılan `combined` formatı ise URL'in tamamı olan `$request`'i
+log'lar. Bu hostname'de access log tutuyorsanız `/auth/reset-password/*` yolunu filtreleyin ya da
+yeniden yazın; bunu yapana kadar o log'u canlı kimlik bilgisi tutan bir yer sayın.
 
-One thing outside the routing contract is worth reproducing anyway: the bundled Caddy holds a
-request for up to 30s while an upstream is restarting instead of answering 502, which is what
-turns an upgrade into latency rather than errors. A proxy without it is still correct, only
-noisier on every `docker compose up -d`. What it takes to match, and why nginx open source has
-no one-to-one equivalent, is in step 5 of [Upgrading](#upgrading).
+Yönlendirme sözleşmesinin dışında kalan ama yine de taklit etmeye değen bir şey var: pakete
+dahil Caddy, bir upstream yeniden başlarken isteği 502 ile yanıtlamak yerine 30s'ye kadar
+tutuyor; bir upgrade'i hatalar yerine gecikmeye çeviren şey bu. Bunu yapmayan bir proxy yine de
+doğrudur, yalnızca her `docker compose up -d` sırasında daha gürültülüdür. Aynısını yapmanın
+neye mal olduğu ve nginx open source'ta neden birebir karşılığı olmadığı,
+[Upgrade](#upgrade) bölümünün 5. adımında.
 
-#### Why the proxy's number is 26 MiB and the API's is 25
+#### Proxy'nin sayısı neden 26 MiB, API'ninki neden 25
 
-**This is not a typo and the two must not be made equal.** The largest _attachment_ this
-instance accepts is `ATTACHMENT_MAX_BYTES`, 25 MiB — that is the number to quote to users and
-the only one to change when you want a different limit. The proxy's 26 MiB is a ceiling above
-it, not a second copy of it.
+**Bu bir yazım hatası değil ve ikisi eşitlenmemeli.** Bu instance'ın kabul ettiği en büyük _ek_
+`ATTACHMENT_MAX_BYTES`, yani 25 MiB — kullanıcıya söylenecek sayı budur ve limiti **düşürmek**
+istediğinizde değiştireceğiniz tek sayı da budur. Yükseltmek istiyorsanız proxy'nin tavanını da
+değiştirmeniz gerekir (aşağıya bakın). Proxy'nin 26 MiB'ı onun **üstünde** bir tavandır, ikinci
+bir kopyası değil.
 
-They differ because they count different things. `client_max_body_size` (and Caddy's
-`request_body max_size`) counts the **whole request body**; `ATTACHMENT_MAX_BYTES` counts the
-**file** inside it. An upload wraps the file in a multipart envelope — a boundary line and a
-`Content-Disposition` header per part, plus the closing boundary — which adds to the body on top
-of the file's own bytes. Measured against the real request this API receives, that envelope is
-309 bytes for a short filename and 563 bytes for a 255-character one.
+Farklı olmalarının sebebi farklı şeyleri saymaları. `client_max_body_size` (ve Caddy'nin
+`request_body max_size`'ı) **istek gövdesinin tamamını** sayar; `ATTACHMENT_MAX_BYTES` ise
+içindeki **dosyayı** sayar. Bir yükleme dosyayı multipart bir zarfa sarar — her parça için bir
+boundary satırı ve bir `Content-Disposition` header'ı, artı kapanış boundary'si — ve bu zarf
+dosyanın kendi baytlarının **üstüne** biner. Bu API'nin aldığı gerçek istek üzerinde ölçüldü:
+kısa bir dosya adı için 309 bayt, 255 karakterlik bir ad için 563 bayt.
 
-So a proxy set to exactly 25 MiB rejects a 25 MiB attachment: the file is within the documented
-limit, the body is not. The user gets a `413` on a file the documentation says is allowed, and
-the number they are pointed at is the one that is not the problem.
+Yani proxy tam 25 MiB'a ayarlanırsa 25 MiB'lık bir ek yüklenemez: dosya belgelenen limitin
+içindedir, gövde değildir. Kullanıcı, belgelerin izinli dediği bir dosyada `413` alır ve
+bakması söylenen sayı, sorun olmayan sayıdır.
 
-The rule the two layers actually follow is an ordering, not an equality:
+İki katmanın gerçekte izlediği kural eşitlik değil, bir sıralamadır:
 
-> **The proxy must never reject something the API would accept.** The proxy's job is to cut
-> absurd bodies before anything buffers them. The exact file limit belongs to the API — the only
-> layer that can answer with _which_ file was too big.
+> **Proxy, API'nin kabul edeceği bir şeyi asla reddetmemeli.** Proxy'nin işi absürt gövdeleri
+> herhangi bir yerde tamponlanmadan önce kesmektir. Kesin dosya limiti API'ye aittir — hangi
+> dosyanın büyük olduğunu cevabında söyleyebilen tek katman odur.
 
-**A second body crosses the same proxy: the Trello import.** `TRELLO_IMPORT_MAX_BYTES` (20 MiB)
-sits under the same ordering rule and under the same 26 MiB proxy ceiling, with more headroom
-because it is a smaller number. The relationship checked between the two is an **inequality**, not
-the equality-plus-envelope the attachment limit is held to — the import limit only has to stay
-below the proxy's, not track it — so raising `TRELLO_IMPORT_MAX_BYTES` past the proxy's number
-gives you an import the proxy kills with an empty-bodied `413` the API never sees.
-`apps/api/src/storage/two-layer-limit.spec.ts` fails the build if either relationship stops
-holding.
+**Aynı proxy'den ikinci bir gövde daha geçiyor: Trello import'u.** `TRELLO_IMPORT_MAX_BYTES`
+(20 MiB) aynı sıralama kuralına ve aynı 26 MiB'lık proxy tavanına tabi; daha küçük bir sayı olduğu
+için payı da daha fazla. Ama ikisi arasında kontrol edilen ilişki bir **eşitsizliktir**, attachment
+limitinin tabi olduğu "eşitlik artı zarf" değil — import limitinin yalnızca proxy'ninkinin altında
+kalması gerekir, onu takip etmesi değil. Yani `TRELLO_IMPORT_MAX_BYTES`'ı proxy'nin sayısının
+üstüne çıkarmak, proxy'nin API'nin hiç görmediği boş gövdeli bir `413` ile kestiği bir import
+üretir. İlişkilerden biri bozulursa build'i düşüren dosya:
+`apps/api/src/storage/two-layer-limit.spec.ts`.
 
-So: raise `ATTACHMENT_MAX_BYTES` and you must raise the proxy's number to stay above it (1 MiB
-of headroom is what the bundled config ships and is ~1860x the largest envelope measured).
-Lower the proxy's below the API's and every upload near the limit fails with a `413` the API
-never sees and never logs. Caddy imposes no body limit of its own, which is why the bundled
-`docker/Caddyfile` has to set one explicitly — and nginx defaults `client_max_body_size` to
-**1 MB**, so a replacement proxy that omits the row rejects every attachment larger than a
-megabyte.
+Dolayısıyla: `ATTACHMENT_MAX_BYTES`'ı yükseltirseniz proxy'nin sayısını da onun üstünde kalacak
+şekilde yükseltmelisiniz (pakete dahil yapılandırma 1 MiB pay bırakıyor; bu, ölçülen en büyük
+zarfın ~1860 katı). Proxy'ninkini API'ninkinin altına indirirseniz limite yakın her yükleme,
+API'nin hiç görmediği ve hiç loglamadığı bir `413` ile düşer. Caddy kendi başına gövde limiti
+koymaz — pakete dahil `docker/Caddyfile`'ın limiti açıkça yazmasının sebebi budur — ve nginx
+`client_max_body_size` için **1 MB** varsayar; yani satırı atlayan bir yedek proxy, bir
+megabayttan büyük her eki reddeder.
 
-#### Why `/auth/*` has a ceiling of its own, and why it is 64 KiB
+#### `/auth/*` neden kendi tavanına sahip ve neden 64 KiB
 
-Rule 1 carries a limit too, and a much smaller one. Better Auth reads the raw request stream
-itself, below the parsers that enforce `REQUEST_BODY_MAX_BYTES` on every other route, so that
-ceiling never applied to `/auth/*`: a `POST /auth/sign-in/email` was read to completion at any
-size, and the built-in attempt budget (3 per 10 seconds per IP and path on sign-in, sign-up and
-change-password, 100 per minute on the other auth routes) counts requests, not bytes. Every body
-those routes take is a JSON object of a few hundred bytes, so 64 KiB is two orders of magnitude
-of headroom.
+Kural 1 de bir limit taşır, hem de çok daha küçüğünü. Better Auth ham istek akışını kendisi
+okur; diğer bütün rotalarda `REQUEST_BODY_MAX_BYTES`'ı uygulayan parser'ların altındadır,
+dolayısıyla o tavan `/auth/*` için hiç geçerli olmadı: bir `POST /auth/sign-in/email` hangi
+boyutta olursa olsun sonuna kadar okunuyordu ve yerleşik deneme bütçesi (sign-in, sign-up ve
+change-password'de IP ve yol başına 10 saniyede 3, diğer auth rotalarında dakikada 100) baytı
+değil isteği sayar. Bu rotaların aldığı her gövde birkaç yüz baytlık bir JSON nesnesidir; 64 KiB
+bunun iki büyüklük mertebesi üstünde bir pay bırakır.
 
-The API enforces the same number as `AUTH_BODY_MAX_BYTES` (`65536`, a constant in
-`apps/api/src/auth/auth-body-limit.ts`, not an environment variable): a request that declares a
-`Content-Length` above it is answered with the `Request body is too large` `413` envelope before
-a byte of the body is read. Here the proxy and the API **may be equal**, unlike the pair above:
-an auth body has no multipart envelope, both layers count the same bytes, and the ordering rule
-holds at equality.
+API aynı sayıyı `AUTH_BODY_MAX_BYTES` olarak uygular (`65536`; bir ortam değişkeni değil,
+`apps/api/src/auth/auth-body-limit.ts` içindeki bir sabit): bunun üstünde bir `Content-Length`
+bildiren istek, gövdesinden tek bayt okunmadan `Request body is too large` yazan `413` zarfıyla
+cevaplanır. Burada proxy ile API, yukarıdaki çiftin aksine, **eşit olabilir**: bir auth
+gövdesinin multipart zarfı yoktur, iki katman aynı baytları sayar ve sıralama kuralı eşitlikte de
+geçerlidir.
 
-A body sent without a `Content-Length` (chunked transfer encoding, which a browser never uses
-for a JSON string body) is the one case the two layers answer differently. The proxy is the
-layer that bounds it with a status: `request_body max_size` cuts the body at the same 64 KiB.
-The API cannot answer a body it is already streaming to Better Auth, so it counts the bytes as
-they arrive and closes the connection past the ceiling, which keeps an instance exposed without
-a proxy bounded too, but as a dropped connection rather than a `413`. That is one more reason
-the proxy is part of the default stack rather than an optional extra.
-`apps/api/src/storage/two-layer-limit.spec.ts` pins the Caddyfile figure, the nginx row below
-and the API constant to each other.
+`Content-Length` olmadan gönderilen bir gövde (chunked transfer encoding; bir tarayıcı JSON
+gövdesi için bunu hiç kullanmaz) iki katmanın farklı cevapladığı tek durumdur. Onu bir status
+koduyla sınırlayan katman proxy'dir: `request_body max_size` gövdeyi aynı 64 KiB'ta keser. API,
+Better Auth'a akıtmakta olduğu bir gövdeye cevap veremez; bu yüzden baytları geldikçe sayar ve
+tavan aşılınca bağlantıyı kapatır. Bu, proxy'siz açığa çıkarılmış bir instance'ı da sınırlı
+tutar, ama `413` yerine kopan bir bağlantıyla. Proxy'nin isteğe bağlı bir ek değil, varsayılan
+stack'in parçası olmasının bir sebebi daha budur. `apps/api/src/storage/two-layer-limit.spec.ts`
+Caddyfile'daki sayıyı, aşağıdaki nginx satırını ve API sabitini birbirine sabitler.
 
-### Telling the 413s apart
+### 413'leri birbirinden ayırmak
 
-Both layers answer an oversized upload with `413` — and so does a third limit that has nothing
-to do with uploads. **The response body is what says which one did it**:
+Her iki katman da boyutu aşan bir yüklemeye `413` ile cevap verir — ve yüklemelerle hiç ilgisi
+olmayan üçüncü bir limit de öyle. **Hangisinin reddettiğini cevap gövdesi söyler**:
 
-| What you get back                                  | Who rejected it | What it means                                                    |
-| -------------------------------------------------- | --------------- | ---------------------------------------------------------------- |
-| `413` with a **JSON** body carrying `statusCode`   | the API         | working as designed — the file is over `ATTACHMENT_MAX_BYTES`    |
-| `413` with an **empty** body (`Content-Length: 0`) | the proxy       | the body was over the proxy's ceiling, which is the coarse cut   |
-| `413` JSON reading `Request body is too large`     | the API         | not an upload at all — a JSON body over `REQUEST_BODY_MAX_BYTES` |
-| `413` JSON, `error: "Attachment Quota Exceeded"`   | the API         | the file fits, the storage doesn't — a quota is full (see above) |
+| Aldığınız cevap                                    | Reddeden | Anlamı                                                            |
+| -------------------------------------------------- | -------- | ----------------------------------------------------------------- |
+| `statusCode` taşıyan **JSON** gövdeli `413`        | API      | tasarlandığı gibi — dosya `ATTACHMENT_MAX_BYTES`'ı aşıyor         |
+| **Boş** gövdeli `413` (`Content-Length: 0`)        | proxy    | gövde proxy'nin tavanını aştı; bu kaba kesim                      |
+| `Request body is too large` yazan JSON `413`       | API      | yükleme bile değil — `REQUEST_BODY_MAX_BYTES`'ı aşan JSON gövde   |
+| `error: "Attachment Quota Exceeded"` taşıyan `413` | API      | dosya sığıyor, depolama sığmıyor — bir kota dolu (yukarıya bakın) |
 
-The first row is the normal answer for an oversized attachment, and the one a user can act on:
-it names the limit. The second is the proxy refusing a body before the API ever saw it — correct
-for something absurd, but if a user hits it on a file **under** `ATTACHMENT_MAX_BYTES` then your
-proxy's ceiling is too low (see "Why the proxy's number is 26 MiB and the API's is 25" above).
+Birinci satır, boyutu aşan bir ek için normal cevaptır ve kullanıcının bir şey yapabileceği
+cevaptır: limiti adlandırır. İkincisi, proxy'nin gövdeyi API hiç görmeden reddetmesidir —
+absürt bir şey için doğrudur, ama kullanıcı bunu `ATTACHMENT_MAX_BYTES`'ın **altındaki** bir
+dosyada alıyorsa proxy tavanınız çok düşüktür (yukarıdaki "Proxy'nin sayısı neden 26 MiB,
+API'ninki neden 25" bölümüne bakın).
 
-The third row is a different limit that happens to share the status code: `REQUEST_BODY_MAX_BYTES`
-(default `1048576`, 1 MiB) caps the **JSON and form-encoded** bodies every other endpoint takes,
-and no attachment ever passes through it. The same sentence under a `path` starting with `/auth/`
-is the smaller `AUTH_BODY_MAX_BYTES` (64 KiB) instead; see rule 1 above. The same sentence also
-answers a JSON body holding more than 1,000 values, or a form body with more than 1,000 fields,
-however few bytes it takes: the API refuses those before validating them (see
-[api-conventions.md](api-conventions.md#request-body-size)). If you see any of these, nothing
-about your storage or your proxy is misconfigured: some request simply sent more JSON than the
-API accepts.
+Üçüncü satır, aynı status kodunu paylaşan başka bir limittir: `REQUEST_BODY_MAX_BYTES`
+(varsayılan `1048576`, 1 MiB) diğer bütün uçların aldığı **JSON ve form-encoded** gövdeleri
+sınırlar ve hiçbir attachment oradan geçmez. Aynı cümle `/auth/` ile başlayan bir `path` altında
+geliyorsa limit, daha küçük olan `AUTH_BODY_MAX_BYTES`'tır (64 KiB); yukarıdaki kural 1'e bakın.
+Aynı cümle, kaç bayt tutarsa tutsun 1.000'den fazla değer taşıyan bir JSON gövdeye ya da 1.000'den
+fazla alanlı bir form gövdeye de verilir: API bunları doğrulamadan önce reddeder (bkz.
+[api-conventions.md](api-conventions.md#request-body-boyutu)). Bunlardan birini görüyorsanız ne
+storage'ınızda ne proxy'nizde yanlış bir şey var; bir istek yalnızca API'nin kabul ettiğinden
+fazla JSON göndermiştir.
 
-The fourth row is a different failure again: the file is under `ATTACHMENT_MAX_BYTES`, but storing
-it would push a workspace or the instance over its quota. See "Attachment storage is unbounded
-until you cap it, and it shares Postgres's disk" above for sizing `ATTACHMENT_WORKSPACE_QUOTA_BYTES`
-and `ATTACHMENT_INSTANCE_QUOTA_BYTES`.
+Dördüncü satır ise başka bir başarısızlıktır: dosya `ATTACHMENT_MAX_BYTES`'ın altındadır, ama onu
+saklamak bir workspace'i ya da instance'ı kendi kotasının üzerine çıkarır. Boyutlandırma için
+yukarıdaki "Attachment depolaması varsayılan olarak sınırlıdır ve Postgres'in diskini paylaşır"
+bölümüne bakın: `ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`.
 
-There is a fifth, and only one endpoint can produce it: a `413` on
-`POST /workspaces/…/imports/trello` is `TRELLO_IMPORT_MAX_BYTES` (20 MiB), not any of the four
-above. The route in the response envelope's `path` is what tells it apart. If a user hits it on an
-export **under** 20 MiB, the proxy cut the body first and the ceiling to look at is the proxy's.
+Bir beşincisi daha var ve onu yalnızca tek bir uç üretebilir:
+`POST /workspaces/…/imports/trello` üzerindeki bir `413`, yukarıdaki dördünden hiçbiri değil,
+`TRELLO_IMPORT_MAX_BYTES`'tır (20 MiB). Ayırt eden şey cevap zarfındaki `path` alanıdır. Kullanıcı
+bunu 20 MiB'ın **altındaki** bir export'ta alıyorsa gövdeyi önce proxy kesmiştir ve bakılacak tavan
+proxy'ninkidir.
 
-The headers do not help — Caddy's `413` carries no `Server` header, so only the body
-distinguishes them. Everything the API itself rejects comes back as
-`Content-Type: application/json; charset=utf-8` with a `{"statusCode":…,"error":…,"path":…,
-"requestId":…}` envelope; the proxy's rejection carries no body at all.
+Header'lar yardımcı olmaz — Caddy'nin `413`'ü `Server` header'ı taşımaz; ikisini yalnız gövde
+ayırır. API'nin kendi reddettiği her şey
+`Content-Type: application/json; charset=utf-8` ile ve
+`{"statusCode":…,"error":…,"path":…,"requestId":…}` zarfıyla döner; proxy'nin reddi ise hiç gövde
+taşımaz.
 
-**The proxy does not log this rejection.** `docker/Caddyfile` has no `log` directive — the API
-already logs every request that reaches it, and access logs on both layers would double every
-deployment's log volume for one size check — so a body rejected by the proxy appears in
-`docker compose logs proxy` **not at all**. An empty `413` with nothing in the proxy log is the
-expected result, not evidence that the limit is broken.
+**Proxy bu reddi loglamaz.** `docker/Caddyfile`'da `log` direktifi yoktur — API zaten kendisine
+ulaşan her isteği logluyor ve her iki katmanda access log tutmak tek bir boyut kontrolü uğruna
+her deployment'ın log hacmini ikiye katlardı — dolayısıyla proxy'nin reddettiği bir gövde
+`docker compose logs proxy` çıktısında **hiç görünmez**. Proxy logunda hiçbir şey yokken gelen
+boş gövdeli bir `413`, limitin bozuk olduğunun değil, beklenen sonucun kendisidir.
 
-Measured on `docker/Caddyfile` against `caddy:2-alpine`, with the limit it carried at the time
-(`25MiB`): exactly `26214400` bytes of body → `200`, one byte more → `413`, with `curl` exiting
-`0` on a well-formed status line — the connection is closed properly rather than cut mid-upload.
-That is what established the threshold is `> max_size` rather than `>=`, and it is also what
-showed the limit had to move: a 26214400-byte _file_ produces a body a few hundred bytes larger
-than that, so the shipped config now sets `26MiB` and the same measurement's boundary moves with
-it.
+`docker/Caddyfile` üzerinde `caddy:2-alpine` ile, o zamanki limitiyle (`25MiB`) ölçüldü: tam
+`26214400` bayt gövde → `200`, bir bayt fazlası → `413`, ve `curl` düzgün bir durum satırıyla
+`0` koduyla çıkıyor — bağlantı yükleme ortasında kesilmiyor, usulünce kapanıyor. Eşiğin `>=`
+değil `> max_size` olduğunu kuran ölçüm budur; limitin taşınması gerektiğini gösteren de aynı
+ölçüm: 26214400 baytlık bir _dosya_ bundan birkaç yüz bayt büyük bir gövde üretiyor. Pakete
+dahil yapılandırma artık `26MiB` diyor ve bu ölçümün sınırı da onunla birlikte kayıyor.
 
-If you reproduce this yourself, **aim it at a real upload endpoint**. Pointing it at an
-arbitrary path measures nothing: the API answers `404` as soon as it has the headers, without
-ever reading the body, so the request finishes before the proxy's limit is reached and you get a
-`404` that looks like the limit is missing.
+Bunu kendiniz denerseniz **gerçek bir yükleme ucuna** yöneltin. Rastgele bir yola atmak hiçbir
+şey ölçmez: API, header'ları alır almaz gövdeyi hiç okumadan `404` cevaplar, istek proxy'nin
+limitine ulaşmadan biter ve limit yokmuş gibi görünen bir `404` alırsınız.
 
-The two API rules differ on purpose. Better Auth derives its mount path from the URL it is
-configured with and matches incoming requests against it, so `/auth` has to be the same string
-on the server, in the browser and in the verification links it emails; the rest of the API is
-mounted at its own root and gets the prefix removed on the way in. In nginx:
+İki API kuralı bilinçli olarak farklıdır. Better Auth, mount yolunu kendisine verilen URL'den
+türetir ve gelen istekleri ona göre eşleştirir; dolayısıyla `/auth` sunucuda, tarayıcıda ve
+gönderdiği doğrulama linklerinde aynı dize olmak zorundadır. API'nin geri kalanı kendi kökünde
+mount edilmiştir ve prefix girişte kaldırılır. nginx'te, Caddy'nin kendiliğinden yaptığı başlık
+işleriyle birlikte:
 
 ```nginx
+# http bağlamında (server'ın dışında): Connection başlığını Upgrade'e göre türetir
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      close;
+}
+
+# server bağlamında
 location /auth/ {
-  proxy_pass http://api:4000;                      # no trailing slash → path preserved
-  client_max_body_size 64k;                        # EQUAL to AUTH_BODY_MAX_BYTES (64 KiB): an
-                                                   # auth body has no multipart envelope, so the
-                                                   # two layers count the same bytes.
+  proxy_pass http://api:4000;                      # sondaki slash yok → yol korunur
+  client_max_body_size 64k;                        # AUTH_BODY_MAX_BYTES'a (64 KiB) EŞİT: auth
+                                                   # gövdesinin multipart zarfı yok, iki katman
+                                                   # aynı baytları sayar.
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
 }
 location /api/  {
-  proxy_pass http://api:4000/;                     # trailing slash    → /api stripped
-  client_max_body_size 26m;                        # ABOVE ATTACHMENT_MAX_BYTES (25 MiB), not
-                                                   # equal to it — the multipart envelope rides
-                                                   # on top of the file. See the section above.
+  proxy_pass http://api:4000/;                     # sondaki slash var → /api kaldırılır
+  client_max_body_size 26m;                        # ATTACHMENT_MAX_BYTES'ın (25 MiB) ÜSTÜNDE,
+                                                   # eşiti değil — multipart zarfı dosyanın
+                                                   # üstüne biner. Yukarıdaki bölüme bakın.
+  proxy_http_version 1.1;                          # WebSocket (realtime board akışı) için
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection $connection_upgrade;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
 }
-location /      { proxy_pass http://web:3000;  }
+location /      {
+  proxy_pass http://web:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
 
-If your proxy sits in front of Kurul's own `proxy` rather than replacing it, set `TRUST_PROXY`
-in `.env` to the number of hops (a CDN in front of Caddy makes it `2`). `docker-compose.yml`
-forwards that variable to the `api` service with a default of `1`, so a blank or absent line is
-the single-hop case, and the value survives the re-fetch of the compose file that every
-[upgrade](#upgrading) does. Left at `1` behind two hops, every rate-limit bucket and every
-access-log IP collapses onto your outer proxy's address. Set to `false` (the value an older
-`.env.example` shipped, from before compose forwarded the line) the same happens behind one hop,
-so remove such a line rather than leave it.
+Paketlenmiş Caddy bu üç şeyi kendiliğinden yapar, nginx yapmaz: `/api/` için WebSocket upgrade
+başlıkları (`Upgrade`, `Connection`, `proxy_http_version 1.1`; ilk ikisi hop-by-hop başlıklardır,
+nginx onları açıkça yazmadıkça upstream'e geçirmez), `Host`'un korunması ve istemcinin adresiyle
+şemasının iletilmesi (`X-Forwarded-For`, `X-Forwarded-Proto`). Sonuncusu yoksa `TRUST_PROXY=1`
+(varsayılan) istemciyi bulamaz: başlık hiç yoksa bütün istekler nginx'in adresinden gelmiş sayılır
+ve her rate-limit kovası tek adreste toplanır; istemci kendi `X-Forwarded-For`'unu gönderirse onun
+en sağdaki girdisi kullanılır, yani taklit edilebilir. `$proxy_add_x_forwarded_for` gelen başlığın
+sağına nginx'in gördüğü adresi ekler ve `TRUST_PROXY=1` en sağdaki girdiyi aldığı için başa
+yazılan sahte adresler etkisiz kalır. Başlıklar her `location`'da yinelenir, çünkü bir blokta tek
+bir `proxy_set_header` bile varsa nginx üst düzeydekileri miras almaz.
 
-## Why there is no rebuild
+Proxy'niz Kurul'un kendi `proxy` servisini değiştirmek yerine onun önünde duruyorsa,
+`.env`'de `TRUST_PROXY`'yi hop sayısına ayarlayın (Caddy'nin önündeki bir CDN bunu `2` yapar).
+`docker-compose.yml` bu değişkeni `api` servisine varsayılanı `1` olarak iletir; yani boş ya da
+hiç olmayan bir satır tek hop durumudur ve değer, her [upgrade](#upgrade)'in yaptığı compose
+dosyası yeniden indirmesinden sağ çıkar. İki hop arkasında `1`'de bırakılırsa tüm rate-limit
+kovaları ve access log'daki tüm IP'ler dıştaki proxy'nizin adresine çöker. `false` yazılırsa
+(compose satırı iletmeden önceki eski bir `.env.example`'ın gönderdiği değer) aynı şey tek hop
+arkasında da olur; böyle bir satırı bırakmak yerine silin.
 
-Next.js compiles `NEXT_PUBLIC_*` variables into the JavaScript it ships, at build time. An
-absolute `NEXT_PUBLIC_API_URL` therefore makes a web image specific to one deployment, and
-"pull the image, set the environment" cannot work — which is exactly what Kurul used to
-require ([audit finding PM-02](https://github.com/dravcore/kurul/issues/119)).
+## Neden yeniden build gerekmiyor
 
-One `NEXT_PUBLIC_*` value is still baked, because nothing that would be correct everywhere
-exists to bake in its place: the browser Sentry DSN.
-[Browser error tracking](#browser-error-tracking) below says what that means for a pull-based
-install.
+Next.js, `NEXT_PUBLIC_*` değişkenlerini build zamanında gönderdiği JavaScript'in içine derler.
+Bu nedenle mutlak bir `NEXT_PUBLIC_API_URL`, web imajını tek bir dağıtıma özgü hale getirir ve
+"imajı çek, env'i ver" modeli çalışamaz — Kurul'un eskiden tam olarak dayattığı şey buydu
+([denetim bulgusu PM-02](https://github.com/dravcore/kurul/issues/119)).
 
-The fix is not to un-bake the value but to bake a value that is already correct everywhere. The
-published image carries `NEXT_PUBLIC_API_URL=/api`, a path on whatever origin the page was
-served from, so it is right on `kurul.example.com` and on `boards.acme.internal` alike. That
-only holds because the reverse proxy puts both apps on one origin, which is why `proxy` is part
-of the default stack rather than an optional extra.
+Bir `NEXT_PUBLIC_*` değeri hâlâ gömülü, çünkü yerine gömülecek her yerde doğru bir değer yok:
+tarayıcı Sentry DSN'i. Bunun pull ile kurulmuş bir instance için ne anlama geldiğini aşağıdaki
+[Tarayıcı hata takibi](#tarayıcı-hata-takibi) anlatıyor.
 
-Server-side rendering cannot use a path — there is no origin to resolve it against inside
-Node — so it reads `INTERNAL_API_URL` instead, which is an ordinary runtime variable
-docker-compose.yml points straight at `http://api:4000` over the container network.
+Çözüm değeri gömülmekten çıkarmak değil, zaten her yerde doğru olan bir değeri gömmek.
+Yayınlanan imaj `NEXT_PUBLIC_API_URL=/api` taşır; bu, sayfanın sunulduğu origin üzerinde bir
+yoldur ve `kurul.example.com`'da da `boards.acme.internal`'da da doğrudur. Bu ancak reverse
+proxy her iki uygulamayı tek origin'e koyduğu için geçerlidir — `proxy`'nin isteğe bağlı bir
+ek değil, varsayılan stack'in parçası olmasının nedeni budur.
 
-A deployment that genuinely wants the API on its own hostname can still build the web image
-with an absolute URL:
+Sunucu tarafı render bir yolu kullanamaz — Node içinde onu çözecek bir origin yoktur — bu
+yüzden `INTERNAL_API_URL`'i okur; bu, docker-compose.yml'nin doğrudan container ağı üzerinden
+`http://api:4000`'e yönlendirdiği sıradan bir çalışma zamanı değişkenidir.
+
+API'yi gerçekten kendi hostname'inde isteyen bir dağıtım, web imajını mutlak bir URL ile yine
+build edebilir:
 
 ```bash
 docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.example.com .
 ```
 
-That image is then specific to `api.example.com`, and you are back to rebuilding per
-deployment — which is the trade-off, not an oversight.
+Bu imaj artık `api.example.com`'a özgüdür ve dağıtım başına yeniden build etmeye geri
+dönersiniz — bu bir eksiklik değil, bilinçli takastır.
 
-### Browser error tracking
+### Tarayıcı hata takibi
 
-`NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT` and `NEXT_PUBLIC_SENTRY_RELEASE` are
-compiled into the web bundle when the image is built: `docker-compose.yml` passes them as
-`build.args`, not as `environment:`, and unlike the API URL there is no deployment-independent
-value to bake, because a DSN names one Sentry project. The release workflow builds
-`ghcr.io/dravcore/kurul-web` with all three blank, and blank means the Sentry SDK is left out of
-the bundle entirely. So the published image ships without browser error tracking, and a
-`NEXT_PUBLIC_SENTRY_DSN` line in `.env` on the install this page describes changes nothing,
-with no warning in any log. The API side is different: `SENTRY_DSN` is an ordinary runtime
-variable, read at container start, and works from `.env` as
-[Error tracking](development.md#error-tracking-sentry--off-by-default) describes.
+`NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT` ve `NEXT_PUBLIC_SENTRY_RELEASE`, imaj
+build edilirken web bundle'ının içine derlenir: `docker-compose.yml` bunları `environment:`
+olarak değil `build.args` olarak geçer ve API URL'inin aksine gömülecek dağıtımdan bağımsız bir
+değer yoktur, çünkü bir DSN tek bir Sentry projesini adlandırır. Release workflow'u
+`ghcr.io/dravcore/kurul-web`'i üçü de boşken build eder ve boş, Sentry SDK'sının bundle'a hiç
+girmemesi demektir. Dolayısıyla yayınlanan imaj tarayıcı hata takibi olmadan gelir ve bu
+sayfanın anlattığı kurulumda `.env`'e yazılan bir `NEXT_PUBLIC_SENTRY_DSN` satırı hiçbir şeyi
+değiştirmez, hiçbir log'da uyarı da vermez. API tarafı farklı: `SENTRY_DSN` container
+başlarken okunan sıradan bir çalışma zamanı değişkenidir ve
+[Hata takibi](development.md#hata-takibi-sentry--varsayılan-kapalı) bölümünün anlattığı gibi
+`.env`'den çalışır.
 
-Browser error tracking therefore means building the web image yourself, which needs a source
-tree the `curl` install does not have. Put the `NEXT_PUBLIC_SENTRY_*` lines in your `.env`,
-clone the tag you run, and build from a copy of that `.env` so the result carries the same
-`TAG` your install resolves:
+Tarayıcı hata takibi bu yüzden web imajını kendiniz build etmek demektir; bunun için de `curl`
+kurulumunun sahip olmadığı bir kaynak ağacı gerekir. `NEXT_PUBLIC_SENTRY_*` satırlarını
+`.env`'inize yazın, çalıştırdığınız tag'i clone'layın ve sonucun kurulumunuzun çözdüğü `TAG`'i
+taşıması için o `.env`'in bir kopyasından build edin:
 
 ```bash
 git clone --branch v0.4.1 https://github.com/dravcore/kurul.git /opt/kurul-src
 cp /opt/kurul/.env /opt/kurul-src/.env
-cd /opt/kurul-src && docker compose build web      # tags ghcr.io/dravcore/kurul-web:<TAG>
-cd /opt/kurul && docker compose up -d web          # no pull: uses the image just built
+cd /opt/kurul-src && docker compose build web      # ghcr.io/dravcore/kurul-web:<TAG> olarak etiketler
+cd /opt/kurul && docker compose up -d web          # pull yok: az önce build edilen imajı kullanır
 ```
 
-Without a compose file, the same build is
-`docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_SENTRY_DSN=https://... .` from the
-clone. Either way the image is specific to one Sentry project, and the `docker compose pull` of
-the next [upgrade](#upgrading) replaces it with the published one: rebuild after every upgrade,
-or the tracking stops with it. The rest of the setup, the two projects and what is sent, is in
-[Error tracking](development.md#error-tracking-sentry--off-by-default).
+Compose dosyası olmadan aynı build, clone içinden
+`docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_SENTRY_DSN=https://... .`
+komutudur. Her iki durumda da imaj tek bir Sentry projesine özgüdür ve bir sonraki
+[upgrade](#upgrade)'in `docker compose pull`'u onu yayınlanan imajla değiştirir: her
+upgrade'den sonra yeniden build edin, yoksa takip onunla birlikte durur. Kurulumun geri kalanı,
+iki proje ve neyin gönderildiği:
+[Hata takibi](development.md#hata-takibi-sentry--varsayılan-kapalı).
 
-## Troubleshooting
+## Sorun giderme
 
-**`docker compose pull` ends in `denied`.** The images are published by a workflow that runs
-on a release tag, so each exists only from the release that first shipped it: `api` and `web`
-from `v0.2.0`, `kurul-migrate` from `v0.3.0`. On `v0.2.0` the pull therefore fails for that one
-image even though the other two resolve, and `docker compose pull` exits non-zero after
-successfully pulling `postgres`, `redis` and `caddy`: read the tail of its output, not just the
-exit code, because the ones that worked scroll the ones that did not off the screen. The same
-symptom on a newer release usually means the files and the images disagree: a
-`docker-compose.yml` fetched from `main`, or from a newer tag than `TAG`, can name an image or a
-service the release you pinned never published, which is why step 2 fetches every file from the
-tag in `TAG` and why an [upgrade](#upgrading) re-fetches them. Re-fetch at the right tag, or
-build from source instead of pulling:
+**`docker compose pull` `denied` ile bitiyor.** İmajları, bir release tag'inde çalışan bir
+workflow yayınlar; dolayısıyla her biri yalnızca kendisini ilk taşıyan sürümden itibaren var:
+`api` ve `web` `v0.2.0`'dan, `kurul-migrate` ise `v0.3.0`'dan. Bu yüzden `v0.2.0`'da diğer
+ikisi çözülse bile o tek imaj için pull başarısız olur ve `docker compose pull`, `postgres`,
+`redis` ve `caddy`'yi başarıyla indirdikten sonra sıfırdan farklı bir kodla çıkar: yalnızca
+çıkış koduna değil çıktının sonuna bakın, çünkü başarılı olanlar, olmayanları ekrandan yukarı
+kaydırır. Daha yeni bir sürümde aynı belirti genellikle dosyalarla imajların uyuşmadığı
+anlamına gelir: `main`'den ya da `TAG`'den daha yeni bir tag'den indirilmiş bir
+`docker-compose.yml`, sabitlediğiniz sürümün hiç yayınlamadığı bir imajı ya da servisi
+adlandırabilir; 2. adımın her dosyayı `TAG`'deki tag'den indirmesinin ve bir
+[upgrade](#upgrade)'in onları yeniden indirmesinin nedeni bu. Doğru tag'den yeniden indirin ya
+da çekmek yerine kaynaktan build edin:
 
 ```bash
 git clone https://github.com/dravcore/kurul.git && cd kurul
 docker compose up -d --build
 ```
 
-That is slower — the api image is a minute or so of build — and it is the only difference.
-`docker-compose.yml` carries `image:` and `build:` for all three services on purpose, so the
-same file installs from a published image when one is resolvable and from source when it is
-not.
+Tek fark bunun daha yavaş olmasıdır — api imajı bir dakika kadar build alır.
+`docker-compose.yml`, `api`, `web`, `migrate` ve (`demo` profilinde) `demo-reset` için bilinçli
+olarak hem `image:` hem `build:` taşır; böylece aynı dosya, çözülebilen bir yayınlanmış imaj
+varsa ondan, yoksa kaynaktan kurar.
 
-**Certificate never issues.** Ports 80 and 443 must both reach the server from the public
-internet, and DNS must already resolve. `docker compose logs proxy` names the failure. Hitting
-Let's Encrypt's rate limit (5 certificates per domain per week) means waiting it out — the
-`caddy_data` volume exists to make sure a restart never re-requests one it already has.
+**Sertifika bir türlü alınmıyor.** 80 ve 443 portlarının ikisi de public internetten sunucuya
+ulaşabilmeli ve DNS çoktan çözülüyor olmalı. `docker compose logs proxy` hatanın adını verir.
+Let's Encrypt'in rate limit'ine (aynı hostname kümesi için haftada 5 sertifika; kayıtlı domain
+başına haftada 50) takıldıysanız beklemekten başka çare yok — `caddy_data` volume'ü tam olarak,
+yeniden başlatmanın zaten sahip olduğu bir sertifikayı tekrar istememesi için var.
 
-**Boards load but never update by themselves.** The WebSocket is not getting through. With the
-bundled `proxy` this should not happen; with your own, check that your `/api/*` rule forwards
-`Upgrade`/`Connection` headers.
+**Board'lar yükleniyor ama kendi kendine güncellenmiyor.** WebSocket geçmiyor demektir. Pakete
+dahil `proxy` ile bu yaşanmamalı; kendi proxy'nizle `/api/*` kuralınızın
+`Upgrade`/`Connection` başlıklarını ilettiğinden emin olun.
 
-**Sign-in fails right after changing the domain.** `SITE_URL` is the origin the session cookie
-is scoped to. Change it, run `docker compose up -d` (which recreates `api` with the new value),
-and sign in again — the old cookie belongs to the old origin.
+**Domain'i değiştirdikten hemen sonra giriş başarısız.** `SITE_URL`, oturum çerezinin
+kapsandığı origin'dir. Değiştirin, `docker compose up -d` çalıştırın (bu, `api`'yi yeni değerle
+yeniden oluşturur) ve tekrar giriş yapın — eski çerez eski origin'e aittir.
 
-**Everything 502s.** `docker compose ps`. If `api` is unhealthy, `docker compose logs api`; the
-usual cause is a `POSTGRES_PASSWORD` in `.env` that no longer matches the one baked into an
-existing `postgres_data` volume — see
-[Database and cache credentials](development.md#database-and-cache-credentials).
+**Her şey 502 veriyor.** `docker compose ps` çalıştırın. `api` unhealthy ise
+`docker compose logs api`; en sık neden, `.env`'deki `POSTGRES_PASSWORD`'ün mevcut bir
+`postgres_data` volume'üne gömülü olanla artık eşleşmemesidir — bkz.
+[Veritabanı ve cache kimlik bilgileri](development.md#veritabanı-ve-cache-kimlik-bilgileri).

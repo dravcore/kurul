@@ -1,99 +1,111 @@
-# 0034. Hosted Billing and Plan Assignment: a Merchant of Record, One Subscription Row, and Nothing at All When Unconfigured
+# 0034. Barındırılan Faturalandırma ve Plan Ataması: Bir Merchant of Record, Tek Bir Subscription Satırı ve Yapılandırılmadığında Hiçbir Şey
 
-**Status:** Proposed
-**Date:** 2026-08-26
+**Durum:** Önerildi
+**Tarih:** 2026-08-26
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe
+aynasıyla" ve "Türkçe aynaları" ifadeleri kaldırılan İngilizce asıl + Türkçe ayna düzenine
+aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Bağlam'daki "`Workspace.planLimits`'in `PlanLimitsService`,
+`BoardService`, `AttachmentService`, `InstanceConfigController` ve `mount-better-auth.ts`'teki
+kayıt reddinde okuyucuları var" ifadesi kodla birebir örtüşmüyor: kolonu doğrudan okuyan tek kod
+`PlanLimitsService.forWorkspace`'tir (`apps/api/src/plan/plan-limits.service.ts`); board ve ek
+servisleri ona dayanır, `InstanceConfigController` ile kayıt reddi ise kolona bakmadan instance
+ortamındaki tavanları (`PLAN_MAX_*`, bayt kotaları) kullanır. Kolonun hiçbir yerde yazılmadığı kısmı
+hâlâ doğrudur.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0034-hosted-billing-and-plan-assignment.md)
+## Bağlam
 
-## Context
+[ADR 0028](0028-open-contributions-hosted-service.md) paranın nereden geleceğine karar verdi:
+"Dravcore'un işlettiği barındırılan bir servis. Bizim sunucularımızda bir hesap; yayınlanmış bir
+limit kümesinin içinde ücretsiz, üzerinde ücretli", burada limitler "özellik değil, operasyonel
+büyüklüklerdir (koltuk, board, depolama ve benzeri)" ve "barındırılan servis, ihtiyaç duyduğu
+plan-limiti ve faturalama kodu dahil, bu depodaki aynı AGPL kodunu çalıştırıyor".
 
-[ADR 0028](0028-open-contributions-hosted-service.md) decided where money comes from: "a hosted
-service run by Dravcore. An account on our servers, free within a published set of limits, paid
-above them", where the limits are "operational quantities (seats, boards, storage, similar), not
-features", and where "the hosted service runs the same AGPL code that is in this repository,
-including the plan-limit and billing code it needs".
+[ADR 0032](0032-plan-limits.md) bunun ilk yarısını inşa etti. Tek bir çözümleyici her tavan sorusunu
+cevaplıyor ve nullable bir JSON kolonu olan `Workspace.planLimits`, bir workspace'in migration
+olmadan kendi tavanlarını taşımasına izin veriyor. O ADR neyi açık bıraktığını tam da bu sözcüklerle
+adlandırmıştı: "Billing'in tavanların ötesinde ihtiyaç duyduğu şey (plan adı, sağlayıcı id'leri,
+dönem sonu), 0028'in kendi sebepleriyle ekleyeceği bir tablo."
 
-[ADR 0032](0032-plan-limits.md) built the first half of that. One resolver answers every ceiling
-question, and `Workspace.planLimits`, a nullable JSON column, lets one workspace carry ceilings of
-its own without a migration. That ADR named what it was leaving open in so many words: "What
-billing needs beyond ceilings (plan name, provider ids, period end) is a table 0028 will add for
-its own reasons."
+Bu ek yeri tamamlanmış ve kullanılmamış durumda. `Workspace.planLimits`'in `PlanLimitsService`,
+`BoardService`, `AttachmentService`, `InstanceConfigController` ve `mount-better-auth.ts`'teki kayıt
+reddinde okuyucuları var ve **`apps/api/src` içinde hiçbir yerde yazıcısı yok**;
+[self-hosting.md](../self-hosting.md) açıkça "uygulama onu asla kendisi yazmaz" diyor. `Subscription`
+modeli yok, sağlayıcı entegrasyonu yok (`stripe`, `paddle` ve `billing` plan limiti dosyalarının
+dışında hiçbir şeyle eşleşmiyor), alıcı route'u yok ve plan kataloğu yok. `ROADMAP.md`'nin
+faturalandırma satırında tek bir kabul kriteri var, sağlayıcı entegrasyonunun yapılandırmanın
+arkasında durması ve varsayılan olarak kapalı olması, ve Faz 3 onu tetiğe bağlıyor, sahibinin öne
+çekme özgürlüğüyle.
 
-The seam is finished and unused. `Workspace.planLimits` has readers in `PlanLimitsService`,
-`BoardService`, `AttachmentService`, `InstanceConfigController` and the sign-up refusal in
-`mount-better-auth.ts`, and **no writer anywhere in `apps/api/src`**;
-[self-hosting.md](../self-hosting.md) says plainly that "the app never writes it itself". There is
-no `Subscription` model, no provider integration (`stripe`, `paddle` and `billing` match nothing
-outside the plan-limit files), no receiver route, and no plan catalogue. `ROADMAP.md`'s billing row
-carries one acceptance criterion, that provider integration sits behind configuration and is off by
-default, and Phase 3 makes it trigger-based with the owner free to pull it forward.
+Mevcut kodun iki özelliği, bir yazıcının ne yapmasına izin verileceğini şekillendiriyor.
 
-Two properties of the existing code shape what a writer is allowed to do.
+- **Bozuk bir yazma "sınırsız" demektir, "reddedildi" değil.** `parseWorkspacePlanOverride`
+  anlamadığı anahtarları ve negatif olmayan tam sayı olmayan değerleri bilinçli olarak düşürüyor,
+  çünkü kolon veridir ve tek bir bozuk JSON değeri yüzünden bir tenant'a hizmeti reddetmek, kötü bir
+  yazmayı bir kesintiye çevirirdi. Bu, bir okuyucu için doğru davranış ve bir yazıcı için tuzak:
+  `{"seats": "10"}` yazan bir plan ataması, gürültülü biçimde başarısız olmak yerine sessizce
+  sınırsız koltuk verir.
+- **Ham gövdeli bir alıcının mount edileceği tam olarak tek bir yer var.** `configure-app.ts` önce
+  origin kontrolünü, sonra `mountBetterAuth`'u, en son da body parser'ları kaydediyor. İmzası ham
+  baytları kapsayan bir sağlayıcı webhook'u, Better Auth mount'uyla aynı nedenle o ortadaki yuvaya,
+  `useBodyParser`'dan önce kaydedilmek zorunda: önündeki bir parser ona zaten tüketilmiş bir stream
+  verir. Önündeki origin kontrolü sorun değil, çünkü yalnızca allowlist dışında bir origin _ilan
+  eden_ istekleri reddediyor ve bir sağlayıcının sunucusu ne `Origin` ne `Referer` gönderir.
 
-- **A malformed write means "unlimited", not "refused".** `parseWorkspacePlanOverride` drops keys
-  it does not understand and values that are not non-negative integers, deliberately, because the
-  column is data and refusing to serve a tenant over one bad JSON value would turn a bad write into
-  an outage. That is the right behaviour for a reader and a trap for a writer: a plan assignment
-  that writes `{"seats": "10"}` silently grants unlimited seats instead of failing loudly.
-- **A raw-body receiver has exactly one place to be mounted.** `configure-app.ts` registers the
-  origin check, then `mountBetterAuth`, then the body parsers last. A provider webhook whose
-  signature covers raw bytes has to be registered in that middle slot, before `useBodyParser`, for
-  the same reason the Better Auth mount is: a parser ahead of it hands it an already-consumed
-  stream. The origin check ahead of it is not a problem, because it rejects only requests that
-  _announce_ an origin outside the allowlist and a provider's server sends neither `Origin` nor
-  `Referer`.
+Bunun ötesinde: `ThrottlerGuard` ve `SessionAuthGuard` global, dolayısıyla Nest içindeki bir alıcı
+`@Public` ve bir throttle muafiyeti isterdi; `organization-options.ts` içinde `organizationHooks`
+zaten var ve genişletilebilir; ve `DEMO_MODE`, çağrı anında okunan ve `GET /config`'te yayımlanan bir
+özellik bayrağının yerleşik biçimi.
 
-Beyond that: `ThrottlerGuard` and `SessionAuthGuard` are global, so an in-Nest receiver would need
-`@Public` and a throttle exemption; `organizationHooks` already exist in `organization-options.ts`
-and can be extended; and `DEMO_MODE` is the established shape for a feature flag read at call time
-and published on `GET /config`.
+## Karar
 
-## Decision
+### 1. Bir merchant of record, ilk adaptör Paddle
 
-### 1. A merchant of record, with Paddle as the first adapter
+Üç sağlayıcı modeli tartıldı.
 
-Three provider models were weighed.
+| Model                                      | Dravcore ne olurdu                                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Merchant of record (Paddle, Lemon Squeezy) | Satıcı değil. Sağlayıcı müşteriye satar, faturayı keser, her yerde KDV ve satış vergisini toplar ve öder, ve bir takvime göre ödeme yapar  |
+| Ödeme işlemcisi (doğrudan Stripe)          | Satıcı. Dravcore faturaları keser ve sattığı her yargı alanında tüketim vergisini kaydettirmek, toplamak ve ödemekle sorumludur            |
+| Better Auth'un Stripe eklentisi            | Yukarıdaki gibi satıcı, ek olarak abonelik durumu auth kütüphanesinde ve organization `referenceId`'si üzerinden anahtarlanmış hâlde durur |
 
-| Model                                      | What Dravcore would be                                                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Merchant of record (Paddle, Lemon Squeezy) | Not the seller. The provider sells to the customer, issues the invoice, collects and remits VAT and sales tax everywhere, and pays out on a schedule  |
-| Payment processor (Stripe direct)          | The seller. Dravcore issues invoices and is responsible for registering, collecting and remitting consumption tax in every jurisdiction it sells into |
-| Better Auth's Stripe plugin                | The seller, as above, with subscription state held by the auth library and keyed on the organization `referenceId`                                    |
+**Karar bir merchant of record ve ilk adaptör Paddle.**
 
-**The decision is a merchant of record, and the first adapter is Paddle.**
+Gerekçe teknik değil. Kurul'u Türkiye'de yaşayan tek bir kişi sürdürüyor ve aboneliği çoğunlukla
+başka yerlerdeki müşterilere satacak. Doğrudan Stripe altında, sınır ötesi dijital hizmet KDV'si
+eşiği olan her yargı alanında sürdürücünün problemi olur: AB OSS kaydı, Birleşik Krallık KDV'si ve
+her birinin kendi beyan takvimi olan büyüyen bir liste. Bu iş solo bir projeye ölçeklenmez,
+ertelenemez (ilk satıştan itibaren tahakkuk eder) ve yanlış yapılması bir hata değil bir yükümlülük
+doğurur. Bir merchant of record her işlemde kayıtlı satıcıdır, bu da daha yüksek bir yüzde
+karşılığında bütün bunları sağlayıcıya taşır. İşlem başına birkaç puan daha ödemek, buradaki tek
+maliyeti, yani sürdürücünün kod yazarak düzeltemeyeceği maliyeti, geri satın almanın mümkün olan en
+ucuz yoludur.
 
-The argument is not technical. Kurul is maintained by one person, resident in Türkiye, selling a
-subscription to customers who will mostly be somewhere else. Under Stripe direct, cross-border
-digital-service VAT is the maintainer's problem in every jurisdiction that has a threshold: EU OSS
-registration, UK VAT, and a growing list of others, each with its own filing calendar. That work
-does not scale down to a solo project, it is not deferrable (it accrues from the first sale), and
-getting it wrong is a liability rather than a bug. A merchant of record is the seller of record on
-every transaction, which moves all of it to the provider in exchange for a higher percentage. Paying
-a few points more for the transaction is the cheapest possible way to buy back the only cost here
-that a maintainer cannot fix by writing code.
+Lemon Squeezy aynı braketteki aynı modeldir ve adlandırılmış alternatif olarak kalır; 2024'ten beri
+Stripe'ın parçasıdır, ki bu onun bağımsız yönünü bir cevap değil bir soru hâline getirir, ve ikisinin
+de güncel ücret tarifeleri ve koşulları bu kaydın üzerindeki tarihe güvenilerek değil, kayıt hayata
+geçirilirken yeniden kontrol edilir.
 
-Lemon Squeezy is the same model in the same bracket and stays as the named alternative;
-it has been part of Stripe since 2024, which makes its independent direction a question rather than
-an answer, and current fee schedules and terms for both are re-checked when this record is
-implemented rather than trusted from the date on it.
+**Better Auth'un Stripe eklentisi yazılı olarak reddediliyor**, yüzeysel olarak en iyi uyum olmasına
+rağmen: `Workspace` zaten Better Auth organization'ıdır ([ADR 0004](0004-auth-better-auth.md)) ve
+eklenti abonelikleri bir organization `referenceId`'si üzerinden anahtarlıyor, yani bu ADR'nin bir
+tabloya harcadığı eşleme bedava gelirdi. Dört nedenle reddediliyor. Bir Stripe eklentisidir,
+dolayısıyla onu benimsemek sağlayıcı sorusunu liyakate göre değil araca göre karara bağlar ve liyakat
+diğer yönü işaret ediyor. Durumu auth kütüphanesinin kendi tablolarında yaşar, dolayısıyla hak yazımı
+bütün bu işin asıl amacı olan `Workspace.planLimits` güncellemesiyle aynı transaction'ı paylaşamazdı.
+`/auth/*` altına mount olur, ki orası Nest router'ın altındaki ham Express'tir ve dinleyen bir
+exception filter yoktur, zaten oradaki organization firewall'ın kendi hata zarfını elle yazmasının
+nedeni de budur. Ve faturalandırma yüzeyini bir Better Auth major versiyonuna bağlardı. Sağlayıcı
+modeli bir gün yeniden ele alınır ve doğrudan Stripe kazanırsa, bu ret de onunla birlikte yeniden ele
+alınır.
 
-**Better Auth's Stripe plugin is rejected in writing**, even though it is superficially the best
-fit: `Workspace` _is_ the Better Auth organization ([ADR 0004](0004-auth-better-auth.md)), and the
-plugin keys subscriptions on an organization `referenceId`, so the mapping this ADR spends a table
-on would come for free. It is rejected for four reasons. It is a Stripe plugin, so adopting it
-decides the provider question by tooling instead of on the merits, and the merits point the other
-way. Its state lives in the auth library's own tables, so the entitlement write could not share a
-transaction with the `Workspace.planLimits` update that is the entire point of the exercise. It
-mounts under `/auth/*`, which is raw Express below the Nest router with no exception filter
-listening, which is why the organization firewall there already writes its own error envelope by
-hand. And it would tie the billing surface to a Better Auth major version. If the provider model is
-ever revisited and Stripe direct wins, this rejection is revisited with it.
+Kodun biçimi, tek bir implementasyonu olan tek bir `BillingProvider` port'udur;
+[ADR 0022](0022-attachment-storage.md)'nin `StorageBackend` için kullandığı biçim: ikinci bir adaptör
+gerçekten ikinci bir sağlayıcı gerektiğinde yazılır ve port, o ihtiyacın bir yeniden yazım olmaması
+için vardır.
 
-The code shape is one `BillingProvider` port with one implementation, in the shape
-[ADR 0022](0022-attachment-storage.md) used for `StorageBackend`: a second adapter is written when a
-second provider is actually needed, and the port exists so that need is not a rewrite.
-
-### 2. One `Subscription` row per workspace
+### 2. Workspace başına tek bir `Subscription` satırı
 
 ```prisma
 model Subscription {
@@ -115,25 +127,25 @@ model Subscription {
 }
 ```
 
-`workspaceId` is unique: a workspace has one plan, and the row is the answer to "what is this
-workspace paying for". `onDelete: Cascade` matches every other workspace-owned table; a deleted
-workspace's billing history lives with the provider, which is the system of record for money, not
-this database. `status` and `planCode` are strings rather than enums because their vocabularies
-belong to the provider and the catalogue respectively, and a Prisma enum makes every new value a
-migration.
+`workspaceId` tekildir: bir workspace'in tek bir planı vardır ve satır, "bu workspace ne için ödüyor"
+sorusunun cevabıdır. `onDelete: Cascade`, workspace'e ait diğer her tabloyla eşleşir; silinmiş bir
+workspace'in faturalandırma geçmişi, para konusunda kayıt sistemi olan sağlayıcıda yaşar, bu
+veritabanında değil. `status` ve `planCode` enum değil string'dir, çünkü sözlükleri sırasıyla
+sağlayıcıya ve kataloğa aittir ve bir Prisma enum'ı her yeni değeri bir migration yapar.
 
-A row exists only for a workspace that has been through checkout. No row means the free plan, which
-is also what every self-hosted workspace looks like, so the two cases share one code path instead of
-needing a synthetic free-plan row created by an `afterCreateOrganization` hook.
+Satır yalnızca checkout'tan geçmiş bir workspace için vardır. Satır yoksa ücretsiz plan demektir ve
+kendi kendine barındırılan her workspace de böyle görünür, dolayısıyla iki durum bir
+`afterCreateOrganization` hook'unun oluşturduğu yapay bir ücretsiz plan satırına ihtiyaç duymadan tek
+bir kod yolunu paylaşır.
 
-A second table, `BillingEvent`, is the idempotency ledger for section 4:
-`id String @id @default(uuid(7))` like every other row in this schema, then `provider`, `eventId` and
-`receivedAt`, with a unique index on `(provider, eventId)`. The unique pair is what the ledger is
-_read_ by and the reason the table exists; the id is not optional decoration, because
-[CLAUDE.md](../../CLAUDE.md) makes UUIDv7 the id of every row and the retention sweep this table
-enters below pages on `id` the way every other cursor in the API does.
+İkinci bir tablo, `BillingEvent`, 4. bölümün idempotency defteridir: bu şemadaki her satır gibi
+`id String @id @default(uuid(7))`, ardından `provider`, `eventId` ve `receivedAt`,
+`(provider, eventId)` üzerinde tekil bir indeksle. Tablonun var olma nedeni ve **okunduğu** anahtar
+o tekil çifttir; id ise isteğe bağlı bir süs değildir, çünkü [CLAUDE.md](../../CLAUDE.md) her
+satırın id'sini UUIDv7 yapıyor ve bu tablonun aşağıda girdiği saklama süpürmesi, API'deki her
+cursor gibi `id` üzerinden sayfalıyor.
 
-### 3. The plan catalogue is code, not rows
+### 3. Plan kataloğu satır değil kod
 
 ```ts
 const PLAN_CATALOG = {
@@ -142,291 +154,290 @@ const PLAN_CATALOG = {
 } as const satisfies Record<string, PlanDefinition>;
 ```
 
-`planCode` resolves through this constant to the exact `Workspace.planLimits` keys
-[ADR 0032](0032-plan-limits.md) already understands (`seats`, `boards`, `storageBytes`), and to a
-display name. There is no `Plan` table, for the reason the board template catalogue is also code:
-the rows would never be edited by anybody except a deploy, a table makes the catalogue a fixture
-every test and every environment has to seed, and a typed constant is a compile error when a plan
-gains a ceiling instead of a silent `undefined`. The numbers above are placeholders; the published
-tiers are a pricing decision, not an architecture one, and they land with the implementation.
+`planCode` bu sabit üzerinden, [ADR 0032](0032-plan-limits.md)'nin zaten anladığı tam
+`Workspace.planLimits` anahtarlarına (`seats`, `boards`, `storageBytes`) ve bir görünen ada çözülür.
+Bir `Plan` tablosu yoktur; board şablon kataloğunun da kod olmasının nedeniyle: satırları bir
+deploy'dan başka kimse düzenlemez, bir tablo kataloğu her testin ve her ortamın seed etmesi gereken
+bir fixture yapar ve tipli bir sabit, bir plan bir tavan kazandığında sessiz bir `undefined` yerine
+bir derleme hatası verir. Yukarıdaki sayılar yer tutucudur; yayımlanan katmanlar bir fiyatlandırma
+kararıdır, bir mimari kararı değil, ve implementasyonla birlikte gelir.
 
-The catalogue is instance-wide, not hosted-only. A self-hoster who never sets `BILLING_PROVIDER`
-never resolves a `planCode` at all, so the constant costs them nothing but the bytes.
+Katalog barındırılana özel değil, instance genelidir. `BILLING_PROVIDER`'ı hiç ayarlamayan biri hiçbir
+zaman bir `planCode` çözmez, dolayısıyla sabit ona bayt büyüklüğünden başka bir maliyet çıkarmaz.
 
-### 4. The entitlement write is one transaction, validated before it happens
+### 4. Hak yazımı tek bir transaction'dır ve yazmadan önce doğrulanır
 
-The only thing that assigns a plan is a provider webhook event: subscription created, updated,
-canceled, and payment failed. Handling one is:
+Plan atayan tek şey bir sağlayıcı webhook event'idir: abonelik oluşturuldu, güncellendi, iptal edildi
+ve ödeme başarısız. Birini işlemek şudur:
 
-1. Verify the signature over the raw body. An unverified request is `401` and nothing else happens.
-2. Resolve `planCode` through `PLAN_CATALOG` and **validate the resulting limit object before
-   writing it**, with the same predicate `parseWorkspacePlanOverride` applies when reading. An
-   unknown `planCode`, or a limit that is not a non-negative integer, is refused: log it, answer
-   `5xx` so the provider retries, and write nothing, which at this point is still literally true
-   because nothing has been written yet. This step exists because the reader drops what it cannot
-   use, so an unvalidated write of a bad shape does not fail, it grants unlimited.
-3. **In one `$transaction`:** insert into `BillingEvent`, upsert `Subscription`, and write
-   `Workspace.planLimits`. A unique-constraint violation on `(provider, eventId)` aborts that whole
-   transaction, which is exactly the right outcome: the event was already applied, nothing is
-   written twice, and the handler answers `200` and stops. Providers retry, and retrying is how
-   at-least-once delivery is supposed to look from the receiving end.
+1. İmzayı ham gövde üzerinde doğrula. Doğrulanmamış bir istek `401`'dir ve başka hiçbir şey olmaz.
+2. `planCode`'u `PLAN_CATALOG` üzerinden çöz ve **ortaya çıkan limit nesnesini yazmadan önce
+   doğrula**, `parseWorkspacePlanOverride`'ın okurken uyguladığı predicate'in aynısıyla. Bilinmeyen
+   bir `planCode` ya da negatif olmayan tam sayı olmayan bir limit reddedilir: logla, sağlayıcı
+   yeniden denesin diye `5xx` cevapla ve hiçbir şey yazma; bu noktada bu ifade harfiyen doğrudur,
+   çünkü henüz hiçbir şey yazılmamıştır. Bu adım, okuyucunun kullanamadığını düşürmesi yüzünden
+   vardır: kötü bir şeklin doğrulanmamış yazımı başarısız olmaz, sınırsız verir.
+3. **Tek bir `$transaction` içinde:** `BillingEvent`'e ekle, `Subscription`'ı upsert et ve
+   `Workspace.planLimits`'i yaz. `(provider, eventId)` üzerindeki bir tekillik ihlali o
+   transaction'ın tamamını geri alır ve doğru sonuç tam olarak budur: event zaten uygulanmıştır,
+   hiçbir şey iki kez yazılmaz, handler `200` cevaplar ve durur. Sağlayıcılar yeniden dener ve
+   en-az-bir-kere teslim, alıcı tarafından tam olarak böyle görünmelidir.
 
-**The ledger row is inside the transaction, not in front of it, and that ordering is the decision.**
-An idempotency ledger committed before the write it protects is a promise that the write happened,
-made before it did. Written that way, a refusal in step 2 or a crash between the two commits leaves
-an event marked applied and a workspace that never got its plan, and the retry the provider is being
-asked for is then answered `200` by the ledger row and dropped. Nothing outside the transaction
-records progress, so the only two outcomes are "event recorded and entitlement written" and
-"neither". A workspace whose `Subscription` row says "team" while its ceilings say "free" is the
-other failure mode the single transaction prevents, and it is the one that generates support mail.
+**Ledger satırı transaction'ın önünde değil içindedir ve asıl karar bu sıralamadır.** Koruduğu
+yazmadan önce commit edilen bir idempotency ledger'ı, yazma gerçekleşmeden önce verilmiş "gerçekleşti"
+sözüdür. Öyle yazıldığında 2. adımdaki bir ret ya da iki commit arasındaki bir çökme, uygulanmış
+işaretli bir event ile planını hiç almamış bir workspace bırakır; üstelik sağlayıcıdan istenen
+yeniden deneme de o ledger satırı yüzünden `200` cevaplanıp düşürülür. Transaction'ın dışında hiçbir
+şey ilerleme kaydetmez, dolayısıyla yalnızca iki sonuç vardır: "event kaydedildi ve hak yazıldı" ya
+da "hiçbiri". `Subscription` satırı "team" derken tavanları "free" diyen bir workspace, tek
+transaction'ın önlediği diğer hata biçimidir ve destek yazışması üreten de odur.
 
-**A daily reconcile job** re-reads every active subscription from the provider and re-applies the
-same write, in the `cleanup.worker.ts` shape: BullMQ, one repeating job, no start at all when
-`REDIS_URL` is unset. Webhooks are lossy in ways nobody controls (an outage during the retry window,
-a mis-scoped endpoint, an event type added by the provider), and a daily convergence pass is the
-difference between a customer who paid and is throttled for a day and one who is throttled until
-they write in. It is also the only mechanism that notices a subscription that ended without an event
-ever arriving.
+**Günlük bir mutabakat job'ı** her aktif aboneliği sağlayıcıdan yeniden okur ve aynı yazımı yeniden
+uygular, `cleanup.worker.ts` biçiminde: BullMQ, tek bir tekrarlayan job, `REDIS_URL` yokken hiç
+başlamaz. Webhook'lar kimsenin kontrol etmediği biçimlerde kayıplıdır (yeniden deneme penceresi
+sırasında bir kesinti, yanlış kapsamlı bir endpoint, sağlayıcının eklediği bir event tipi) ve günlük
+bir yakınsama geçişi, ödemesini yapmış ama bir gün boyunca kısıtlanan bir müşteriyle yazana kadar
+kısıtlanan bir müşteri arasındaki farktır. Ayrıca hiç event gelmeden sona ermiş bir aboneliği fark
+eden tek mekanizmadır.
 
-### 5. The receiver is mounted below the Nest router
+### 5. Alıcı Nest router'ın altına mount edilir
 
 ```
 POST /billing/webhooks/:provider
 ```
 
-Registered in `configure-app.ts` in the slot after `mountBetterAuth` and before the body parsers,
-with `express.raw({ type: 'application/json', limit: '64kb' })` scoped to that path, and a
-hand-written error envelope in the shape the organization firewall already uses there. Three things
-follow from that placement and are chosen for them: the raw bytes reach the signature check
-unparsed; the route sits outside a future `/v1` by construction, exactly as `/auth/*` does
-([ADR 0031](0031-api-versioning.md)), which is correct because its contract belongs to the provider
-and not to Kurul's API; and it never meets the global `SessionAuthGuard`, so there is no `@Public`
-annotation to forget.
+`configure-app.ts` içinde, `mountBetterAuth`'tan sonraki ve body parser'lardan önceki yuvaya, o
+path'e kapsanmış `express.raw({ type: 'application/json', limit: '64kb' })` ile ve oradaki organization
+firewall'ın zaten kullandığı biçimde elle yazılmış bir hata zarfıyla kaydedilir. Bu yerleşimden üç
+şey doğar ve zaten onlar için seçilmiştir: ham baytlar imza kontrolüne ayrıştırılmadan ulaşır; route
+tam olarak `/auth/*`'ın yaptığı gibi ([ADR 0031](0031-api-versioning.md)) yapısı gereği gelecekteki bir
+`/v1`'in dışında kalır, ki bu doğrudur çünkü kontratı Kurul'un API'sine değil sağlayıcıya aittir; ve
+global `SessionAuthGuard` ile hiç karşılaşmaz, dolayısıyla unutulacak bir `@Public` anotasyonu yoktur.
 
-The cost of skipping the global guards is that the throttler is skipped too. The compensations are
-in the handler: the 64 KB body cap, a signature check that runs before any database work, and a
-constant-time comparison. An unsigned request is `401` and costs one HMAC.
+Global guard'ları atlamanın bedeli, throttler'ın da atlanmasıdır. Telafiler handler'ın içindedir: 64
+KB gövde sınırı, herhangi bir veritabanı işinden önce çalışan bir imza kontrolü ve sabit zamanlı bir
+karşılaştırma. İmzasız bir istek `401`'dir ve bir HMAC'e mal olur.
 
-**Checkout is started from a session, by an owner.** `POST /workspaces/:workspaceId/billing/checkout`
-is `MemberRole.OWNER` and `@SessionOnly`, and returns a provider-hosted URL. Owner rather than
-`ADMIN_ROLES` because this one creates a payment obligation in someone's name, which is a narrower
-question than workspace administration; session-only for the reason the token routes are, that a
-standing credential should not be able to start a purchase.
+**Checkout bir oturumdan, bir owner tarafından başlatılır.**
+`POST /workspaces/:workspaceId/billing/checkout` `MemberRole.OWNER` ve `@SessionOnly`'dir ve
+sağlayıcının barındırdığı bir URL döner. `ADMIN_ROLES` yerine owner, çünkü bu, birinin adına bir ödeme
+yükümlülüğü yaratır ve bu, workspace yönetiminden daha dar bir sorudur; session-only ise token
+route'larının olduğu gerekçeyle: sürekli duran bir kimlik bilgisi bir satın alma başlatabilmemelidir.
 
-### 6. Failure is a grace period, and nothing is ever deleted
+### 6. Başarısızlık bir ödemesiz dönemdir ve hiçbir şey silinmez
 
-On a failed payment the workspace keeps its current ceilings until `graceUntil`, seven days by
-default. When the grace period expires the reconcile job writes the free plan's limits, and that is
-the whole downgrade: no board is deleted, no member is removed, no attachment is unlinked. ADR 0032's
-ceilings are soft by design and refuse only **new** writes, so a workspace over its new ceiling
-simply cannot add until it is back under, which is a state the plan-limit error envelope already
-explains to the user with a code, a limit and a current count.
+Başarısız bir ödemede workspace mevcut tavanlarını `graceUntil`'e kadar korur, varsayılan olarak yedi
+gün. Ödemesiz dönem dolduğunda mutabakat job'ı ücretsiz planın limitlerini yazar ve düşürmenin tamamı
+budur: hiçbir board silinmez, hiçbir üye çıkarılmaz, hiçbir dosya eki koparılmaz. ADR 0032'nin
+tavanları tasarımı gereği yumuşaktır ve yalnızca **yeni** yazmaları reddeder, dolayısıyla yeni
+tavanının üzerinde kalan bir workspace basitçe ekleme yapamaz; bu, plan limiti hata zarfının kullanıcıya
+bir kod, bir limit ve güncel bir sayıyla zaten açıkladığı bir durumdur.
 
-Deleting anything for non-payment would be the single most destructive thing this codebase could
-learn to do, on the least reliable input it has (a third party's opinion about a card), and no part
-of the product would be able to tell it apart from a bug.
+Ödememe yüzünden bir şey silmek, bu kod tabanının öğrenebileceği en yıkıcı şey olurdu ve sahip olduğu
+en güvenilmez girdi üzerine (bir üçüncü tarafın bir kart hakkındaki görüşü) kurulu olurdu; üstelik
+ürünün hiçbir parçası bunu bir hatadan ayırt edemezdi.
 
-### 7. Inert unless `BILLING_PROVIDER` is set
+### 7. `BILLING_PROVIDER` ayarlı değilse tamamen atıl
 
-`BILLING_PROVIDER` unset is the self-hosted default and means:
+`BILLING_PROVIDER`'ın ayarlı olmaması, kendi kendine barındırmanın varsayılanıdır ve şu demektir:
 
-- the billing module registers **no controller and no route**, so `POST /billing/webhooks/:provider`
-  and the checkout route do not exist;
-- no reconcile job is scheduled, and no queue is created;
-- `GET /workspaces/{workspaceId}/plan` answers `plan: null`;
-- `Workspace.planLimits` stays what [self-hosting.md](../self-hosting.md) says it is, a column an
-  operator writes by hand.
+- faturalandırma modülü **hiçbir controller ve hiçbir route** kaydetmez, yani
+  `POST /billing/webhooks/:provider` ve checkout route'u yoktur;
+- hiçbir mutabakat job'ı zamanlanmaz ve hiçbir queue oluşturulmaz;
+- `GET /workspaces/{workspaceId}/plan`, `plan: null` cevaplar;
+- `Workspace.planLimits`, [self-hosting.md](../self-hosting.md)'nin söylediği şey olarak kalır: bir
+  operatörün elle yazdığı bir kolon.
 
-This is a contract, not an intention, so it is proven the way contracts are: an e2e that boots the
-API with `BILLING_PROVIDER` unset and asserts, document by document,
+Bu bir niyet değil bir kontrattır, dolayısıyla kontratların kanıtlandığı gibi kanıtlanır: API'yi
+`BILLING_PROVIDER` ayarlı değilken açan ve belge belge şunları doğrulayan bir e2e:
 
-- that `GET /config` is **byte-identical** to the `InstanceConfigDto` the same build serves with a
-  provider configured. Billing publishes no capability there at all, in either direction, so this
-  one is an exact-equality assertion with nothing carved out of it;
-- that `GET /workspaces/{workspaceId}/plan` differs from the document served before this record by
-  **exactly one member and nothing else**: the `plan` key section 8 adds, whose value is `null`.
-  `limits` and `usage` are byte-identical, and no other key appears anywhere in the response;
-- that `POST /billing/webhooks/:provider` and the checkout route both answer `404`.
+- `GET /config`, aynı build'in sağlayıcı yapılandırılmışken sunduğu `InstanceConfigDto` ile **bayt
+  bayt aynıdır**. Faturalandırma oraya hiçbir yönde hiçbir yetenek yayımlamaz, dolayısıyla bu, hiçbir
+  istisnası olmayan tam eşitlik iddiasıdır;
+- `GET /workspaces/{workspaceId}/plan`, bu kayıttan önce sunulan belgeden **tam olarak tek bir üye
+  kadar ve başka hiçbir şeyle** ayrılır: 8. bölümün eklediği ve değeri `null` olan `plan` anahtarı.
+  `limits` ve `usage` bayt bayt aynıdır ve yanıtın hiçbir yerinde başka bir anahtar görünmez;
+- `POST /billing/webhooks/:provider` ve checkout route'u `404` cevaplar.
 
-The second assertion is deliberately narrower than "byte-identical", and the difference is the point
-rather than a concession. `plan` is a member of `WorkspacePlanDto` on **every** instance, not a
-hosted-only key, because a client that has to branch on whether a field exists is a client that has
-to know how the server was deployed. The property worth testing is therefore not that the document
-never changed, it is that turning billing off adds nothing beyond the one `null` the published type
-already promises. Asserting byte-equality on `/plan` would assert the opposite of what section 8
-decides, and a test that cannot pass is worse than no test.
+İkinci iddia "bayt bayt aynı"dan bilinçli olarak daha dardır ve bu fark bir taviz değil, kararın
+kendisidir. `plan`, yalnızca barındırılana özel bir anahtar değil, **her** instance'ta
+`WorkspacePlanDto`'nun bir üyesidir; çünkü bir alanın var olup olmadığına göre dallanmak zorunda kalan
+bir istemci, sunucunun nasıl kurulduğunu bilmek zorunda kalan bir istemcidir. Dolayısıyla test etmeye
+değer özellik, belgenin hiç değişmemiş olması değil, faturalandırmayı kapatmanın yayımlanan tipin
+zaten vaat ettiği o tek `null`'ın ötesinde hiçbir şey eklememesidir. `/plan` üzerinde bayt eşitliği
+iddia etmek, 8. bölümün kararının tersini iddia etmek olurdu ve geçemeyecek bir test, hiç test
+olmamasından kötüdür.
 
-ADR 0028 promises self-hosters the same code with nothing held back; the reverse promise, that the
-code they run holds nothing _extra_, needs a test rather than a paragraph.
+ADR 0028, kendi kendine barındıranlara hiçbir şey saklanmadan aynı kodu vaat ediyor; tersi vaat, yani
+çalıştırdıkları kodun **fazladan** hiçbir şey barındırmadığı, bir paragraf değil bir test ister.
 
-### 8. `WorkspacePlanDto` gains a plan identity, additively
+### 8. `WorkspacePlanDto` eklemeli biçimde bir plan kimliği kazanır
 
 ```ts
 interface WorkspacePlanDto {
   limits: WorkspacePlanLimitsDto;
   usage: WorkspacePlanUsageDto;
-  /** `null` on any instance with no billing provider configured. */
+  /** Faturalandırma sağlayıcısı yapılandırılmamış her instance'ta `null`. */
   plan: { code: string; name: string; manageUrl: string | null } | null;
 }
 ```
 
-The refusal envelope already names the ceiling that was hit and `plan-limit.exception.ts` already
-anticipates "a hosted deployment mapping `planLimit.code` to an upgrade prompt", but nothing tells
-a client which plan the workspace is on or where to change it. Adding it to the existing read keeps
-ADR 0032's "two read surfaces" rule intact instead of introducing a third. `manageUrl` is the
-provider's customer portal and is non-null only for an owner, because it is a link into a billing
-account; every other member sees the code and the name.
+Ret zarfı hangi tavana çarpıldığını zaten söylüyor ve `plan-limit.exception.ts` "barındırılan bir
+deployment'ın `planLimit.code`'u bir yükseltme istemine eşlemesi"ni zaten öngörüyor, ama hiçbir şey bir
+istemciye workspace'in hangi planda olduğunu ya da bunu nereden değiştireceğini söylemiyor. Bunu
+mevcut okumaya eklemek, üçüncü bir yüzey açmak yerine ADR 0032'nin "iki okuma yüzeyi" kuralını
+koruyor. `manageUrl` sağlayıcının müşteri portalıdır ve yalnızca bir owner için null olmayan bir
+değerdir, çünkü bir faturalandırma hesabına giden bir bağlantıdır; diğer her üye kodu ve adı görür.
 
-### 9. Soft ceilings become billing boundaries, which is a new trigger for the advisory lock
+### 9. Yumuşak tavanlar faturalandırma sınırı olur, bu da advisory kilit için yeni bir tetiktir
 
-[ADR 0027](0027-attachment-quotas.md) considered a per-workspace `pg_advisory_xact_lock` and
-rejected it in writing, and [ADR 0032](0032-plan-limits.md) restated the same trade for counts:
-check-then-write, overshoot bounded by concurrency, "**Trigger:** a report of a ceiling being raced
-deliberately". `BoardService` carries a comment pointing at that rejection.
+[ADR 0027](0027-attachment-quotas.md) workspace başına bir `pg_advisory_xact_lock`'u değerlendirip
+yazılı olarak reddetti ve [ADR 0032](0032-plan-limits.md) aynı takası sayımlar için yineledi:
+oku-sonra-yaz, eşzamanlılıkla sınırlı aşım, "**Tetikleyici:** bir tavanın kasten yarıştırıldığına
+dair bir rapor". `BoardService` o reddi işaret eden bir yorum taşıyor.
 
-Both rejections were correct for a ceiling that is an operator guard-rail. **Neither survives a
-ceiling that is a revenue boundary**: a limit a customer can exceed by sending ten requests at once
-is not a plan.
+Her iki ret de operatör korkuluğu olan bir tavan için doğruydu. **Hiçbiri gelir sınırı olan bir tavanda
+ayakta kalmıyor**: bir müşterinin aynı anda on istek göndererek aşabildiği bir limit bir plan
+değildir.
 
-This is a new trigger, not one of the triggers those records named, and the difference is worth
-being exact about. ADR 0027's are "a measured deployment where concurrent overshoot materially
-exceeds one `ATTACHMENT_MAX_BYTES`, or an operator report of the quota being raced deliberately",
-and ADR 0032 restates the same pair for counts. Neither has fired, and this record does not claim
-otherwise. What changed is what the ceiling _means_, which is a reason those records could not have
-weighed because there was no revenue behind a ceiling when they were written. So the ground is
-stated here and the earlier records are revisited on it, rather than being read as having predicted
-this. So, **as part of the billing slice and not before it**, a per-workspace
-`pg_advisory_xact_lock(hashtext(workspaceId))` is taken inside the transaction for board creation,
-invitation creation and acceptance, and attachment creation, with a single fixed key around
-sign-up for the instance-wide user ceiling. `GET .../plan` keeps its current unlocked reads, which
-are a display and can be stale.
+Bu yeni bir tetiktir, o kayıtların adlandırdığı tetiklerden biri değil ve farkı net söylemeye değer.
+ADR 0027'ninkiler "eşzamanlı aşımın tek bir `ATTACHMENT_MAX_BYTES`'ı kayda değer biçimde aştığı
+ölçülmüş bir kurulum ya da kotanın kasten yarıştırıldığına dair operatör raporu"dur ve ADR 0032 aynı
+çifti sayımlar için yineler. Hiçbiri ateşlenmedi ve bu kayıt aksini iddia etmiyor. Değişen şey, tavanın ne
+**anlama geldiği**; o kayıtların tartamayacağı bir gerekçe bu, çünkü yazıldıklarında bir tavanın
+arkasında gelir yoktu. Dolayısıyla zemin burada yazılıyor ve önceki kayıtlar bu zemin üzerinde yeniden
+ele alınıyor, bunu önceden görmüş gibi okunmuyorlar. Dolayısıyla, **faturalandırma diliminin parçası
+olarak, ondan önce değil**, board oluşturma, davet oluşturma ve kabul etme ve dosya
+eki oluşturma için transaction içinde workspace başına bir
+`pg_advisory_xact_lock(hashtext(workspaceId))` alınır; instance geneli kullanıcı tavanı için de kayıt
+etrafında tek bir sabit anahtar. `GET .../plan` mevcut kilitsiz okumalarını korur; onlar bir gösterimdir
+ve bayat olabilir.
 
-The order matters: the lock lands with billing, so an instance that never assigns a plan never pays
-for the serialisation, and ADR 0027's argument that it "serializes every upload in a workspace"
-stays true of exactly the deployments it was written about.
+Sıra önemli: kilit faturalandırmayla iner, böylece hiç plan atamayan bir instance serileştirmenin
+bedelini hiç ödemez ve ADR 0027'nin "bir workspace'in tüm yüklemelerini serileştirir" argümanı tam olarak
+hakkında yazıldığı deployment'lar için doğru kalır.
 
-### 10. Token caps are plan quantities, deferred to the catalogue
+### 10. Token tavanları plan niceliğidir, kataloğa ertelenir
 
-A member can mint unlimited personal access tokens today, and a token's expiry is optional, so a
-never-expiring credential is possible. For a self-hosted team that is not a defect. For a hosted
-service, unbounded credentials per seat are a support and revocation problem. The answer is
-**not** two new environment variables: ADR 0028 says paid differences are quantities, and
-`PLAN_CATALOG` is now where a quantity lives. A `maxTokensPerMember` key enters the catalogue and
-the plan-limit resolver when the hosted service has customers, refusing with the existing
-`Plan Limit Exceeded` envelope. A maximum token **lifetime** is a different question, an API 1.0
-hardening one rather than a plan one, and stays with the `/v1` remainder.
+Bugün bir üye sınırsız personal access token üretebilir ve bir token'ın son kullanma tarihi
+opsiyoneldir, yani hiç sona ermeyen bir kimlik bilgisi mümkündür. Kendi kendine barındıran bir takım
+için bu bir kusur değildir. Barındırılan bir servis için koltuk başına sınırsız kimlik bilgisi bir
+destek ve iptal problemidir. Cevap **iki yeni ortam değişkeni değildir**: ADR 0028 ücretli farkların
+nicelik olduğunu söylüyor ve `PLAN_CATALOG` artık bir niceliğin yaşadığı yer. Barındırılan servisin
+müşterileri olduğunda kataloğa ve plan limiti çözümleyicisine bir `maxTokensPerMember` anahtarı girer
+ve mevcut `Plan Limit Exceeded` zarfıyla reddeder. Azami token **ömrü** farklı bir sorudur, bir plan
+sorusundan çok bir API 1.0 sertleştirme sorusudur ve `/v1` kalanıyla birlikte durur.
 
-### 11. Hosted operational prerequisites, listed and not decided
+### 11. Barındırma için operasyonel ön koşullar, listelenir ve karara bağlanmaz
 
-Running the hosted service needs decisions this record deliberately does not make, because each is
-its own ADR and none of them is on the critical path to charging a customer. They are listed so
-that "what else does hosting need" has an answer that is not a memory:
+Barındırılan servisi işletmek, bu kaydın bilinçli olarak vermediği kararlar gerektirir; her biri kendi
+ADR'sidir ve hiçbiri bir müşteriden ücret almanın kritik yolunda değildir. "Barındırma başka ne
+gerektiriyor" sorusunun cevabı hafıza olmasın diye listeleniyorlar:
 
-| Prerequisite                                                                                                                                                                 | Trigger for deciding it                                                                   |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Object storage behind the existing `StorageBackend` port (only `disk-storage-backend.ts` exists; ADR 0022 reserved the port)                                                 | The first hosted deployment that needs a second API instance                              |
-| A metrics surface (`docs/development.md` states there is no Prometheus, no Grafana, no log shipper, by design)                                                               | The first availability commitment made to a customer                                      |
-| Secrets from a manager rather than `.env`                                                                                                                                    | The first operator who is not the maintainer                                              |
-| Multi-instance behaviour end to end (Socket.io already has the Redis adapter; the upload byte counters fall back to process memory when Redis errors, which is per-instance) | Same trigger as object storage; the Compose file already names the single-host constraint |
-| Per-tenant backup and restore                                                                                                                                                | The first customer request to export or restore one workspace                             |
+| Ön koşul                                                                                                                                                                  | Karar tetiği                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Mevcut `StorageBackend` port'unun arkasında nesne depolama (yalnızca `disk-storage-backend.ts` var; ADR 0022 port'u ayırmıştı)                                            | İkinci bir API instance'ına ihtiyaç duyan ilk barındırılan deployment              |
+| Bir metrik yüzeyi (`docs/development.md` tasarım gereği Prometheus, Grafana ve log shipper olmadığını söylüyor)                                                           | Bir müşteriye verilen ilk erişilebilirlik taahhüdü                                 |
+| Sırların `.env` yerine bir secrets manager'dan gelmesi                                                                                                                    | Sürdürücü olmayan ilk operatör                                                     |
+| Uçtan uca çok instance davranışı (Socket.io'da Redis adapter zaten var; yükleme bayt sayaçları Redis hata verdiğinde process belleğine düşüyor, ki bu instance başınadır) | Nesne depolamayla aynı tetik; Compose dosyası tek-host kısıtını zaten adlandırıyor |
+| Tenant başına yedekleme ve geri yükleme                                                                                                                                   | Tek bir workspace'i dışa aktarma veya geri yükleme yönündeki ilk müşteri talebi    |
 
-## Rationale
+## Gerekçe
 
-**Why the tax argument outranks the fee argument.** A merchant of record costs more per transaction
-than a processor, and on a spreadsheet that is the whole comparison. It is the wrong spreadsheet.
-The cost that actually threatens a solo project is not a percentage, it is a recurring compliance
-obligation in jurisdictions the maintainer does not live in, with deadlines, filings and penalties,
-which cannot be automated away by the person paying it and which arrives with the first sale rather
-than at scale. Paying a provider to be the seller converts an open-ended legal exposure into a line
-item. If Kurul ever reaches a volume where the percentage genuinely dominates, that is a good
-problem, the port from section 1 is where a second adapter goes, and this record can be superseded
-by one written from evidence instead of from prudence.
+**Vergi argümanı neden ücret argümanından üstün.** Bir merchant of record işlem başına bir işlemciden
+daha pahalıdır ve bir tabloda karşılaştırmanın tamamı budur. Yanlış tablodur. Solo bir projeyi
+gerçekten tehdit eden maliyet bir yüzde değil, sürdürücünün yaşamadığı yargı alanlarında, son
+tarihleri, beyanları ve cezaları olan, ödeyen kişinin otomatikleştiremeyeceği ve ölçekte değil ilk
+satışta gelen tekrar eden bir uyum yükümlülüğüdür. Satıcı olması için bir sağlayıcıya ödeme yapmak,
+açık uçlu bir hukuki maruziyeti bir gider kalemine çevirir. Kurul bir gün yüzdenin gerçekten baskın
+olduğu bir hacme ulaşırsa, bu iyi bir problemdir, 1. bölümdeki port ikinci adaptörün gideceği yerdir ve
+bu kayıt, ihtiyattan değil kanıttan yazılmış bir kayıtla yerini bırakabilir.
 
-**Why the entitlement write validates before it writes.** This is the one place where
-ADR 0032's deliberately forgiving reader becomes dangerous. Dropping an unusable key is right for a
-column written by hand and read on every request; it means a bad write degrades to the instance
-default rather than to an outage. But "degrades to the instance default" on a hosted instance with
-no `PLAN_MAX_*` variables set means _unlimited_, so an unvalidated writer turns a typo into a free
-enterprise plan and nothing anywhere reports it. The validation is four lines and it is the reason
-the write is safe to automate at all.
+**Hak yazımı neden yazmadan önce doğrular.** Bu, ADR 0032'nin bilinçli olarak bağışlayıcı okuyucusunun
+tehlikeli hâle geldiği tek yerdir. Kullanılamaz bir anahtarı düşürmek, elle yazılan ve her istekte
+okunan bir kolon için doğrudur; kötü bir yazmanın bir kesintiye değil instance varsayılanına
+düşmesini sağlar. Ama hiçbir `PLAN_MAX_*` değişkeni ayarlı olmayan barındırılan bir instance'ta
+"instance varsayılanına düşer" _sınırsız_ demektir, dolayısıyla doğrulamayan bir yazıcı bir yazım
+hatasını bedava bir kurumsal plana çevirir ve bunu hiçbir yerde hiçbir şey raporlamaz. Doğrulama dört
+satırdır ve yazımın otomatikleştirilmesini güvenli kılan şeydir.
 
-**Why a daily reconcile in addition to webhooks.** Webhook delivery is at-least-once at best and
-best-effort in practice; [ADR 0033](0033-webhook-delivery-and-failure-policy.md) says the same thing about Kurul's own outbound deliveries and
-tells consumers to reconcile. It would be inconsistent to demand that of Kurul's consumers and then
-trust a provider's events as the only source of truth here. The reconcile pass is also what makes
-the grace expiry work without a timer: it is a daily job that already visits every subscription.
+**Webhook'lara ek olarak neden günlük bir mutabakat.** Webhook teslimi en iyi ihtimalle
+en-az-bir-keredir ve pratikte elden gelenin en iyisidir; [ADR 0033](0033-webhook-delivery-and-failure-policy.md) Kurul'un kendi dışa giden teslimleri
+için aynı şeyi söylüyor ve tüketicilere mutabakat kurmalarını söylüyor. Bunu Kurul'un tüketicilerinden
+istemek ve sonra burada bir sağlayıcının event'lerine tek doğruluk kaynağı olarak güvenmek tutarsız
+olurdu. Mutabakat geçişi ayrıca ödemesiz dönem sonunu bir zamanlayıcı olmadan işleten şeydir: zaten
+her aboneliği ziyaret eden günlük bir job'dır.
 
-**Why the receiver is below Nest rather than a `@Public()` controller.** Both work. Below Nest, the
-raw body is available without a Nest-specific opt-in, the route is outside `/v1` by construction so
-it never becomes part of the versioned contract, and there is no chance of a future global guard
-quietly applying to it. In Nest, the route would inherit the exception filter and the OpenAPI
-document, which sounds like a gain until you notice that neither is wanted: the provider does not
-read Kurul's error envelope, and publishing the receiver in the API documentation invites callers
-it does not have.
+**Alıcı neden `@Public()` bir Nest controller değil de Nest'in altında.** İkisi de çalışır. Nest'in
+altında ham gövde Nest'e özgü bir opt-in olmadan hazırdır, route yapısı gereği `/v1`'in dışındadır ve
+asla versiyonlanmış kontratın parçası olmaz, ve gelecekteki global bir guard'ın sessizce ona uygulanma
+ihtimali yoktur. Nest içinde route exception filter'ı ve OpenAPI belgesini miras alırdı, ki bu bir
+kazanç gibi duruyor ta ki ikisinin de istenmediği fark edilene kadar: sağlayıcı Kurul'un hata zarfını
+okumaz ve alıcıyı API dokümantasyonunda yayımlamak, sahip olmadığı çağıranları davet eder.
 
-**Why nothing is deleted on non-payment.** Because the product cannot distinguish "this customer
-stopped paying" from "this provider had a bad day", and the two have the same webhook. Refusing new
-writes is reversible by paying; deleting a board is not reversible by anything. The plan-limit layer
-was built to refuse rather than to destroy, and billing should not be the first caller to ask it for
-more than that.
+**Ödememede neden hiçbir şey silinmez.** Çünkü ürün "bu müşteri ödemeyi bıraktı" ile "bu sağlayıcının
+günü kötüydü"yü ayırt edemez ve ikisinin webhook'u aynıdır. Yeni yazmaları reddetmek ödeyerek geri
+alınabilir; bir board'u silmek hiçbir şeyle geri alınamaz. Plan limiti katmanı yok etmek için değil
+reddetmek için inşa edildi ve faturalandırma, ondan bundan fazlasını isteyen ilk çağıran olmamalı.
 
-## Consequences
+## Sonuçlar
 
-- **The self-hosted product must be provably unchanged.** Section 7's e2e is the acceptance
-  criterion for the whole slice, not a nice-to-have. Without it, "off by default" is a claim about
-  code that the code does not check, and the first regression is discovered by a self-hoster.
-- **New tables mean new retention rows.** `BillingEvent` is append-only and grows with every
-  provider retry, so it enters [ADR 0020](0020-data-retention.md)'s table with a window (90 days is
-  the proposal, long enough to answer "did we apply that event" and short enough that the ledger
-  never needs an index for the sweep). `Subscription` has no window: it is one row per paying
-  workspace and it cascades with its workspace.
-- **The advisory lock changes measured behaviour on hosted instances.** Board creation, invitation
-  creation and acceptance, and attachment creation serialise per workspace. That is a real latency
-  cost under concurrency and it is accepted here for the deployments that need exact ceilings, on a
-  trigger this record states rather than one ADR 0027 predicted.
-- **On acceptance, [ROADMAP.md](../../ROADMAP.md) and [api-conventions.md](../api-conventions.md)
-  change and this record does not change them.** The "Hosted service billing and plan assignment"
-  row gains a link here and a first sub-item (the ADR itself), its acceptance criterion grows the
-  inertness e2e, and the `Plan limits` section of api-conventions gains the `plan` member of
-  `WorkspacePlanDto` with its Turkish mirror. `apps/api/openapi.json` is regenerated in the same
-  pull request as the DTO change, because CI fails when the code and the document disagree.
-- **[ADR 0027](0027-attachment-quotas.md) and [ADR 0032](0032-plan-limits.md) are partially
-  reversed by section 9 and their index rows say so.** Both keep the status they have and gain an
-  annotation in the shape [0011](0011-label-task-metadata-permissions.md) and
-  [0022](0022-attachment-storage.md) already use, naming this record: their advisory-lock rejections
-  stand for a ceiling that is an operator guard-rail and are revisited here for one that is a
-  revenue boundary. A reader who arrives at 0027 from the index should not have to reach 0034 to
-  learn that.
-- **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` and the Turkish mirrors gain
-  `BILLING_PROVIDER` and the provider's key and signing-secret variables**, all unset, with the
-  paragraph that says what unset means. A variable that is not forwarded in the Compose `api`
-  environment block does not exist for anyone running the published stack, and that is now checked
-  rather than remembered: `scripts/lib/compose-env.test.mjs` fails the build when
-  `docker-compose.yml` drops a setting the API reads.
-- **A pricing decision is now blocking a code decision, and that is the right way round.**
-  `PLAN_CATALOG`'s numbers cannot be written until the tiers are chosen. Everything else in this
-  record can be built against placeholder tiers, which is why the catalogue is one constant and not
-  a schema.
-- **Money makes a new class of incident.** A signature check that regresses, a reconcile job that
-  writes the free plan to a paying workspace, an event applied twice: each of these is now a
-  customer-visible failure with a support cost, in a codebase whose worst current failure is a lost
-  email. The idempotency ledger, the single transaction and the validation step are all here for
-  that reason, and none of them is optional.
+- **Kendi kendine barındırılan ürünün değişmediği kanıtlanabilmeli.** 7. bölümün e2e'si bütün dilimin
+  kabul kriteridir, olsa iyi olur denen bir şey değil. O olmadan "varsayılan olarak kapalı", kodun
+  kendisinin kontrol etmediği, kod hakkında bir iddiadır ve ilk regresyonu kendi kendine barındıran
+  biri keşfeder.
+- **Yeni tablolar yeni saklama satırları demektir.** `BillingEvent` yalnızca ekleme yapılan bir tablodur
+  ve her sağlayıcı yeniden denemesiyle büyür, dolayısıyla bir pencereyle
+  [ADR 0020](0020-data-retention.md)'nin tablosuna girer (öneri 90 gün: "o event'i uyguladık mı"
+  sorusunu cevaplayacak kadar uzun, defterin süpürme için asla indekse ihtiyaç duymayacağı kadar kısa).
+  `Subscription`'ın penceresi yoktur: ödeme yapan workspace başına tek bir satırdır ve workspace'iyle
+  birlikte cascade eder.
+- **Advisory kilit barındırılan instance'larda ölçülebilir davranışı değiştirir.** Board oluşturma,
+  davet oluşturma ve kabul etme ve dosya eki oluşturma workspace başına serileşir. Bu, eşzamanlılık
+  altında gerçek bir gecikme maliyetidir ve tam tavana ihtiyaç duyan deployment'lar için, ADR 0027'nin
+  önceden gördüğü bir tetikle değil, bu kaydın yazdığı bir tetikle burada kabul ediliyor.
+- **Kabul edilirse [ROADMAP.md](../../ROADMAP.md) ve
+  [api-conventions.md](../api-conventions.md) değişir, bu kayıt onları değiştirmez.** "Hosted service
+  billing and plan assignment" satırı buraya bir link ve ilk bir alt maddesi (ADR'nin kendisi) kazanır,
+  kabul kriteri atıllık e2e'siyle büyür ve api-conventions'ın `Plan limitleri` bölümü
+  `WorkspacePlanDto`'nun `plan` üyesini Türkçe aynasıyla kazanır. `apps/api/openapi.json` DTO
+  değişikliğiyle aynı pull request'te yeniden üretilir, çünkü kod ile belge uyuşmazsa CI başarısız olur.
+- **[ADR 0027](0027-attachment-quotas.md) ve [ADR 0032](0032-plan-limits.md), 9. bölümce kısmen geri
+  alınır ve indeks satırları bunu söyler.** İkisi de mevcut durumunu korur ve
+  [0011](0011-label-task-metadata-permissions.md) ile [0022](0022-attachment-storage.md)'nin zaten
+  kullandığı biçimde, bu kaydı adlandıran bir not kazanır: advisory kilit retleri, operatör korkuluğu
+  olan bir tavan için geçerliliğini koruyor ve gelir sınırı olan bir tavan için burada yeniden ele
+  alınıyor. İndeksten 0027'ye gelen bir okuyucunun bunu öğrenmek için 0034'e kadar gitmesi
+  gerekmemeli.
+- **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` ve Türkçe aynaları `BILLING_PROVIDER`'ı
+  ve sağlayıcının anahtar ve imzalama sırrı değişkenlerini kazanır**, hepsi ayarsız, ve ayarsızın ne
+  demek olduğunu söyleyen paragrafla. Compose'un `api` environment bloğunda forward edilmeyen bir
+  değişken, yayımlanan yığını çalıştıran hiç kimse için var değildir; bu artık hatırlanan değil
+  denetlenen bir şey: `scripts/lib/compose-env.test.mjs`, `docker-compose.yml` API'nin okuduğu bir
+  ayarı düşürdüğünde build'i düşürür.
+- **Artık bir fiyatlandırma kararı bir kod kararını bekletiyor ve doğru sıra bu.** `PLAN_CATALOG`'un
+  sayıları, katmanlar seçilmeden yazılamaz. Bu kayıttaki diğer her şey yer tutucu katmanlara karşı inşa
+  edilebilir; kataloğun bir şema değil tek bir sabit olmasının nedeni de budur.
+- **Para yeni bir olay sınıfı yaratır.** Regresyona uğrayan bir imza kontrolü, ödeme yapan bir
+  workspace'e ücretsiz planı yazan bir mutabakat job'ı, iki kez uygulanan bir event: bunların her biri
+  artık, en kötü mevcut hatası kaybolan bir e-posta olan bir kod tabanında, destek maliyeti olan ve
+  müşterinin gördüğü bir başarısızlıktır. Idempotency defteri, tek transaction ve doğrulama adımı bu
+  yüzden var ve hiçbiri opsiyonel değil.
 
-## Alternatives considered
+## Değerlendirilen Alternatifler
 
-| Alternative                                                                        | Why not                                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stripe direct                                                                      | Makes a solo Türkiye-resident maintainer the seller of record and therefore responsible for cross-border VAT registration and filing everywhere they sell                                                                               |
-| Better Auth's Stripe plugin, keyed on the organization `referenceId`               | Decides the provider by tooling; keeps subscription state in the auth library's tables, outside the transaction that writes `planLimits`; mounts under `/auth/*` where no exception filter runs; couples billing to a Better Auth major |
-| A `Plan` table with rows per tier                                                  | A catalogue nothing but a deploy ever edits, made into a fixture every test and every environment must seed, losing compile-time errors when a tier gains a ceiling                                                                     |
-| Ceilings stored on the `Subscription` row                                          | Duplicates ADR 0032's column and creates a second answer to "what may this workspace do", free to disagree with the first                                                                                                               |
-| A free `Subscription` row created for every workspace by `afterCreateOrganization` | A row per workspace on every self-hosted instance to represent the absence of billing; "no row means free" needs no hook and no migration for existing workspaces                                                                       |
-| Trusting provider webhooks with no reconcile job                                   | A missed or mis-scoped event leaves a paying customer throttled until they complain; there is nothing that notices a subscription that ended without an event                                                                           |
-| Applying an event without an idempotency ledger                                    | Providers retry by design, and a retried "subscription updated" would re-run the write; the unique index is what makes replay free                                                                                                      |
-| Writing `planLimits` without validating the catalogue first                        | `parseWorkspacePlanOverride` drops what it cannot parse, so a bad write grants unlimited instead of failing, and nothing reports it                                                                                                     |
-| A receiver as a `@Public()` Nest controller                                        | Needs a raw-body opt-in, a throttle exemption and a guard exemption, and would join the versioned API surface that the provider's contract has no business in                                                                           |
-| Suspending or deleting data on non-payment                                         | The product cannot tell a lapsed customer from a provider outage, and refusing new writes is reversible where deleting a board is not                                                                                                   |
-| A separate `GET /workspaces/{id}/subscription` endpoint                            | A third read surface for plan state, where ADR 0032 deliberately settled on two; the plan identity is additive on the existing one                                                                                                      |
-| `PAT_MAX_TOKENS` and `PAT_MAX_LIFETIME_DAYS` as environment knobs                  | Adds two documented variables and a `/config` field for a hosted-only concern; ADR 0028 says paid differences are quantities, and the catalogue is where quantities live                                                                |
-| Taking the advisory lock now, ahead of billing                                     | Silently contradicts ADR 0027's written rejection for deployments whose ceilings are still operator guard-rails; the trigger is a paid plan, so it ships with one                                                                       |
+| Alternatif                                                                      | Neden değil                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Doğrudan Stripe                                                                 | Türkiye'de yaşayan solo bir sürdürücüyü kayıtlı satıcı yapar ve sattığı her yerde sınır ötesi KDV kaydı ile beyanından sorumlu kılar                                                                                                                        |
+| Better Auth'un organization `referenceId`'siyle anahtarlanan Stripe eklentisi   | Sağlayıcıyı araca göre karara bağlar; abonelik durumunu auth kütüphanesinin tablolarında, `planLimits`'i yazan transaction'ın dışında tutar; exception filter'ın çalışmadığı `/auth/*` altına mount olur; faturalandırmayı bir Better Auth major'una bağlar |
+| Katman başına satırları olan bir `Plan` tablosu                                 | Bir deploy'dan başka kimsenin düzenlemediği bir kataloğu her testin ve her ortamın seed etmesi gereken bir fixture yapar, bir katman tavan kazandığında derleme hatasını kaybeder                                                                           |
+| Tavanların `Subscription` satırında saklanması                                  | ADR 0032'nin kolonunu çoğaltır ve "bu workspace ne yapabilir" sorusuna, ilkiyle çelişmekte özgür ikinci bir cevap yaratır                                                                                                                                   |
+| Her workspace için `afterCreateOrganization` ile ücretsiz `Subscription` satırı | Faturalandırmanın yokluğunu temsil etmek için kendi kendine barındırılan her instance'ta workspace başına bir satır; "satır yoksa ücretsiz" ne hook ne de mevcut workspace'ler için migration ister                                                         |
+| Mutabakat job'ı olmadan sağlayıcı webhook'larına güvenmek                       | Kaçırılmış ya da yanlış kapsamlı bir event, ödeme yapan bir müşteriyi şikâyet edene kadar kısıtlı bırakır; hiç event gelmeden sona eren bir aboneliği fark eden bir şey yoktur                                                                              |
+| Idempotency defteri olmadan event uygulamak                                     | Sağlayıcılar tasarım gereği yeniden dener ve tekrarlanan bir "abonelik güncellendi" yazımı yeniden çalıştırırdı; tekrarı bedava kılan şey tekil indekstir                                                                                                   |
+| Kataloğu doğrulamadan `planLimits` yazmak                                       | `parseWorkspacePlanOverride` ayrıştıramadığını düşürür, dolayısıyla kötü bir yazma başarısız olmak yerine sınırsız verir ve bunu hiçbir şey raporlamaz                                                                                                      |
+| Alıcının `@Public()` bir Nest controller'ı olması                               | Ham gövde opt-in'i, throttle muafiyeti ve guard muafiyeti ister ve sağlayıcının kontratının işi olmayan versiyonlanmış API yüzeyine katılırdı                                                                                                               |
+| Ödememede veriyi askıya almak veya silmek                                       | Ürün, ödemesi geçmiş bir müşteriyi bir sağlayıcı kesintisinden ayırt edemez ve yeni yazmaları reddetmek geri alınabilirken bir board'u silmek değildir                                                                                                      |
+| Ayrı bir `GET /workspaces/{id}/subscription` endpoint'i                         | ADR 0032'nin bilinçle ikide bıraktığı yerde plan durumu için üçüncü bir okuma yüzeyi; plan kimliği mevcut olanın üzerine eklemelidir                                                                                                                        |
+| Ortam değişkeni olarak `PAT_MAX_TOKENS` ve `PAT_MAX_LIFETIME_DAYS`              | Yalnızca barındırmayı ilgilendiren bir konu için iki belgelenmiş değişken ve bir `/config` alanı ekler; ADR 0028 ücretli farkların nicelik olduğunu söylüyor ve nicelikler katalogda yaşıyor                                                                |
+| Advisory kilidi faturalandırmadan önce, şimdi almak                             | Tavanları hâlâ operatör korkuluğu olan deployment'lar için ADR 0027'nin yazılı reddiyle sessizce çelişir; tetik ücretli bir plandır, dolayısıyla onunla iner                                                                                                |

@@ -53,7 +53,7 @@ export interface AuthClientErrorBody {
  * and `api.*` would otherwise need two error paths side by side — and `apiStatus`,
  * `resolveApiMessage` and `useApiResource` would work on only one of them. The code goes into
  * `error` because that is the field callers are told to branch on
- * (`docs/api-conventions.md#errors`), never the message.
+ * (`docs/api-conventions.md#hatalar`), never the message.
  */
 export function authClientError(body: AuthClientErrorBody): ApiError {
   return new ApiError({
@@ -80,7 +80,7 @@ export interface ApiMessageKeys {
    *
    * For the failures a status alone cannot name: the upload endpoint answers 413 for both the
    * per-file size limit and a storage quota (ADR 0027), and `error` is the field
-   * `docs/api-conventions.md#errors` tells clients to branch on. Keys here should come from
+   * `docs/api-conventions.md#hatalar` tells clients to branch on. Keys here should come from
    * `@kurul/shared-types` constants, never be retyped strings.
    */
   byError?: Readonly<Partial<Record<string, string>>>;

@@ -8,7 +8,7 @@ import { TrelloImportScope, TrelloImportSkipReason } from '@kurul/shared-types';
  *
  * **These names were written from memory and checked against two real Trello exports on
  * 2026-08-22** (`apps/api/test/fixtures/trello/real/`, diffs in
- * `apps/api/test/fixtures/trello/README.md#field-mapping-diffs`) — with no diff found on any
+ * `apps/api/test/fixtures/trello/README.md#alan-eşleme-farkları`) — with no diff found on any
  * field below. That is one date and two boards, not a guarantee about Trello's schema going
  * forward, which is why this file still reports rather than throws — see `parseTrelloExport`.
  */
@@ -368,7 +368,7 @@ function countMembers(raw: unknown, issues: TrelloReadIssue[]): number {
  *
  * **The contract is "I report what I do not know", not "I know Trello's schema."** Every field
  * name in this file was written from memory and has since been checked against two real exports
- * (`apps/api/test/fixtures/trello/README.md#field-mapping-diffs`), but Trello's schema carries no
+ * (`apps/api/test/fixtures/trello/README.md#alan-eşleme-farkları`), but Trello's schema carries no
  * version field and no changelog, so a reader that threw on anything unexpected would still turn
  * the next schema drift into a total failure. Instead: a field of an unexpected type, an entry
  * that cannot be represented, or a whole section that is missing lands in `issues` as a

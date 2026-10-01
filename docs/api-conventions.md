@@ -1,52 +1,53 @@
-# API Conventions
+# API Konvansiyonları
 
-REST conventions for the Kurul API: URLs, verbs, payloads, errors, pagination, and DTOs.
+Kurul API'si için REST konvansiyonları: URL'ler, verb'ler, payload'lar, hatalar,
+pagination ve DTO'lar.
 
-> 🌐 English (canonical) | [Türkçe](tr/api-conventions.md)
+## İçindekiler
 
-## Contents
-
-- [Scope](#scope)
-- [Resource naming](#resource-naming)
-- [HTTP verbs and status codes](#http-verbs-and-status-codes)
-- [Request and response bodies](#request-and-response-bodies)
-- [Errors](#errors)
-- [Authentication](#authentication)
-- [Cross-origin requests](#cross-origin-requests)
+- [Kapsam](#kapsam)
+- [Kaynak adlandırma](#kaynak-adlandırma)
+- [HTTP verb'leri ve status kodları](#http-verbleri-ve-status-kodları)
+- [Request ve response body'leri](#request-ve-response-bodyleri)
+- [Hatalar](#hatalar)
+- [Kimlik doğrulama](#kimlik-doğrulama)
+- [Cross-origin istekler](#cross-origin-istekler)
 - [Rate limiting](#rate-limiting)
 - [Pagination](#pagination)
-- [Filtering, sorting, field selection](#filtering-sorting-field-selection)
-- [DTO naming](#dto-naming)
-- [Data types](#data-types)
-- [The OpenAPI document](#the-openapi-document)
-- [Versioning](#versioning)
+- [Filtreleme, sıralama, alan seçimi](#filtreleme-sıralama-alan-seçimi)
+- [DTO adlandırma](#dto-adlandırma)
+- [Veri tipleri](#veri-tipleri)
+- [OpenAPI belgesi](#openapi-belgesi)
+- [Versiyonlama](#versiyonlama)
 
-## Scope
+## Kapsam
 
-These rules apply to every HTTP endpoint in `apps/api`. Socket.io events follow their own
-contract, defined in `@kurul/shared-types` and described in
-[architecture.md](architecture.md).
+Bu kurallar `apps/api`'deki her HTTP endpoint'i için geçerlidir. Socket.io event'leri,
+`@kurul/shared-types`'ta tanımlanan ve [architecture.md](architecture.md)'de tarif
+edilen kendi kontratını takip eder.
 
-Base URL in development: `http://localhost:4000`.
+Geliştirmede base URL: `http://localhost:4000`.
 
-## Resource naming
+## Kaynak adlandırma
 
-| Rule                                               |                                                                                                                                                                                                                                                             |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Nouns, not verbs                                   | `/tasks`, never `/getTasks`                                                                                                                                                                                                                                 |
-| Plural collections                                 | `/boards`, `/tasks`, `/workspaces`                                                                                                                                                                                                                          |
-| kebab-case in paths                                | `/workspace-members`, not `/workspaceMembers`                                                                                                                                                                                                               |
-| camelCase path params                              | `:workspaceId`, `:boardId`, `:taskId`                                                                                                                                                                                                                       |
-| Nesting expresses ownership                        | A collection is reached through its owner: a board's tasks, a task's comments                                                                                                                                                                               |
-| Nesting stops at 2 levels below the workspace root | `:workspaceId` is mandatory on every route and does not count toward the limit — it is the tenant scope, not a hierarchy level. Deeper hierarchies use query filters instead                                                                                |
-| Once a resource has an id, address it shallowly    | `/workspaces/:workspaceId/tasks/:taskId`, never `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId`. The id already identifies the row; the workspace guard already scopes it. The parent segment adds a value the server must validate for no benefit |
+| Kural                                                            |                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Fiil değil isim                                                  | `/tasks`, asla `/getTasks` değil                                                                                                                                                                                                                                                                                                           |
+| Çoğul koleksiyonlar                                              | `/boards`, `/tasks`, `/workspaces`                                                                                                                                                                                                                                                                                                         |
+| Path'lerde kebab-case                                            | `/workspace-members`, `/workspaceMembers` değil                                                                                                                                                                                                                                                                                            |
+| camelCase path param'ları                                        | `:workspaceId`, `:boardId`, `:taskId`                                                                                                                                                                                                                                                                                                      |
+| İç içelik sahipliği ifade eder                                   | Bir koleksiyona kendi sahibi üzerinden ulaşılır: bir board'un task'ları, bir task'ın yorumları                                                                                                                                                                                                                                             |
+| İç içelik, workspace kökünün 2 seviye altında durur              | `:workspaceId` her route'ta zorunludur ve limite dahil edilmez — o bir hiyerarşi seviyesi değil, tenant scope'udur. Daha derin hiyerarşiler yerine query filtreleri kullanılır                                                                                                                                                             |
+| Bir kaynağın id'si olduğunda, ona sığ (shallow) biçimde ulaşılır | `/workspaces/:workspaceId/tasks/:taskId`, asla `/workspaces/:workspaceId/boards/:boardId/tasks/:taskId` değil. Id zaten satırı tanımlıyor; üyeliği workspace guard'ı, satırın o workspace'e ait olduğunu da servis sorgusu zaten doğruluyor. Ebeveyn segmenti, sunucunun doğrulaması gereken ama hiçbir fayda sağlamayan bir değer ekliyor |
 
 ### Workspace scoping
 
-**Every resource-bearing route is nested under a workspace.** This is not decoration — it is
-how multi-tenant isolation is enforced at the guard level, before any service code runs. A
-route without `:workspaceId` cannot be scoped by a guard and is therefore not allowed,
-except for the account-level routes listed below.
+**Kaynak taşıyan her route bir workspace'in altına iç içe geçirilir.** Bu bir süsleme
+değildir — multi-tenant izolasyonunun ilk halkasıdır: `WorkspaceGuard`, hiçbir servis kodu
+çalışmadan önce çağıranın o workspace'in üyesi olduğunu doğrular; her servis sorgusu da kendi
+`workspaceId` koşulunu ekler. `:workspaceId` içermeyen bir route bir guard tarafından
+scope'lanamaz ve bu yüzden, aşağıda listelenen hesap seviyesi route'lar dışında izin
+verilmez.
 
 ```
 GET    /workspaces
@@ -54,32 +55,33 @@ POST   /workspaces
 GET    /workspaces/:workspaceId
 PATCH  /workspaces/:workspaceId
 DELETE /workspaces/:workspaceId
+GET    /workspaces/:workspaceId/plan           # çözümlenmiş plan tavanları ve kullanım (her üye)
 
-GET    /workspaces/:workspaceId/members        # cursor page of the roster
-GET    /workspaces/:workspaceId/members/me     # the caller's own membership
-POST   /workspaces/:workspaceId/members/me/leave      # leave the workspace (any role)
-DELETE /workspaces/:workspaceId/members/:userId       # remove a member (OWNER/ADMIN)
-PATCH  /workspaces/:workspaceId/members/:userId/role  # change a member's role (OWNER/ADMIN)
-GET    /workspaces/:workspaceId/invitations     # cursor page of pending invitations (OWNER/ADMIN)
+GET    /workspaces/:workspaceId/members        # roster'ın cursor sayfası
+GET    /workspaces/:workspaceId/members/me     # çağıranın kendi üyeliği
+POST   /workspaces/:workspaceId/members/me/leave      # workspace'ten ayrıl (her rol)
+DELETE /workspaces/:workspaceId/members/:userId       # üyeyi çıkar (OWNER/ADMIN)
+PATCH  /workspaces/:workspaceId/members/:userId/role  # üyenin rolünü değiştir (OWNER/ADMIN)
+GET    /workspaces/:workspaceId/invitations     # bekleyen davetlerin cursor sayfası (OWNER/ADMIN)
 POST   /workspaces/:workspaceId/invitations
 DELETE /workspaces/:workspaceId/invitations/:invitationId
 
-GET    /workspaces/:workspaceId/board-templates  # the starting shapes a create can name
+GET    /workspaces/:workspaceId/board-templates  # bir create'in adlandırabileceği başlangıç şekilleri
 GET    /workspaces/:workspaceId/boards
-POST   /workspaces/:workspaceId/boards            # `template` seeds its columns and labels
+POST   /workspaces/:workspaceId/boards            # `template` onun kolonlarını ve etiketlerini tohumlar
 GET    /workspaces/:workspaceId/boards/:boardId
 PATCH  /workspaces/:workspaceId/boards/:boardId
 DELETE /workspaces/:workspaceId/boards/:boardId
 
 GET    /workspaces/:workspaceId/boards/:boardId/columns
 POST   /workspaces/:workspaceId/boards/:boardId/columns
-POST   /workspaces/:workspaceId/boards/:boardId/columns/defaults  # seed an empty board
+POST   /workspaces/:workspaceId/boards/:boardId/columns/defaults  # boş board'u tohumla
 PATCH  /workspaces/:workspaceId/columns/:columnId
 DELETE /workspaces/:workspaceId/columns/:columnId
 PATCH  /workspaces/:workspaceId/columns/:columnId/position
 
-GET    /workspaces/:workspaceId/boards/:boardId/tasks     # list, scoped to a board
-POST   /workspaces/:workspaceId/boards/:boardId/tasks     # create in a board
+GET    /workspaces/:workspaceId/boards/:boardId/tasks     # listele, board'a scope'lu
+POST   /workspaces/:workspaceId/boards/:boardId/tasks     # bir board içinde oluştur
 
 GET    /workspaces/:workspaceId/tasks/:taskId
 PATCH  /workspaces/:workspaceId/tasks/:taskId
@@ -107,16 +109,16 @@ DELETE /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId
 POST   /workspaces/:workspaceId/tasks/:taskId/checklists/:checklistId/items
 PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId
 PATCH  /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId/position
-DELETE /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId  # no GET: checklists come back inside GET tasks/:taskId
+DELETE /workspaces/:workspaceId/tasks/:taskId/checklist-items/:itemId  # GET yok: checklist'ler GET tasks/:taskId içinde döner
 
 GET    /workspaces/:workspaceId/tasks/:taskId/attachments
-POST   /workspaces/:workspaceId/tasks/:taskId/attachments   # multipart (a file) or JSON (a link)
+POST   /workspaces/:workspaceId/tasks/:taskId/attachments   # multipart (dosya) veya JSON (bağlantı)
 GET    /workspaces/:workspaceId/attachments/:attachmentId
-GET    /workspaces/:workspaceId/attachments/:attachmentId/content  # the bytes — the one non-JSON response
+GET    /workspaces/:workspaceId/attachments/:attachmentId/content  # byte'lar — JSON olmayan tek cevap
 DELETE /workspaces/:workspaceId/attachments/:attachmentId
 
-GET    /workspaces/:workspaceId/activities                 # workspace activity feed
-GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task activity feed
+GET    /workspaces/:workspaceId/activities                 # workspace aktivite akışı
+GET    /workspaces/:workspaceId/tasks/:taskId/activities    # task aktivite akışı
 
 GET    /workspaces/:workspaceId/dashboard/summary
 
@@ -125,143 +127,169 @@ GET    /workspaces/:workspaceId/notifications/unread-count
 POST   /workspaces/:workspaceId/notifications/read-all
 POST   /workspaces/:workspaceId/notifications/:notificationId/read
 
-POST   /workspaces/:workspaceId/imports/trello   # multipart, one part named `file`; admin-only
+POST   /workspaces/:workspaceId/imports/trello   # multipart, `file` adında tek parça; yalnız admin
 ```
 
-Board and column role gates:
-[ADR 0009](decisions/0009-board-column-permissions.md). Task gates:
-[ADR 0010](decisions/0010-task-permissions.md). Label and metadata gates:
-[ADR 0011](decisions/0011-label-task-metadata-permissions.md). Comment delete authorship:
-[ADR 0012](decisions/0012-comment-delete-authorship.md). Activity, dashboard, and notification
-routes are read-only aggregations/feeds over the same data and inherit the workspace member
-gate (`WorkspaceGuard`) — no separate role matrix.
+Board ve column rol kapıları:
+[ADR 0009](decisions/0009-board-column-permissions.md). Task kapıları:
+[ADR 0010](decisions/0010-task-permissions.md). Label ve metadata kapıları:
+[ADR 0011](decisions/0011-label-task-metadata-permissions.md). Comment silme yetkisi:
+[ADR 0012](decisions/0012-comment-delete-authorship.md). Activity, dashboard ve notification
+route'ları aynı veri üzerinde salt-okunur agregasyon/akışlardır ve ayrı bir rol matrisi
+yerine workspace üyelik kapısını (`WorkspaceGuard`) miras alır.
 
-Attachments are five routes, and three of them are addressed by attachment id rather than
-through a task — the shallow-addressing rule above. Reading (list, single, bytes) is open to
-any workspace member; attaching and detaching need a content role. Detaching draws **no**
-author line, unlike comment deletion (ADR 0012): the same role can already delete the whole
-task, and `Attachment.taskId` cascades, so gating the smaller act while leaving the larger one
-open would be a UI trap rather than an authorization check. Kinds, limits and the serving
-policy: [ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md).
+Attachment'lar beş route'tur ve üçü bir task üzerinden değil, doğrudan attachment id'siyle
+adreslenir — yukarıdaki sığ adresleme kuralı. Okumalar (liste, tekil, byte'lar) her workspace
+üyesine açık; ekleme ve silme bir content rolü ister. Silme, comment silmenin aksine (ADR 0012)
+**yazar çizgisi çekmez**: aynı rol zaten task'ın tamamını silebiliyor ve `Attachment.taskId`
+cascade, dolayısıyla küçük eylemi kapatıp büyüğünü açık bırakmak bir yetki kontrolü değil, bir
+UI tuzağı olurdu. Tipler, limitler ve servis politikası:
+[ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md).
 
-`imports/trello` is the one route whose collection segment is not a resource anyone can read:
-there is no `GET /imports` and no import id, because an import is an action that leaves a board
-behind rather than a row of its own. It is admin-only and it is the API's only bulk write — the
-shape, the limits and everything it deliberately does not carry across are in
-[Importing a Trello board export](#importing-a-trello-board-export).
+`imports/trello`, koleksiyon segmenti kimsenin okuyamayacağı tek route'tur: `GET /imports` yok,
+import id'si de yok — çünkü import, kendi satırı olan bir kaynak değil, arkasında bir board bırakan
+bir eylemdir. Yalnız admin'e açıktır ve API'nin toplu yazan tek ucudur; şekli, limitleri ve bilinçli
+olarak taşımadığı her şey
+[Trello board export'u içe aktarma](#trello-board-exportu-içe-aktarma) bölümünde.
 
-Invitations are workspace-scoped in the public API. Persistence is the
-`WorkspaceInvitation` table, mapped from Better Auth's organization plugin.
-Product names map organization → Workspace — see
-[ADR 0004](decisions/0004-auth-better-auth.md#domain-mapping-organization--workspace).
+Davetler public API'de workspace-scoped'dır. Persistence, Better Auth'un organization
+plugin'inden eşlenen `WorkspaceInvitation` tablosudur. Ürün isimleri
+organization → Workspace eşlemesini kullanır — bkz. [ADR 0004](decisions/0004-auth-better-auth.md#alan-eşlemesi-organization--workspace).
 
-Note the shape: a **collection** is nested under the parent that owns it, because that is
-what scopes the list. A **single resource** is addressed by its own id directly under the
-workspace, because nothing further is needed to find it.
+Şekle dikkat edin: bir **koleksiyon**, listeyi scope'layan şey olduğu için onu sahiplenen
+ebeveynin altına iç içe yerleştirilir. Bir **tekil kaynak**, kendisini bulmak için
+başka hiçbir şeye ihtiyaç olmadığı için kendi id'siyle doğrudan workspace'in altında
+adreslenir.
 
-Non-workspace routes (the complete list):
+Workspace olmayan route'lar (tam liste):
 
 ```
-GET   /health                # liveness, unauthenticated
-GET   /health/ready          # readiness, unauthenticated
-GET   /config                # instance capabilities; any signed-in caller
-POST  /auth/*                # Better Auth handlers
-GET   /me                    # current user profile
-PATCH /me                    # own profile; interface language and the notification-email switch
-GET   /me/deletion-preview   # what deleting this account would do
-DELETE /me                   # delete this account (anonymises it)
-GET   /instance/activation                     # activation funnel; INSTANCE_ADMIN_EMAILS only (verified email required)
-GET   /instance/users/:userId/deletion-preview # same preview, for an operator
-DELETE /instance/users/:userId                 # execute an erasure request for somebody else
+GET   /health                # liveness, kimliksiz
+GET   /health/ready          # readiness, kimliksiz
+GET   /config                # instance yetenekleri; oturum açmış her çağıran
+ANY   /auth/*                # Better Auth handler'ları; her HTTP metodu (örn. GET /auth/get-session, POST /auth/sign-in/email)
+GET   /me                    # mevcut kullanıcı profili
+PATCH /me                    # kendi profili; arayüz dili ve bildirim e-postası anahtarı
+GET   /me/deletion-preview   # bu hesabı silmek neye yol açar
+DELETE /me                   # bu hesabı sil (anonimleştirir)
+GET   /instance/activation                     # aktivasyon hunisi; yalnız INSTANCE_ADMIN_EMAILS (doğrulanmış e-posta gerekli)
+GET   /instance/users/:userId/deletion-preview # aynı önizleme, operatör için
+DELETE /instance/users/:userId                 # bir başkası adına silme talebini uygula
 ```
 
-The two health routes answer different questions and are not interchangeable. `/health` is
-liveness — the process is up — and touches nothing, so a dependency blip never gets an
-instance restarted. `/health/ready` probes Postgres and Redis and answers `200` with
-`{ status, checks }` when the instance can serve traffic, `503` with the same document when it
-cannot; `checks` names the dependency that is down (`up` / `down` / `skipped`, the last one
-meaning the deployment does not configure it). The failure body is intentionally the probe
-document rather than the error envelope below — the caller is a healthcheck, not a client.
+`API_DOCS_ENABLED` açıkken `GET /docs`, `GET /openapi.json` ve `GET /docs-yaml` de sunulur; bunlar
+Nest router'ının dışındadır, kimlik istemez ve throttle edilmez (bkz.
+[OpenAPI belgesi](#openapi-belgesi)).
 
-`PATCH /me` is not workspace-scoped and not role-gated: the subject is the caller, so the
-session guard is the whole authorization story. It is also the only place `User.locale` is
-written — see [decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md) —
-and the only place `User.emailNotifications` is: one boolean, `true` for a new account, that
-switches the assignment, mention and due-soon emails off together. In-app notifications are
-not affected, and the flag changes nothing on an instance whose `mailEnabled` is `false`.
+İki health route'u farklı sorulara cevap verir, birbirinin yerine kullanılamaz. `/health`
+liveness'tır — süreç ayakta mı — ve hiçbir bağımlılığa dokunmaz; böylece bir bağımlılıktaki
+anlık dalgalanma instance'ı yeniden başlatmaya yol açmaz. `/health/ready` Postgres ve Redis'i
+yoklar: instance trafik alabiliyorsa `{ status, checks }` gövdesiyle `200`, alamıyorsa aynı
+gövdeyle `503` döner; `checks` düşen bağımlılığı adıyla söyler (`up` / `down` / `skipped` —
+sonuncusu deployment'ın o bağımlılığı hiç yapılandırmadığı anlamına gelir). Hata gövdesi
+bilinçli olarak aşağıdaki hata zarfı değil, probe belgesinin kendisidir — çağıran taraf bir
+healthcheck'tir, bir istemci değil.
 
-`DELETE /me` deletes the caller's account, and it is the one route in this API that refuses to
-act on an incomplete request rather than picking a default. The body carries `confirmEmail` (the
-account's own address) and one `disposition` per workspace the caller is the **only** OWNER of —
-`transfer` to a named member, or `delete` the workspace outright. A missing, unknown or
-duplicated disposition is `409` and names the workspaces still undecided; a confirmation address
-that does not match is `403`; a transfer target who is not in that workspace is `404`, the same
-opacity every workspace route gives. `GET /me/deletion-preview` is what a client reads to build
-that body. `DELETE /instance/users/:userId` is the same operation performed by an instance
-operator — `403` when `INSTANCE_ADMIN_EMAILS` does not name the caller or their email is unverified, which is the default on
-a fresh install. The account row is anonymised rather than deleted; see
+`PATCH /me` workspace'e scope'lu değildir ve rol kontrolü yoktur: özne çağıranın kendisidir,
+dolayısıyla yetkilendirmenin tamamı session guard'ıdır. `User.locale`'in yazıldığı tek yer de
+burasıdır — bkz.
+[decisions/0018-localization-strategy.md](decisions/0018-localization-strategy.md) — ve
+`User.emailNotifications`'ın da: yeni hesapta `true` olan tek bir boolean, atama, mention ve
+due-soon e-postalarını birlikte kapatır. Uygulama içi bildirimler etkilenmez; `mailEnabled`'ı
+`false` olan bir instance'ta bu bayrak hiçbir şeyi değiştirmez.
+
+`DELETE /me` çağıranın hesabını siler ve bu API'de eksik bir isteğe varsayılan seçerek değil,
+reddederek karşılık veren tek route'tur. Gövde `confirmEmail` (hesabın kendi adresi) ve
+çağıranın **tek** OWNER olduğu her workspace için bir `disposition` taşır — adı verilen bir üyeye
+`transfer` ya da workspace'i doğrudan `delete`. Eksik, tanınmayan veya tekrarlanan bir karar
+`409`'dur ve mesaj ilgili workspace'leri id'leriyle anar (eksik kararda henüz karara bağlanmamış
+her workspace'i); eşleşmeyen bir onay adresi `403`'tür; o workspace'te olmayan bir devir hedefi `404`'tür — her workspace route'unun verdiği
+aynı opaklık. `GET /me/deletion-preview`, istemcinin o gövdeyi kurmak için okuduğu şeydir.
+`DELETE /instance/users/:userId` aynı işlemin bir instance operatörü tarafından yapılan hâlidir —
+`INSTANCE_ADMIN_EMAILS` çağıranı adıyla saymıyorsa ya da e-postası doğrulanmamışsa `403`, ki taze bir kurulumda varsayılan budur.
+Hesap satırı silinmez, anonimleştirilir; bkz.
 [decisions/0026-account-deletion-anonymisation.md](decisions/0026-account-deletion-anonymisation.md).
 
-The `/instance/*` routes are the only ones in the API that are neither workspace-scoped nor
-about the caller themselves. They answer `403` and never `404`: the `404` a workspace route
-gives exists to stop a cross-tenant probe distinguishing "forbidden" from "does not exist", and
-here there is nothing to hide — the route is in the source of an AGPL project.
+`/instance/*` route'ları, API'de ne workspace'e scope'lu olan ne de çağıranın kendisiyle ilgili
+olan tek route'lardır. `404` değil `403` dönerler: bir workspace route'unun verdiği `404`,
+tenant'lar arası bir yoklamanın "yasak" ile "yok"u ayırt etmesini engellemek için vardır ve
+burada gizlenecek bir şey yok — route, AGPL bir projenin kaynak kodunda duruyor.
 
-### Instance configuration
+### Instance yapılandırması
 
-`GET /config` answers **"what is this deployment configured to do"** with an `InstanceConfigDto`:
+`GET /config`, **"bu deployment neyi yapacak şekilde yapılandırılmış"** sorusuna bir
+`InstanceConfigDto` ile cevap verir:
 
 ```json
-{ "mailEnabled": true, "attachmentsEnabled": true }
+{
+  "mailEnabled": true,
+  "attachmentsEnabled": true,
+  "signUpEnabled": true,
+  "demo": { "enabled": false, "resetIntervalMinutes": null, "nextResetAt": null },
+  "planLimits": {
+    "seatsPerWorkspace": null,
+    "boardsPerWorkspace": null,
+    "workspaces": null,
+    "users": null,
+    "storageBytesPerWorkspace": 2147483648,
+    "storageBytesPerInstance": 21474836480
+  }
+}
 ```
 
-| Field                | Meaning                                                                                                                                                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `mailEnabled`        | `false` when no SMTP host is configured, so every message is written to the API log and delivered nowhere — nobody can confirm an address or accept an invite, and notification email is off whatever `User.emailNotifications` says |
-| `attachmentsEnabled` | `false` when `STORAGE_PATH` is unset, so this deployment stores no files and the web app hides the upload control. **Link attachments do not depend on it** — a link needs no storage at all                                         |
+| Alan                 | Anlamı                                                                                                                                                                                                                                                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mailEnabled`        | SMTP host'u yapılandırılmamışsa `false` — her mesaj API log'una yazılır ve hiçbir yere teslim edilmez; kimse adresini doğrulayamaz, dolayısıyla daveti kabul edemez, ve `User.emailNotifications` ne derse desin bildirim e-postası kapalıdır                                                                    |
+| `attachmentsEnabled` | `STORAGE_PATH` tanımsızsa `false` — bu deployment hiç dosya saklamaz ve web arayüzü yükleme kontrolünü gizler. **Bağlantı ekleri buna bağlı değildir** — bir bağlantı hiç depolama istemez                                                                                                                       |
+| `signUpEnabled`      | `SIGNUP_ENABLED=false` değilse `true`; kapalıyken `POST /auth/sign-up/email` `403` ve `error: "Sign-up Disabled"` alır, giriş açık kalır                                                                                                                                                                         |
+| `demo`               | `{ enabled, resetIntervalMinutes, nextResetAt }`; yalnız `DEMO_MODE=true` iken `enabled: true` olur ve sıfırlama takvimini banner için yayınlar, aksi hâlde `enabled: false` ve diğer ikisi `null`                                                                                                               |
+| `planLimits`         | Instance'ın tavanları: `seatsPerWorkspace`, `boardsPerWorkspace`, `workspaces`, `users`, `storageBytesPerWorkspace`, `storageBytesPerInstance`; `null` sınırsız demektir (iki bayt kotasının varsayılanı olduğu için ayarlanmamış bir instance'ta onlar `null` değildir), bkz. [Plan limitleri](#plan-limitleri) |
 
-Three rules hold this endpoint's shape, and each one is a decision that was available to make
-differently:
+Bu ucun biçimini üç kural tutar ve her biri başka türlü de karar verilebilecek bir seçimdir:
 
-- **It is not part of `/health`.** A healthcheck exists so an orchestrator can decide whether
-  to restart the process, and "SMTP is unconfigured" is never a reason to restart anything —
-  it is a permanent, intentional property of the deployment. `/health` is also `@Public()` and
-  `@SkipRateLimit()`, an exemption that is only affordable because the document says nothing
-  about the product; publishing configuration there would inherit both by accident.
-- **It requires a session, and no role.** The leak is small, but nothing needs the endpoint to
-  be public, and an unauthenticated one would hand a scanner a per-instance list of what a
-  self-hosted install has left unconfigured. Nothing here varies by workspace or by role, so it
-  carries no `:workspaceId` and no role gate. Rate limiting is the global default.
-- **Every field is a capability, never tenant state.** A value that differs per workspace, per
-  user, or per request belongs on the resource it describes. This document must stay cacheable
-  as "what this server can do".
+- **`/health`'in parçası değildir.** Bir healthcheck, orchestrator'ın süreci yeniden başlatıp
+  başlatmayacağına karar vermesi için vardır; "SMTP yapılandırılmamış" ise hiçbir zaman yeniden
+  başlatma sebebi değildir — deployment'ın kalıcı ve bilinçli bir özelliğidir. Ayrıca `/health`
+  hem `@Public()` hem `@SkipRateLimit()`'tir; bu muafiyet yalnızca belge üründen hiç söz
+  etmediği için karşılanabilir. Yapılandırmayı oraya koymak ikisini de kazara devralmak olurdu.
+- **Oturum ister, rol istemez.** Sızıntı küçüktür ama ucun public olmasına da hiçbir şeyin
+  ihtiyacı yok; kimliksiz bir uç, bir tarama aracına self-host kurulumun neleri yapılandırmadan
+  bıraktığının instance başına listesini verirdi. Buradaki hiçbir değer workspace'e ya da role
+  göre değişmediği için ne `:workspaceId` taşır ne de rol kapısı. Rate limiting global
+  varsayılandır.
+- **Her alan bir yetenektir, asla kiracı durumu değildir.** Workspace'e, kullanıcıya veya
+  isteğe göre değişen bir değer, tarif ettiği kaynağın üzerinde durur. Bu belge "bu sunucu ne
+  yapabiliyor" olarak cache'lenebilir kalmalıdır.
 
-### Reporting what happened to an email
+### Bir e-postaya ne olduğunu bildirmek
 
-`InvitationDto.emailDelivery` is **optional**, carries `SENT` / `NOT_CONFIGURED` / `FAILED`
-(`MailDeliveryStatus`), and appears on exactly one response: `POST /workspaces/:workspaceId/invitations`.
+`InvitationDto.emailDelivery` **opsiyoneldir**, `SENT` / `NOT_CONFIGURED` / `FAILED`
+(`MailDeliveryStatus`) taşır ve tam olarak tek bir yanıtta bulunur:
+`POST /workspaces/:workspaceId/invitations`.
 
-**An absent field is not `SENT`.** It means this API observed no send for the request, and a
-client must not resolve that into a verdict. A listed invitation is a stored row while delivery
-is an event that nothing records, so `GET .../invitations` never carries the field.
+**Alanın yokluğu `SENT` demek değildir.** Bu API'nin o istek için hiçbir gönderim
+gözlemlemediği anlamına gelir ve istemci bunu bir hükme dönüştürmemelidir. Listelenen bir davet
+saklanmış bir satırdır, teslim ise hiçbir yerde kaydedilmeyen bir olaydır; bu yüzden
+`GET .../invitations` bu alanı hiç taşımaz.
 
-The reason it exists at all: the invitation email is sent inside Better Auth's
-`sendInvitationEmail` hook, and a failed or log-only send is swallowed there by design (a
-stored invitation must not be reported as failed because its notification bounced). That left
-the admin with a `201` and no way to learn that nothing was delivered. The status is the
-return channel — the request still succeeds, the invitation is still created, and the response
-simply says what became of the email. Sending it is still not a precondition of anything: on a
-deployment without SMTP the accept link in `acceptUrl` is the one path that works, which is
-what the web client offers when the status is not `SENT`.
+Var olma sebebi: davet e-postası Better Auth'un `sendInvitationEmail` hook'unun içinden
+gönderilir ve başarısız ya da yalnızca log'a düşen bir gönderim orada bilinçli olarak yutulur
+(zaten saklanmış bir davet, bildirimi geri döndü diye başarısız raporlanmamalıdır). Geriye
+admin'in elinde bir `201` ve hiçbir şeyin teslim edilmediğini öğrenmenin hiçbir yolu kalıyordu.
+Bu durum alanı o geri dönüş kanalıdır — istek yine başarılı olur, davet yine oluşturulur, yanıt
+sadece e-postaya ne olduğunu söyler. Gönderim hâlâ hiçbir şeyin ön koşulu değildir: SMTP'siz bir
+deployment'ta `acceptUrl` içindeki kabul bağlantısı işleyen tek yoldur ve durum `SENT` değilken
+web istemcisinin işaret ettiği şey de budur.
 
-The same rule applies to any future endpoint that triggers mail: **report the delivery status,
-never fail the request on it, and never infer one you did not observe.**
+Aynı kural mail tetikleyen her yeni uç için geçerlidir: **teslim durumunu bildir, isteği bunun
+yüzünden başarısız etme ve gözlemlemediğin bir durumu asla çıkarsama.**
 
-### Actions that are not CRUD
+### CRUD olmayan aksiyonlar
 
-Some operations are not a resource update — moving a task recomputes ordering, an invitation
-is accepted rather than edited. Model these as a **sub-resource with a verb-free name** where
-possible, and as an explicit action segment where not:
+Bazı operasyonlar bir kaynak güncellemesi değildir — bir task'ı taşımak sıralamayı yeniden
+hesaplar, bir davet düzenlenmek yerine kabul edilir. Bunları mümkün olduğunda **fiilsiz
+isimli bir alt-kaynak** olarak, mümkün olmadığında ise açık bir aksiyon segmenti olarak
+modelleyin:
 
 ```
 PATCH /workspaces/:workspaceId/columns/:columnId/position
@@ -273,54 +301,62 @@ POST  /workspaces/:workspaceId/tasks/:taskId/labels
 DELETE /workspaces/:workspaceId/tasks/:taskId/labels/:labelId
 ```
 
-Action segments are the exception and each one needs a reason. Do not invent
-`/tasks/:id/doUpdate`.
+Aksiyon segmentleri istisnadır ve her birinin bir sebebi olmalıdır.
+`/tasks/:id/doUpdate` gibi bir şey icat etmeyin.
 
-## HTTP verbs and status codes
+## HTTP verb'leri ve status kodları
 
-| Verb     | Semantics                                    | Idempotent | Body | Success                        |
-| -------- | -------------------------------------------- | ---------- | ---- | ------------------------------ |
-| `GET`    | Read a resource or collection                | Yes        | No   | `200`                          |
-| `POST`   | Create, or trigger a non-idempotent action   | No         | Yes  | `201` (create), `200` (action) |
-| `PATCH`  | Partial update — only the sent fields change | No         | Yes  | `200`                          |
-| `PUT`    | Full replacement                             | Yes        | Yes  | `200`                          |
-| `DELETE` | Remove                                       | Yes        | No   | `204`                          |
+| Verb     | Semantik                                               | Idempotent | Body  | Başarı                             |
+| -------- | ------------------------------------------------------ | ---------- | ----- | ---------------------------------- |
+| `GET`    | Bir kaynağı veya koleksiyonu oku                       | Evet       | Hayır | `200`                              |
+| `POST`   | Oluştur, ya da idempotent olmayan bir aksiyonu tetikle | Hayır      | Evet  | `201` (oluşturma), `200` (aksiyon) |
+| `PATCH`  | Kısmi güncelleme — yalnızca gönderilen alanlar değişir | Hayır      | Evet  | `200`                              |
+| `PUT`    | Tam değiştirme                                         | Evet       | Evet  | `200`                              |
+| `DELETE` | Kaldır                                                 | Evet       | Hayır | `204`                              |
 
-**`PATCH` is the default for updates.** `PUT` is used only where a full replacement is
-genuinely the operation (reordering an entire column, for example). A `PATCH` that omits a
-field leaves it untouched; sending `null` explicitly clears a nullable field.
+**Güncellemeler için varsayılan `PATCH`'tir.** `PUT`, yalnızca tam bir değiştirmenin
+gerçekten operasyon olduğu yerde kullanılır (örneğin bir column'un tamamını yeniden
+sıralamak). Bir alanı atlayan bir `PATCH` onu dokunulmamış bırakır; açıkça `null` göndermek
+nullable bir alanı temizler.
 
-| Status                       | When                                                                                                                                                                                                                                                                               |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200 OK`                     | Successful read, update, or action                                                                                                                                                                                                                                                 |
-| `201 Created`                | Resource created; body is the created resource                                                                                                                                                                                                                                     |
-| `204 No Content`             | Successful delete; empty body                                                                                                                                                                                                                                                      |
-| `400 Bad Request`            | Malformed request or validation failure                                                                                                                                                                                                                                            |
-| `401 Unauthorized`           | Missing or invalid session                                                                                                                                                                                                                                                         |
-| `403 Forbidden`              | Authenticated, workspace member, but role is insufficient, **or** a plan ceiling would be exceeded (its `error` says which, see [Plan limits](#plan-limits)), **or** registration is closed (`SIGNUP_ENABLED=false`: `POST /auth/sign-up/email` only, `error: "Sign-up Disabled"`) |
-| `404 Not Found`              | Resource does not exist **or** belongs to another workspace                                                                                                                                                                                                                        |
-| `409 Conflict`               | Uniqueness violation (duplicate slug), or a conflicting concurrent change                                                                                                                                                                                                          |
-| `413 Payload Too Large`      | A JSON/form body is over `REQUEST_BODY_MAX_BYTES`, an upload is over `ATTACHMENT_MAX_BYTES` or would exceed a storage quota (its `error` says which — see [File uploads and downloads](#file-uploads-and-downloads)), or an import is over `TRELLO_IMPORT_MAX_BYTES`               |
-| `415 Unsupported Media Type` | The file's **magic bytes** are not on the allowlist. The declared `Content-Type` and the extension are not evidence and are not consulted                                                                                                                                          |
-| `422 Unprocessable Entity`   | Semantically invalid though well-formed (e.g. moving a task to a column on another board)                                                                                                                                                                                          |
-| `429 Too Many Requests`      | Rate limited: over a route's request budget, or over the upload route's per-IP byte budget (its `error` says which, see [Rate limiting](#rate-limiting))                                                                                                                           |
-| `500 Internal Server Error`  | Unhandled failure. Never leaks a stack trace.                                                                                                                                                                                                                                      |
+| Status                       | Ne zaman                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200 OK`                     | Başarılı okuma, güncelleme veya aksiyon                                                                                                                                                                                                                                                                                                         |
+| `201 Created`                | Kaynak oluşturuldu; body oluşturulan kaynaktır                                                                                                                                                                                                                                                                                                  |
+| `204 No Content`             | Başarılı silme; boş body                                                                                                                                                                                                                                                                                                                        |
+| `400 Bad Request`            | Bozuk request veya validation hatası                                                                                                                                                                                                                                                                                                            |
+| `401 Unauthorized`           | Eksik veya geçersiz session                                                                                                                                                                                                                                                                                                                     |
+| `403 Forbidden`              | Kimlikli, workspace üyesi, ama rol yetersiz, **ya da** bir plan tavanı aşılacak (hangisi olduğunu `error` söyler, bkz. [Plan limitleri](#plan-limitleri)), **ya da** kayıt kapalı (`SIGNUP_ENABLED=false`: yalnızca `POST /auth/sign-up/email`, `error: "Sign-up Disabled"`)                                                                    |
+| `404 Not Found`              | Kaynak yok **veya** başka bir workspace'e ait                                                                                                                                                                                                                                                                                                   |
+| `409 Conflict`               | Benzersizlik ihlali (yinelenen slug), veya çakışan bir eşzamanlı değişiklik                                                                                                                                                                                                                                                                     |
+| `413 Payload Too Large`      | JSON/form body `REQUEST_BODY_MAX_BYTES`'ı, bir yükleme `ATTACHMENT_MAX_BYTES`'ı aşıyor ya da bir depolama kotasını aşacak (hangisi olduğunu `error` söyler — bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)), ya da bir import `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                   |
+| `415 Unsupported Media Type` | Dosyanın **magic byte**'ları allowlist'te değil. Beyan edilen `Content-Type` ve uzantı kanıt sayılmaz; uzantı hiç okunmaz, `Content-Type` yalnızca magic number'ı olmayan düz metin için, tam `text/plain` ya da `text/csv` olması gereken bir giriş koşulu olarak okunur (bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme))          |
+| `422 Unprocessable Entity`   | İyi biçimlendirilmiş ama semantik olarak geçersiz (örn. bir task'ı başka bir board'daki bir column'a taşımak)                                                                                                                                                                                                                                   |
+| `429 Too Many Requests`      | Rate limit uygulandı: bir route'un istek bütçesi ya da yükleme route'unun IP başına bayt bütçesi aşıldı (hangisi olduğunu `error` söyler, bkz. [Rate limiting](#rate-limiting))                                                                                                                                                                 |
+| `500 Internal Server Error`  | Ele alınmamış hata. Asla bir stack trace sızdırmaz.                                                                                                                                                                                                                                                                                             |
+| `503 Service Unavailable`    | Bu deployment dosya saklamıyor (`STORAGE_PATH` tanımsız; `GET /config` → `attachmentsEnabled: false`) ve istek depolamaya dokunuyor: bir FILE eki yüklemek ya da var olan bir FILE ekinin içeriğini (`GET .../attachments/:attachmentId/content`) okumak. `GET /health/ready`'nin `503`'ü ayrıdır, bkz. [Workspace scoping](#workspace-scoping) |
 
-**Cross-workspace access returns `404`, not `403`.** A `403` would confirm that the resource
-exists, which leaks information across the tenant boundary. `403` is reserved for a
-legitimate member whose role is too low, for the plan ceilings below, for a closed registration
-(`SIGNUP_ENABLED=false`) and for the actions a demo instance refuses (`DEMO_MODE=true`), which
-the envelope's `error` field tells apart.
+`DELETE` için tek istisna, bir task'ın alt kaynağını silen dört uçtur —
+`DELETE …/tasks/:taskId/assignees/:userId`, `…/tasks/:taskId/labels/:labelId`,
+`…/tasks/:taskId/checklists/:checklistId` ve `…/tasks/:taskId/checklist-items/:itemId`: bunlar
+`204` yerine güncel `TaskDto` gövdesiyle `200` döner, çünkü çağıranın her durumda güncellenmiş
+task'a ihtiyacı vardır.
 
-### Plan limits
+**Cross-workspace erişim `403` değil `404` döner.** Bir `403`, kaynağın var olduğunu
+doğrulardı, ki bu tenant sınırının ötesine bilgi sızdırır. `403`, rolü çok düşük meşru bir
+üye için, aşağıdaki plan tavanları için, kapalı kayıt (`SIGNUP_ENABLED=false`) için ve bir demo
+instance'ın reddettiği eylemler (`DEMO_MODE=true`) için ayrılmıştır; zarfın `error` alanı
+bunları birbirinden ayırır.
 
-Seats, boards, workspaces and accounts have configurable ceilings
-([ADR 0032](decisions/0032-plan-limits.md)). Every ceiling is **unlimited unless the instance
-sets it**, so an unconfigured deployment never produces any of these responses.
+### Plan limitleri
 
-A write that would cross a ceiling is refused with `403` and an `error` of its own, because the
-status alone cannot say which fix to suggest: a role change never helps here, someone has to
-free a seat or raise a number.
+Seat'lerin, board'ların, workspace'lerin ve hesapların yapılandırılabilir tavanları var
+([ADR 0032](decisions/0032-plan-limits.md)). Her tavan, **instance onu ayarlamadıkça
+sınırsızdır**, dolayısıyla yapılandırılmamış bir deployment bu yanıtlardan hiçbirini üretmez.
+
+Bir tavanı aşacak bir yazma, kendine ait bir `error` ile `403` olarak reddedilir, çünkü status
+tek başına hangi düzeltmenin önerileceğini söyleyemez: burada bir rol değişikliği asla yardımcı
+olmaz, birinin bir seat boşaltması ya da bir sayıyı yükseltmesi gerekir.
 
 ```jsonc
 {
@@ -334,30 +370,31 @@ free a seat or raise a number.
 }
 ```
 
-`planLimit` is the only optional envelope member besides `details`. `current` is what was
-counted at the moment of the refusal, so it can equal or exceed `limit`.
+`planLimit`, `details` ve `detailsOmitted` dışındaki tek opsiyonel zarf üyesidir. `current`, reddin olduğu anda
+sayılan şeydir, dolayısıyla `limit`'e eşit ya da onu aşabilir.
 
-| `planLimit.code`        | Refuses                                      | Counts                                             |
-| ----------------------- | -------------------------------------------- | -------------------------------------------------- |
-| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, and accepting one    | Members plus invitations still pending             |
-| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Boards in the workspace                            |
-| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Workspaces on the instance                         |
-| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Accounts on the instance, anonymised ones excluded |
+| `planLimit.code`        | Reddeder                                     | Sayar                                                   |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `PLAN_LIMIT_SEATS`      | `POST .../invitations`, ve birini kabul etme | Üyeler artı hâlâ bekleyen davetler                      |
+| `PLAN_LIMIT_BOARDS`     | `POST .../boards`, `POST .../imports/trello` | Workspace'teki board'lar                                |
+| `PLAN_LIMIT_WORKSPACES` | `POST /workspaces`                           | Instance'taki workspace'ler                             |
+| `PLAN_LIMIT_USERS`      | `POST /auth/sign-up/email`                   | Instance'taki hesaplar, anonimleştirilmiş olanlar hariç |
 
-Accepting an invitation counts members only, since the invitation being accepted is already
-holding its seat. Attachment bytes are a plan ceiling too, but they keep the `413` and the
-`error: "Attachment Quota Exceeded"` that [ADR 0027](decisions/0027-attachment-quotas.md) gave
-them; what the plan layer adds is that a workspace can carry its own byte ceiling.
+Bir daveti kabul etmek yalnızca üyeleri sayar, çünkü kabul edilen davet zaten kendi seat'ini
+tutuyordur. Attachment baytları da bir plan tavanıdır, ama onlar [ADR 0027](decisions/0027-attachment-quotas.md)'nin
+kendilerine verdiği `413`'ü ve `error: "Attachment Quota Exceeded"`'ı korur; plan katmanının
+eklediği şey, bir workspace'in kendine ait bir bayt tavanı taşıyabilmesidir.
 
-Two reads publish the numbers so a client can show them before it is refused: `GET /config`
-carries the instance ceilings (capability, identical for every caller), and
-`GET /workspaces/{workspaceId}/plan` carries one workspace's resolved ceilings and current
-usage, readable by any member. `null` in either document means unlimited.
+Bir istemcinin reddedilmeden önce sayıları gösterebilmesi için iki okuma bunları yayınlar:
+`GET /config` instance tavanlarını taşır (her çağıran için aynı kapasite), ve
+`GET /workspaces/:workspaceId/plan` bir workspace'in çözümlenmiş tavanlarını ve güncel
+kullanımını taşır, herhangi bir üye tarafından okunabilir. Her ikisinde de `null`, sınırsız
+demektir.
 
-## Request and response bodies
+## Request ve response body'leri
 
-Resources are returned as **plain JSON objects**. There is no `data` wrapper, no `success`
-flag, no envelope.
+Kaynaklar **düz JSON objeleri** olarak döndürülür. Bir `data` sarmalayıcısı, bir `success`
+flag'i, bir zarf (envelope) yoktur.
 
 ```jsonc
 // GET /workspaces/w_1/tasks/t_1  → 200
@@ -386,176 +423,180 @@ flag, no envelope.
 }
 ```
 
-Collections are the only exception: paginated lists carry their cursor metadata alongside
-the items (see [Pagination](#pagination)).
+Koleksiyonlar tek istisnadır: sayfalı listeler cursor metadata'sını item'larla birlikte
+taşır (bkz. [Pagination](#pagination)).
 
-Rules:
+Kurallar:
 
-- JSON property names are `camelCase`.
-- Omit nothing for the sake of size — a field that exists is always present, with `null` if
-  empty. Clients should not have to distinguish "absent" from "null".
-- Never return a Prisma entity directly. The response DTO decides what is public.
-- `Content-Type: application/json; charset=utf-8` on every response with a body — with exactly
-  one documented exception: `GET /workspaces/:workspaceId/attachments/:attachmentId/content`
-  answers with the stored file's own media type and its bytes. It is the only handler in the
-  API that writes something other than JSON, and the next one needs a reason of the same size.
+- JSON property isimleri `camelCase`'dir.
+- Boyut uğruna hiçbir şey atlanmaz — var olan bir alan her zaman mevcuttur, boşsa `null`
+  ile. Client'lar "yok"u "null"dan ayırt etmek zorunda kalmamalıdır.
+- Bir Prisma entity'sini asla doğrudan döndürmeyin. Neyin public olduğuna response DTO'su
+  karar verir.
+- Body'si olan her response'ta `Content-Type: application/json; charset=utf-8` — belgelenmiş
+  tam olarak tek bir istisnayla: `GET /workspaces/:workspaceId/attachments/:attachmentId/content`
+  saklanan dosyanın kendi medya tipiyle ve byte'larıyla cevap verir. API'de JSON dışında bir şey
+  yazan tek handler budur; ikincisinin aynı büyüklükte bir gerekçesi olmalıdır.
 
-### Request body size
+### Request body boyutu
 
-**`REQUEST_BODY_MAX_BYTES` (default `1048576` — 1 MiB) is the largest JSON or form-encoded body
-the API will read.** Over it, the answer is `413` in the error envelope above — a client error,
-and one that is deliberately **not** reported to error tracking, exactly like a `404` or a `403`.
+**`REQUEST_BODY_MAX_BYTES` (varsayılan `1048576` — 1 MiB), API'nin okuyacağı en büyük JSON veya
+form-encoded body'dir.** Bunun üstünde cevap, yukarıdaki hata zarfı içinde `413`'tür — bir client
+hatasıdır ve tıpkı bir `404` ya da `403` gibi hata takibine **bilinçli olarak** bildirilmez.
 
-**A JSON body also holds at most 1,000 values**, counting every member of every object and every
-element of every array at any depth, however few bytes they take. Over that, the answer is the
-same `413`, before anything validates the body: validation walks every key, and one object with
-tens of thousands of them held the whole process for seconds (80,000 short keys in 868,891 bytes
-took 3 seconds). 1,000 is the number of fields the form-encoded parser has always allowed a form
-body, refused the same way, and the largest body any endpoint takes holds 802 values: an account
-deletion with the most workspace dispositions it accepts, 200.
+**Bir JSON body ayrıca en fazla 1.000 değer taşır**; her derinlikteki her objenin her üyesi ve her
+array'in her elemanı sayılır, kaç bayt tuttukları fark etmez. Bunun üstünde cevap, body'yi hiçbir
+şey doğrulamadan önce, yine aynı `413`'tür: doğrulama her anahtarı dolaşır ve on binlerce anahtarlı
+tek bir obje bütün süreci saniyelerce meşgul ediyordu (868.891 bayttaki 80.000 kısa anahtar 3
+saniye sürüyordu). 1.000, form-encoded parser'ın bir form body'ye her zaman izin verdiği ve
+aşıldığında aynı şekilde reddettiği alan sayısıdır; herhangi bir ucun aldığı en büyük body ise 802
+değer taşır: kabul ettiği en fazla workspace kararıyla, 200 kararla, bir hesap silme.
 
-This is the size of a _parsed body_ and it is unrelated to `ATTACHMENT_MAX_BYTES`: an upload is
-`multipart/form-data`, which this limit never sees — multer reads those, with its own ceiling
-(see [File uploads and downloads](#file-uploads-and-downloads)).
+Bu, _parse edilmiş bir body'nin_ boyutudur ve `ATTACHMENT_MAX_BYTES` ile ilgisi yoktur: bir
+yükleme `multipart/form-data`'dır ve bu limit onu hiç görmez — onları multer okur, kendi
+tavanıyla (bkz. [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)).
 
-Two things about the number are worth stating plainly. It was, until it was written down, an
-accident: nothing configured a limit, so Express's own default of **100 kB** was the API's real
-ceiling — a value nobody chose and no file recorded. And it is a **memory** ceiling as much as a
-size one, since the body is parsed into heap before anything validates it; N concurrent requests
-cost up to N × this value. 1 MiB is roughly two orders of magnitude above the largest body any
-endpoint legitimately receives today (no endpoint takes an array body, and the longest single
-field any DTO accepts is 2048 characters). An endpoint that genuinely needs more does **not** raise
-this variable — the Trello importer is the one that would have had to, and instead takes its body
-as `multipart/form-data` under a ceiling of its own (see
-[Importing a Trello board export](#importing-a-trello-board-export)). Raising this number to fit
-one endpoint hands the same memory cost to every other one.
+Bu sayı hakkında açıkça söylenmesi gereken iki şey var. Yazıya dökülene kadar bir kazaydı:
+hiçbir yer bir limit yapılandırmıyordu, dolayısıyla API'nin gerçek tavanı Express'in kendi
+varsayılanı olan **100 kB**'ydi — kimsenin seçmediği ve hiçbir dosyanın kaydetmediği bir değer.
+Ve bu, bir boyut tavanı olduğu kadar bir **bellek** tavanıdır: body, herhangi bir şey onu
+doğrulamadan önce heap'e parse edilir, yani N eşzamanlı istek N × bu değere kadar maliyet
+çıkarır. 1 MiB, bugün herhangi bir ucun meşru olarak aldığı en büyük body'nin bir mertebeden
+fazla üstündedir (hiçbir uç array body almıyor ve herhangi bir DTO'nun kabul ettiği en uzun tek
+alan 20.000 karakterlik task açıklaması). Gerçekten daha fazlasına ihtiyaç duyan bir uç bu değişkeni **yükseltmez** —
+yükseltmek zorunda kalacak olan tek uç Trello importer'ıydı ve o, bunun yerine gövdesini kendi
+tavanı altında `multipart/form-data` olarak alıyor (bkz.
+[Trello board export'u içe aktarma](#trello-board-exportu-içe-aktarma)). Bu sayıyı tek bir uca
+sığdırmak için yükseltmek, aynı bellek maliyetini diğer bütün uçlara dağıtmak demektir.
 
-### File uploads and downloads
+### Dosya yükleme ve indirme
 
-One endpoint takes both shapes an attachment can have:
-`POST /workspaces/:workspaceId/tasks/:taskId/attachments` accepts `multipart/form-data` with a
-part named `file` (a **FILE**), or `application/json` (a **LINK**). `kind` is always carried
-explicitly in the body — `"FILE"` or `"LINK"` — and never inferred from whether a file part
-arrived, so a request carrying neither gets a validation error that names what is missing
-rather than a guess. Both shapes answer `201` with an `AttachmentDto`.
+Bir attachment'ın alabileceği iki şekli de tek bir uç alır:
+`POST /workspaces/:workspaceId/tasks/:taskId/attachments` ya `multipart/form-data` (adı `file`
+olan bir part — **FILE**) ya da `application/json` (**LINK**) kabul eder. `kind` her zaman
+gövdede açıkça taşınır — `"FILE"` ya da `"LINK"` — ve bir dosya part'ının gelip gelmediğinden
+türetilmez; böylece ikisini de taşımayan bir istek tahmin değil, eksiği adıyla söyleyen bir
+doğrulama hatası alır. İki şekil de `201` ve bir `AttachmentDto` ile cevaplanır.
 
-**A LINK is a URL the server stores and returns and never requests.** No preview, no favicon,
-no `<title>` scrape, no unfurl, no health check. Only `http:` and `https:` are stored;
-`javascript:`, `data:` and `file:` are rejected with `400` at write time. Server-side fetching
-of a user-supplied URL is an SSRF primitive, and a Compose network where `postgres` and `redis`
-resolve by name is the worst possible place for one ([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)).
+**LINK, sunucunun sakladığı, döndürdüğü ve asla istek atmadığı bir URL'dir.** Önizleme yok,
+favicon yok, `<title>` kazıma yok, unfurl yok, sağlık kontrolü yok. Yalnız `http:` ve `https:`
+saklanır; `javascript:`, `data:` ve `file:` yazma anında `400` ile reddedilir. Kullanıcının
+verdiği bir URL'e sunucu tarafı fetch bir SSRF primitive'idir ve `postgres` ile `redis`'in
+isimle çözüldüğü bir Compose ağı bunun için olabilecek en kötü yerdir
+([ADR 0024](decisions/0024-attachment-kinds-and-serving-policy.md)).
 
-**A FILE is accepted on its magic bytes.** The declared `Content-Type` and the filename
-extension both come from the caller and neither is evidence, so the type is read from the
-content and matched against an allowlist: PNG, JPEG, GIF and WebP; PDF; the OpenXML and
-OpenDocument office formats; ZIP; plus `text/plain` and `text/csv` through the narrow path
-below. `text/html` and `image/svg+xml` are excluded by name, along with every executable and
-script container. Anything else is `415`.
+**FILE, magic byte'larıyla kabul edilir.** Beyan edilen `Content-Type` de dosya uzantısı da
+çağırandan gelir ve hiçbiri kanıt değildir; tip içerikten okunur ve bir allowlist'le
+eşleştirilir: PNG, JPEG, GIF, WebP; PDF; OpenXML ve OpenDocument ofis formatları; ZIP; artı
+aşağıdaki dar yoldan `text/plain` ve `text/csv`. `text/html` ve `image/svg+xml` isim isim
+dışarıdadır, her yürütülebilir ve script konteyneriyle birlikte. Başka her şey `415`.
 
-**Why a `.txt` is accepted and an `.html` renamed `.txt` is not.** Plain text has no magic
-number, so it sniffs as nothing and would be refused by the rule above — which would make its
-place on the allowlist a lie. It is instead accepted by a fallback that requires **four**
-things at once:
+**Bir `.txt` neden geçiyor da `.txt` diye yeniden adlandırılmış bir `.html` geçmiyor.** Düz
+metnin magic number'ı yoktur, yani hiçbir şey olarak sniff edilir ve yukarıdaki kural onu
+reddederdi — bu da allowlist'teki yerini bir yalana çevirirdi. Bunun yerine **dört** koşulu
+birden isteyen bir geri düşüş kuralıyla kabul edilir:
 
-1. the declared type is **exactly** `text/plain` or `text/csv` (nothing else opens this door),
-2. the bytes decode as valid UTF-8,
-3. they contain no `NUL` byte, and
-4. the first non-whitespace character is not `<`.
+1. beyan edilen tip **tam olarak** `text/plain` ya da `text/csv` (bu kapıyı başka hiçbir şey
+   açmaz),
+2. byte'lar geçerli UTF-8 olarak çözülüyor,
+3. içlerinde `NUL` byte'ı yok, ve
+4. boşluklar atıldıktan sonraki ilk karakter `<` değil.
 
-Fail any one and the answer is `415`. Condition 4 is what keeps markup out, and condition 1 is
-a membership test against two literals — the type written to the row and later to the response
-header is one of those two literals, never a copy of the caller's string. The declaration
-picks between two labels that are already equally inert; it never decides whether the upload is
-safe. That verdict is conditions 2-4.
+Herhangi biri sağlanmazsa cevap `415`. Markup'ı dışarıda tutan 4. koşuldur; 1. koşul ise iki
+literale karşı bir üyelik testidir — satıra ve sonra cevap header'ına yazılan tip o iki
+literalden biridir, asla çağıranın string'inin bir kopyası değil. Beyan, zaten eşit ölçüde inert
+olan iki etiket arasında seçim yapar; yüklemenin güvenli olup olmadığına asla o karar vermez. O
+yargı 2-4. koşullarındır.
 
-**Size is limited in two layers that carry deliberately different numbers.**
-`ATTACHMENT_MAX_BYTES` (default `26214400` — 25 MiB) is the size of the **file** and the number
-to quote to users; the reverse proxy caps the **whole request body** and is set higher, because
-a multipart envelope adds a few hundred bytes on top of the file. Both answer `413`, and the
-response body is what tells them apart: the API's `413` is the error envelope above, the
-proxy's is not JSON at all. Which number to change, and the ordering rule between them, are in
-[self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy).
+**Boyut, bilinçli olarak farklı sayılar taşıyan iki katmanda sınırlanır.**
+`ATTACHMENT_MAX_BYTES` (varsayılan `26214400` — 25 MiB) **dosyanın** boyutudur ve kullanıcıya
+söylenecek sayı odur; ters proxy **isteğin tamamını** sınırlar ve daha yükseğe ayarlanır, çünkü
+multipart zarfı dosyanın üstüne birkaç yüz byte ekler. İkisi de `413` döner ve hangisinin
+döndüğünü cevabın gövdesi söyler: API'nin `413`'ü yukarıdaki hata zarfıdır, proxy'ninki hiç JSON
+değildir. Hangi sayının değiştirileceği ve aralarındaki sıralama kuralı:
+[self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak).
 
-**Storage quotas answer `413` too, with their own `error`.** `ATTACHMENT_WORKSPACE_QUOTA_BYTES`
-and `ATTACHMENT_INSTANCE_QUOTA_BYTES` cap the summed size of stored FILE attachments; unset they
-are 2 GiB and 20 GiB, and a written `0` lifts one
-([ADR 0027](decisions/0027-attachment-quotas.md), updated 2026-08-21). An upload whose bytes
-would push the sum past a ceiling is rejected before anything is written. The envelope carries `error: "Attachment Quota Exceeded"` where the per-file limit's
-carries `"Payload Too Large"` — the status alone cannot say whether to shrink the file or free
-up space, and clients branch on `statusCode` and `error`, never on `message` (see
-[Errors](#errors)). A file that fills the quota exactly is accepted; the ceiling is inclusive,
-like the per-file one. LINK attachments store no bytes: they neither count against a quota nor
-are refused by a full one.
+**Depolama kotaları da `413` döner, ama kendi `error`'larıyla.**
+`ATTACHMENT_WORKSPACE_QUOTA_BYTES` ve `ATTACHMENT_INSTANCE_QUOTA_BYTES`, saklanan FILE eklerinin
+toplam boyutuna tavan koyar; ayarlanmadıklarında 2 GiB ve 20 GiB'dir, yazılı bir `0` ilgili
+tavanı kaldırır ([ADR 0027](decisions/0027-attachment-quotas.md), 2026-08-21'de güncellendi).
+Byte'ları toplamı tavanın ötesine itecek bir yükleme, hiçbir şey yazılmadan reddedilir. Zarf `error: "Attachment Quota Exceeded"` taşır; dosya başına limitinki
+ise `"Payload Too Large"` taşır — durum kodu tek başına dosyayı mı küçültmek yoksa yer mi açmak
+gerektiğini söyleyemez ve istemciler `statusCode` ile `error` üzerinden dallanır, asla `message`
+üzerinden değil (bkz. [Hatalar](#hatalar)). Kotayı tam dolduran dosya kabul edilir; tavan, dosya
+başına olan gibi kapsayıcıdır. LINK ekleri byte saklamaz: ne kotadan düşerler ne de dolu bir
+kota tarafından reddedilirler.
 
-**A multipart body multer refuses is `400`.** A second file, a file part under any name but
-`file`, more text fields than the route takes, a text value of 8 KiB or more, or a field name
-carrying an array index above `0` (`items[1]`: the limit that closes
-[GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)) never reaches the
-handler. The envelope's `message` is multer's own sentence with the part name after it;
-[Errors](#errors) says why the wording is multer's. A part name longer than 64 characters is
-refused on its own, as `Field name too long`, and no refusal repeats more than 64 characters of a
-name. A `Content-Type` the multipart parser cannot read, such as `multipart/mixed`, is a `400`
-too. An upload the client abandons partway is never reported, and gets a `400` only if something
-can still be written to it, which by the time the parser notices is normally not the case.
+**Multipart gövdeyi multer reddederse cevap `400`'dür.** İkinci bir dosya, `file` dışında bir
+adla gelen bir dosya parçası, rotanın aldığından fazla metin alanı, 8 KiB ya da daha uzun bir
+metin değeri veya `0`'dan büyük bir dizi indeksi taşıyan bir alan adı (`items[1]`:
+[GHSA-535w-7cp7-47q4](https://github.com/advisories/GHSA-535w-7cp7-47q4)'ü kapatan limit)
+handler'a hiç ulaşmaz. Zarfın `message`'ı multer'ın kendi cümlesi ve ardından parça adıdır;
+metnin neden multer'ın olduğunu [Hatalar](#hatalar) anlatır. 64 karakterden uzun bir parça adı
+kendi başına, `Field name too long` olarak reddedilir ve hiçbir ret bir adın 64 karakterinden
+fazlasını geri yazmaz. Multipart ayrıştırıcının okuyamadığı bir `Content-Type`, örneğin
+`multipart/mixed`, de `400`'dür. İstemcinin yarıda bıraktığı bir yükleme asla raporlanmaz ve
+ancak ona hâlâ bir şey yazılabiliyorsa `400` alır; ayrıştırıcı bunu fark ettiğinde genellikle
+yazılabilecek bir şey kalmamıştır.
 
-**Downloads.** `GET .../attachments/:attachmentId/content` streams the bytes with the **sniffed**
-media type (never the one the client declared at upload), `Content-Length`, and
-`Content-Disposition`. Disposition is `attachment` for everything except the four image types,
-which are served `inline` so the panel can preview them — PDFs included in "everything". Every
-such response also carries `X-Content-Type-Options: nosniff`,
-`Cross-Origin-Resource-Policy: same-origin` (overriding the `cross-origin` policy the API sets
-globally) and `Cache-Control: private, max-age=0, must-revalidate`. Asking for the content of a
-`LINK` is `404`: there are no bytes, and saying "wrong kind" would confirm the row exists.
+**İndirme.** `GET .../attachments/:attachmentId/content` byte'ları **sniff edilmiş** medya tipiyle
+(asla istemcinin yüklemede beyan ettiğiyle değil), `Content-Length` ve `Content-Disposition` ile
+akıtır. Disposition, panelin önizleyebilmesi için `inline` servis edilen dört görsel tipi
+dışında her şeyde `attachment`'tır — "her şey"e PDF de dahil. Böyle her cevap ayrıca
+`X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: same-origin` (API'nin global
+olarak verdiği `cross-origin` politikasını override eder) ve
+`Cache-Control: private, max-age=0, must-revalidate` taşır. Bir `LINK`'in içeriğini istemek
+`404`'tür: byte yoktur, ve "tip yanlış" demek satırın var olduğunu doğrulardı.
 
-### Importing a Trello board export
+### Trello board export'u içe aktarma
 
-`POST /workspaces/:workspaceId/imports/trello` takes a Trello board's JSON export and creates a
-**new board** from it. It is the API's only bulk-write endpoint.
+`POST /workspaces/:workspaceId/imports/trello`, bir Trello board'unun JSON export'unu alır ve
+ondan **yeni bir board** yaratır. API'nin toplu yazma yapan tek ucudur.
 
-| Property     | Value                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------- |
-| Body         | `multipart/form-data`, one part named **`file`** — no other part, no JSON shape         |
-| Role         | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                                    |
-| Size ceiling | `TRELLO_IMPORT_MAX_BYTES` (default `20971520` — 20 MiB)                                 |
-| Row ceiling  | `TRELLO_IMPORT_MAX_CARDS` (default `50000`), `TRELLO_IMPORT_MAX_LISTS` (default `5000`) |
-| Rate limit   | **3 / min** per client IP                                                               |
-| Success      | `201` with a `TrelloImportReportDto`                                                    |
+| Özellik      | Değer                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| Gövde        | `multipart/form-data`, **`file`** adında tek bir parça — başka parça yok, JSON yok            |
+| Rol          | **`ADMIN_ROLES`** (`OWNER`, `ADMIN`)                                                          |
+| Boyut tavanı | `TRELLO_IMPORT_MAX_BYTES` (varsayılan `20971520` — 20 MiB)                                    |
+| Satır tavanı | `TRELLO_IMPORT_MAX_CARDS` (varsayılan `50000`), `TRELLO_IMPORT_MAX_LISTS` (varsayılan `5000`) |
+| Rate limit   | **3 / dk**, client IP başına                                                                  |
+| Başarı       | `201` ve gövdede bir `TrelloImportReportDto`                                                  |
 
-**Multipart rather than JSON, and that is a decision rather than a convenience.** A board export
-is several megabytes and `REQUEST_BODY_MAX_BYTES` is 1 MiB; raising that to fit this one endpoint
-would hand the same cost to every other endpoint the API has. So the export arrives as a file
-part under a limit this module owns. The two numbers measure different resources —
-`TRELLO_IMPORT_MAX_BYTES` is a **heap** ceiling (the bytes are buffered, `JSON.parse`d, and the
-parsed graph is a multiple of the bytes that produced it), while `ATTACHMENT_MAX_BYTES` is a
-**disk** ceiling — which is why they are separate variables and why neither is derived from the
-other. The import limit must stay below the reverse proxy's body limit; that relationship is
-covered by a test (`storage/two-layer-limit.spec.ts`) and explained in
-[self-hosting.md](self-hosting.md#bringing-your-own-reverse-proxy).
+**JSON değil multipart, ve bu bir kolaylık değil bir karar.** Bir board export'u birkaç
+megabayttır, `REQUEST_BODY_MAX_BYTES` ise 1 MiB'dır; onu tek bir uç için yükseltmek aynı maliyeti
+API'nin bütün uçlarına dağıtırdı. Dolayısıyla export, bu modülün sahibi olduğu bir limitin altında
+bir dosya parçası olarak gelir. İki sayı farklı kaynakları ölçer — `TRELLO_IMPORT_MAX_BYTES` bir
+**heap** tavanıdır (baytlar belleğe alınır, `JSON.parse` edilir ve ayrıştırılmış grafik onları
+üreten baytların katıdır), `ATTACHMENT_MAX_BYTES` ise bir **disk** tavanıdır — ayrı değişken
+olmalarının ve hiçbirinin diğerinden türetilmemesinin sebebi budur. Import limiti ters proxy'nin
+gövde limitinin altında kalmak zorundadır; bu ilişkiyi bir test kapsıyor
+(`storage/two-layer-limit.spec.ts`) ve
+[self-hosting.md](self-hosting.md#kendi-reverse-proxynizi-kullanmak) açıklıyor.
 
-**`ADMIN_ROLES`, by permission arithmetic.** Creating a board is `CONTENT_ROLES`, but creating a
-_column_ is admin-only — and an import creates both. An endpoint must not do in one request what
-its caller could not do in several.
+**`ADMIN_ROLES`, izin aritmetiğiyle.** Board yaratmak `CONTENT_ROLES`, ama _kolon_ yaratmak
+yalnızca admin'e açık — ve bir import ikisini birden yapıyor. Bir uç, çağıranın birkaç istekte
+yapamayacağı şeyi tek istekte yapmamalı.
 
-**Errors:**
+**Hatalar:**
 
-| Status | When                                                                                                                                                                                                                                                             |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400`  | No part named `file`; the file is not valid JSON; the JSON is not a Trello board export; the export has more cards than `TRELLO_IMPORT_MAX_CARDS` or more lists than `TRELLO_IMPORT_MAX_LISTS`; multer refuses the multipart body itself (see [Errors](#errors)) |
-| `403`  | Workspace member whose role is below `ADMIN`, **or** the workspace is at its board ceiling (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, see [Plan limits](#plan-limits))                                                              |
-| `404`  | Not a member of the workspace, or the workspace does not exist — never `403`, which would confirm it                                                                                                                                                             |
-| `413`  | The file part is over `TRELLO_IMPORT_MAX_BYTES`                                                                                                                                                                                                                  |
-| `429`  | More than three imports in a rolling minute                                                                                                                                                                                                                      |
+| Durum | Ne zaman                                                                                                                                                                                                                                                                    |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400` | `file` adında parça yok; dosya geçerli JSON değil; JSON bir Trello board export'u değil; export'un kart sayısı `TRELLO_IMPORT_MAX_CARDS`'ı ya da liste sayısı `TRELLO_IMPORT_MAX_LISTS`'i aşıyor; multipart gövdeyi multer'ın kendisi reddediyor (bkz. [Hatalar](#hatalar)) |
+| `403` | Workspace üyesi, ama rolü `ADMIN`'in altında **ya da** workspace board tavanında (`error: "Plan Limit Exceeded"`, `planLimit.code: "PLAN_LIMIT_BOARDS"`, bkz. [Plan limitleri](#plan-limitleri))                                                                            |
+| `404` | Workspace üyesi değil, ya da workspace yok — asla `403`, çünkü o varlığı doğrulardı                                                                                                                                                                                         |
+| `413` | Dosya parçası `TRELLO_IMPORT_MAX_BYTES`'ı aşıyor                                                                                                                                                                                                                            |
+| `429` | Bir dakikalık pencerede üçten fazla import                                                                                                                                                                                                                                  |
 
-A `400` is the only failure that reaches the parser, and **nothing is written when it does**: the
-export is read and mapped entirely before the transaction opens, so a rejected import leaves the
-workspace byte-for-byte as it was. The row-cap refusal is part of that same `400`: once the export
-is read, its list and card counts are checked against `TRELLO_IMPORT_MAX_LISTS` and
-`TRELLO_IMPORT_MAX_CARDS` before the planner maps a single row, so an oversized export is refused
-after reading and before mapping, with nothing written either way. The board-ceiling `403` writes
-nothing either: the check is the first statement inside the transaction, before the board row, so
-the refusal rolls back an empty transaction.
+Ayrıştırıcıya ulaşan tek hata `400`'dür ve **ulaştığında hiçbir şey yazılmaz**: export, transaction
+açılmadan önce baştan sona okunup eşlenir, yani reddedilen bir import workspace'i baytı baytına
+olduğu gibi bırakır. Satır tavanı reddi de aynı `400`'ün bir parçasıdır: export okunduktan sonra,
+planlayıcı tek bir satırı eşlemeden önce liste ve kart sayıları `TRELLO_IMPORT_MAX_LISTS` ve
+`TRELLO_IMPORT_MAX_CARDS`'a karşı kontrol edilir, yani aşırı büyük bir export okunduktan sonra ve
+eşlemeden önce reddedilir, her iki durumda da hiçbir şey yazılmadan. Board tavanı `403`'ü de
+hiçbir şey yazmaz: kontrol, board satırından önce, transaction'ın ilk ifadesidir, dolayısıyla ret
+boş bir transaction'ı geri alır.
 
-**The response body is the whole report, and it is not stored anywhere.**
+**Cevabın gövdesi raporun kendisidir ve hiçbir yerde saklanmaz.**
 
 ```jsonc
 // POST /workspaces/w_1/imports/trello  → 201
@@ -579,40 +620,42 @@ the refusal rolls back an empty transaction.
 }
 ```
 
-`imported` counts rows actually written. `skipped` groups everything else by `(scope, reason)`;
-`count` is always the real number, while `samples` is capped at 20 names so the response scales
-with the number of _kinds_ of problem rather than with the size of the export. The vocabularies
-are closed — `TrelloImportScope` and `TrelloImportSkipReason` in `@kurul/shared-types` — because
-the web renders one translated sentence per reason and a free-text reason would ship English into
-a Turkish UI (ADR 0018).
+`imported`, gerçekten yazılan satırları sayar. `skipped` ise geri kalan her şeyi `(scope, reason)`
+çiftine göre gruplar; `count` her zaman gerçek sayıdır, `samples` ise 20 isimle sınırlıdır — böylece
+cevap export'un boyutuyla değil, sorun **türlerinin** sayısıyla büyür. Sözlükler kapalıdır —
+`@kurul/shared-types` içindeki `TrelloImportScope` ve `TrelloImportSkipReason` — çünkü web her
+sebep için çevrilmiş tek bir cümle basıyor ve serbest metin bir sebep, Türkçe bir arayüze İngilizce
+taşırdı (ADR 0018).
 
-**`defaulted` is in the skip list without being a skip**, and deliberately: an imported column
-takes the default category and an unknown Trello colour falls back to `slot-1`. Both changed
-something the user will see, and the question after an import is "why does my board look
-different", not "what did I lose".
+**`defaulted`, bir atlama olmadığı hâlde atlama listesinde**, ve bu bilinçli: içe aktarılan bir
+kolon varsayılan kategoriyi alıyor, bilinmeyen bir Trello rengi de `slot-1`'e düşüyor. İkisi de
+kullanıcının göreceği bir şeyi değiştirdi, ve import sonrası sorulan soru "ne kaybettim" değil,
+"board'um neden farklı görünüyor".
 
-**What this endpoint does not do**, each of which is a decision recorded in
-[ADR 0025](decisions/0025-trello-import-mapping.md):
+**Bu ucun yapmadıkları** — her biri
+[ADR 0025](decisions/0025-trello-import-mapping.md)'te kayıtlı birer karar:
 
-- **No idempotency.** Posting the same export twice creates **two boards**. There is no dedupe
-  key, no update-in-place, no "already imported" answer. Updating an existing board is
-  synchronisation, not import, and it needs a conflict policy this API does not have.
-- **No member mapping.** A Trello account is not a Kurul account, so assignments are dropped
-  and counted. Every row written — tasks and attachments alike — is attributed to the caller.
-- **No column categories.** Every imported column is `UNSTARTED`; the category is never inferred
-  from a list's name or its position ([ADR 0019](decisions/0019-column-category.md) refuses both).
-  The report says how many columns this affected, and the user sets them afterwards.
-- **No files.** A Trello export carries attachment URLs, not bytes, so every attachment becomes a
-  `LINK` row — and the server never requests those URLs, the same rule the attachment endpoint
-  follows.
-- **No comments.** Out of scope, and counted rather than silently dropped.
-- **No socket event.** An import creates a board whose room nobody has joined yet. It writes
-  exactly one activity row, `board.imported`, rather than one per card.
+- **İdempotans yok.** Aynı export'u iki kez göndermek **iki board** yaratır. Tekilleştirme
+  anahtarı, yerinde güncelleme, "zaten aktarılmıştı" cevabı yok. Var olan bir board'u güncellemek
+  import değil senkronizasyondur ve bu API'de olmayan bir çakışma politikası ister.
+- **Üye eşlemesi yok.** Bir Trello hesabı bir Kurul hesabı değildir; atamalar düşer, rapor ise
+  atamaları değil export'taki Trello üyelerini sayar. Yazılan her satır — task'lar da
+  attachment'lar da — çağıranın üzerine yazılır.
+- **Kolon kategorisi yok.** İçe aktarılan her kolon `UNSTARTED`; kategori ne list'in adından ne de
+  konumundan çıkarılır ([ADR 0019](decisions/0019-column-category.md) ikisini de reddediyor).
+  Rapor bunun kaç kolonu etkilediğini söyler, kategorileri sonrasında kullanıcı ayarlar.
+- **Dosya yok.** Trello export'u attachment'ların baytlarını değil URL'lerini taşır, dolayısıyla
+  her attachment bir `LINK` satırı olur — ve sunucu, attachment ucunun izlediği kuralın aynısıyla,
+  o URL'lere hiç istek atmaz.
+- **Yorum yok.** Kapsam dışı, ve sessizce düşürülmek yerine sayılıyor.
+- **Socket event'i yok.** Import, odasına henüz kimsenin katılmadığı bir board yaratır. Kart başına
+  değil, toplam **tek** bir activity satırı yazar: `board.imported`.
 
-## Errors
+## Hatalar
 
-Errors use a **problem-JSON-style object** (RFC 7807 in spirit, using NestJS's field names so
-the framework's built-in exceptions and hand-written ones look identical):
+Hatalar **problem-JSON tarzı bir obje** kullanır (ruhen RFC 7807, ancak framework'ün
+built-in exception'larıyla elle yazılmış olanların aynı görünmesi için NestJS'in alan
+isimleriyle):
 
 ```jsonc
 {
@@ -620,7 +663,11 @@ the framework's built-in exceptions and hand-written ones look identical):
   "error": "Bad Request",
   "message": "Validation failed",
   "details": [
-    { "field": "title", "constraint": "isNotEmpty", "message": "title should not be empty" },
+    {
+      "field": "title",
+      "constraint": "minLength",
+      "message": "title must be longer than or equal to 1 characters",
+    },
     {
       "field": "estimatedMinutes",
       "constraint": "min",
@@ -633,80 +680,83 @@ the framework's built-in exceptions and hand-written ones look identical):
 }
 ```
 
-| Field            | Type   | Required | Meaning                                                             |
-| ---------------- | ------ | -------- | ------------------------------------------------------------------- |
-| `statusCode`     | number | yes      | Mirrors the HTTP status                                             |
-| `error`          | string | yes      | Stable, machine-readable reason phrase (`Bad Request`, `Not Found`) |
-| `message`        | string | yes      | Human-readable, single sentence, safe to log                        |
-| `details`        | array  | no       | Per-field validation problems, at most 100; only for `400`/`422`    |
-| `detailsOmitted` | number | no       | How many problems `details` left out; present only when it did      |
-| `path`           | string | yes      | Request path, without the query string                              |
-| `timestamp`      | string | yes      | ISO 8601 UTC                                                        |
-| `requestId`      | string | yes      | Correlation id; same value as the `X-Request-Id` response header    |
+| Alan             | Tip    | Zorunlu | Anlam                                                                                |
+| ---------------- | ------ | ------- | ------------------------------------------------------------------------------------ |
+| `statusCode`     | number | evet    | HTTP status'ünü yansıtır                                                             |
+| `error`          | string | evet    | Kararlı, makine tarafından okunabilir sebep ifadesi (`Bad Request`, `Not Found`)     |
+| `message`        | string | evet    | İnsan tarafından okunabilir, tek cümle, loglanması güvenli                           |
+| `details`        | array  | hayır   | Alan bazlı validation problemleri, en fazla 100; yalnızca `400`/`422`'de mevcut      |
+| `detailsOmitted` | number | hayır   | `details`'in dışarıda bıraktığı problem sayısı; yalnızca bir şey bıraktığında mevcut |
+| `path`           | string | evet    | Request path'i, query string olmadan                                                 |
+| `timestamp`      | string | evet    | ISO 8601 UTC                                                                         |
+| `requestId`      | string | evet    | Korelasyon id'si; `X-Request-Id` response header'ıyla aynı değer                     |
 
-- One global exception filter produces this shape for **every** error, including unhandled
-  ones. There is no second error format anywhere in the API.
-- `message` is never a raw exception string in production, and stack traces are logged, not
-  returned.
-- Clients branch on `statusCode` and `error`, never on `message` text.
-- `path` is the path the request was sent to and nothing after it: no query string and no
-  fragment. A query can carry a token from a link, and the client already has it. Nest's own
-  `404` for a route that does not exist names the same path, `Cannot GET /nope` and not the whole
-  URL. Past 256 characters, well beyond the longest route the API serves (153 with its three ids
-  filled in), a path is cut to its first 256 followed by `[+N more]`, as a name is (next item).
-  The access log writes the path as well, without that cut (see
-  [Request correlation](#request-correlation)), and the `requestId` joins the two.
-- A name the client chose is repeated in `details` whole only up to 64 characters. A key the DTO
-  does not declare is refused by name, in `field` and again in `message`
-  (`property <name> should not exist`), and past 64 characters each is cut to its first 64
-  followed by `[+N more]`: a nested `field` is cut as one path, so it still reads from its
-  declared start (`items[0].` and then the key). Every name a DTO declares is shorter than that
-  and is repeated exactly. A multipart part name gets the same bound, below.
-- `details` lists at most 100 problems, the first ones in the order validation found them, which
-  puts keys the DTO does not declare first. A refusal that found more says how many it left out
-  in `detailsOmitted`, a positive integer present only then; `details` keeps its shape. There is
-  one entry per rule a value failed and one per undeclared key, so the list used to grow with the
-  body: 80,000 short keys in an 868,891-byte body made a 7,898,051-byte envelope. No form comes
-  near 100, and the largest DTO fails in 12 ways with every field wrong.
-- A failure thrown by a library whose error vocabulary _is_ HTTP status codes — `http-errors`,
-  which is what Express's body parsers throw — is answered with **its own 4xx** in this envelope,
-  with wording chosen here rather than the library's. The mapping stops at 4xx on purpose: a 5xx
-  from the same source is still a server fault and keeps the `500` envelope _and_ the report.
-- A multipart body multer refuses is answered **`400`** in this envelope (**`413`** when the
-  refusal is the file's size) and is not reported. Nest translates most of multer's error codes
-  before the filter sees them, and the filter maps the rest by `code`, never by message. Here the
-  wording _is_ the library's, on purpose: it is what Nest already returns for the codes it
-  translates, so a refusal reads the same whichever layer caught it. That is multer's sentence,
-  then the part name when there is one (`Field name array index too large - items[4294967294]`).
-  The part name is the client's own input and is repeated whole only up to 64 characters: both
-  multipart routes refuse a longer one before anything names it, and one that is named anyway is
-  cut to its first 64 characters followed by `[+N more]`, whichever layer worded the refusal. That
-  includes Nest's own `Field value too long - <name>`, which multer raises before it looks at the
-  name's length, for a text value of the route's limit or more (8 KiB on the attachment upload,
-  1 KiB on the Trello import, which reads none). `STREAM_DESTROYED`, which multer's disk storage
-  raises when an upload's own stream has failed, is the one code that stays a `500`.
-- A multipart upload whose client leaves before the body has arrived in full is not a server
-  failure and is never reported. It is answered **`400`** in this envelope, as the JSON parsers
-  answer the same abort, when anything can still be written; by the time multer reports it the
-  connection is normally gone, and then nothing is written at all. A `Content-Type` the
-  multipart parser cannot read is a **`400`** as well, worded the way Nest words the parser
-  errors it translates and without the header read back: `Multipart: Unsupported content type`
-  for a `multipart/*` type other than `multipart/form-data`, `Multipart: Malformed content type`
-  for one it cannot parse.
+- Tek bir global exception filter, ele alınmamışlar dahil **her** hata için bu şekli
+  üretir. API'nin hiçbir yerinde ikinci bir hata formatı yoktur.
+- `message`, production'da asla ham bir exception string'i değildir, stack trace'ler
+  döndürülmez, loglanır.
+- Client'lar `message` metnine değil, `statusCode` ve `error`'a göre dallanır.
+- `path`, isteğin gönderildiği yoldur ve ondan sonrasını içermez: ne query string ne fragment.
+  Bir query bir linkten gelen token'ı taşıyabilir ve client onu zaten bilir. Nest'in var olmayan
+  bir rota için verdiği kendi `404`'ü de aynı yolu anar: tüm URL'yi değil, `Cannot GET /nope`.
+  API'nin sunduğu en uzun rotanın (üç id'si yazılmış hâliyle 153 karakter) çok üstündeki 256
+  karakteri aşan bir yol, ilk 256 karakterine kesilir ve ardından `[+N more]` gelir, bir adın
+  kesildiği gibi (sonraki madde). Erişim logu da yolu yazar, bu kesme olmadan
+  ([Request korelasyonu](#request-korelasyonu)); ikisini `requestId` birleştirir.
+- Client'ın seçtiği bir ad `details` içinde yalnızca 64 karaktere kadar olduğu gibi yazılır.
+  DTO'nun tanımlamadığı bir anahtar adıyla reddedilir, hem `field`'da hem yeniden `message`'da
+  (`property <ad> should not exist`); 64 karakteri aşan her biri ilk 64 karakterine kesilir ve
+  ardından `[+N more]` gelir: iç içe bir `field` tek bir yol olarak kesilir, böylece tanımlı
+  başlangıcından okunmaya devam eder (`items[0].` ve ardından anahtar). Bir DTO'nun tanımladığı
+  her ad bundan kısadır ve olduğu gibi yazılır. Multipart bir parça adı da aşağıda aynı sınırı
+  alır.
+- `details` en fazla 100 problem listeler: validation'ın onları bulduğu sıradaki ilkleri, ki bu
+  sıra DTO'nun tanımlamadığı anahtarları öne koyar. Daha fazlasını bulan bir ret, kaçını dışarıda
+  bıraktığını `detailsOmitted` içinde söyler; bu alan pozitif bir tam sayıdır ve yalnızca o
+  durumda bulunur. `details` şeklini korur. Bir değerin geçemediği her kural için bir, tanımlanmamış
+  her anahtar için bir kayıt vardır, yani liste eskiden gövdeyle birlikte büyürdü: 868.891 baytlık
+  bir gövdedeki 80.000 kısa anahtar 7.898.051 baytlık bir zarf üretiyordu. Hiçbir form 100'e
+  yaklaşmaz; en büyük DTO, her alanı yanlış olduğunda 12 şekilde reddedilir.
+- Hata sözlüğü _zaten_ HTTP status kodları olan bir kütüphanenin fırlattığı bir hata —
+  Express'in body parser'larının fırlattığı `http-errors` — bu zarf içinde **kendi 4xx'i** ile
+  cevaplanır; metin kütüphanenin değil, burada seçilendir. Eşleme bilinçli olarak 4xx'te durur:
+  aynı kaynaktan gelen bir 5xx hâlâ bir sunucu hatasıdır, `500` zarfını **ve** raporunu korur.
+- multer'ın reddettiği bir multipart gövde bu zarf içinde **`400`** ile cevaplanır (ret dosyanın
+  boyutu yüzündense **`413`**) ve raporlanmaz. Nest, multer'ın hata kodlarının çoğunu filter'a
+  ulaşmadan kendisi çevirir; filter geri kalanını mesaja göre değil, `code`'a göre eşler. Burada
+  metin _kütüphanenin_ metnidir, bilinçli olarak: Nest'in çevirdiği kodlar için zaten döndürdüğü
+  metin budur, yani bir ret hangi katmanda yakalanırsa yakalansın aynı okunur. Bu metin multer'ın
+  cümlesi, varsa ardından parça adıdır (`Field name array index too large - items[4294967294]`).
+  Parça adı client'ın kendi girdisidir ve yalnızca 64 karaktere kadar olduğu gibi yazılır: iki
+  multipart rota da daha uzun bir adı, ona adıyla değinen hiçbir şey olmadan önce reddeder; yine
+  de adıyla anılan bir ad, reddi hangi katman yazmış olursa olsun ilk 64 karakterine kesilir ve
+  ardından `[+N more]` gelir. Buna Nest'in kendi `Field value too long - <ad>` metni de dahildir:
+  multer bu reddi, adın uzunluğuna bakmadan önce, rotanın limitine ulaşan bir metin değeri için
+  verir (dosya ekinde 8 KiB, hiç metin alanı okumayan Trello import'unda 1 KiB). multer'ın disk
+  depolamasının, bir yüklemenin kendi akışı bozulduğunda fırlattığı `STREAM_DESTROYED`, `500`
+  olarak kalan tek koddur.
+- İstemcisi gövdenin tamamı gelmeden ayrılan bir multipart yükleme sunucu hatası değildir ve
+  asla raporlanmaz. Hâlâ bir şey yazılabiliyorsa, JSON parser'larının aynı kesintiye verdiği gibi bu
+  zarf içinde **`400`** ile cevaplanır; multer bunu bildirdiğinde bağlantı genellikle çoktan
+  kapanmıştır ve o zaman hiçbir şey yazılmaz. Multipart ayrıştırıcının okuyamadığı bir
+  `Content-Type` de **`400`**'dür; metin, Nest'in çevirdiği ayrıştırıcı hatalarına verdiği
+  biçimdedir ve header'ı geri okumaz: `multipart/form-data` dışındaki bir `multipart/*` tipi için
+  `Multipart: Unsupported content type`, ayrıştıramadığı bir tip için
+  `Multipart: Malformed content type`.
 
-### Request correlation
+### Request korelasyonu
 
-Every request carries an id, and every response returns it in the `X-Request-Id` header. A
-client may supply its own — an id minted by a reverse proxy or load balancer flows straight
-through — as long as it is URL-safe and between 8 and 128 characters; anything else is
-discarded and replaced with a generated [UUIDv7](#data-types), so a header value can never
-reach a log line or a response body unsanitised.
+Her request bir id taşır ve her response bunu `X-Request-Id` header'ında geri döndürür.
+Client kendi id'sini verebilir — bir reverse proxy ya da load balancer'ın ürettiği id
+doğrudan akıp geçer — yeter ki URL-safe ve 8–128 karakter arasında olsun; bunun dışındaki
+her şey atılır ve yerine üretilmiş bir [UUIDv7](#veri-tipleri) konur, böylece bir header
+değeri hiçbir zaman sanitize edilmeden bir log satırına veya response body'sine ulaşamaz.
 
-The same id appears in three places, which is the point: the `X-Request-Id` header the client
-received, the `requestId` field of the error envelope, and the server's log lines for that
-request. A user reporting a failure quotes one id, and it selects exactly one request.
+Aynı id üç yerde birden görünür, ki asıl mesele budur: client'ın aldığı `X-Request-Id`
+header'ı, hata zarfının `requestId` alanı ve o request'e ait sunucu log satırları. Bir
+hatayı bildiren kullanıcı tek bir id verir ve bu id tam olarak tek bir request'i seçer.
 
-Every request also writes a single-line JSON access log to stdout:
+Her request ayrıca stdout'a tek satırlık bir JSON erişim logu yazar:
 
 ```jsonc
 {
@@ -714,300 +764,313 @@ Every request also writes a single-line JSON access log to stdout:
   "level": "info", // info < 400, warn 4xx, error 5xx
   "requestId": "0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d",
   "method": "GET",
-  "path": "/workspaces/w_1/tasks", // route only — the query string is stripped
+  "path": "/workspaces/w_1/tasks", // yalnızca route — query string ayıklanır
   "status": 200,
   "durationMs": 15.444,
-  "userId": "0198e2c1-9a11-7c40-8f2b-1d3e5a7c9b02", // omitted when unauthenticated
-  "ip": "203.0.113.7", // Express's resolved client IP — see TRUST_PROXY below
+  "userId": "0198e2c1-9a11-7c40-8f2b-1d3e5a7c9b02", // kimliksiz istekte yer almaz
+  "ip": "203.0.113.7", // Express'in çözdüğü client IP'si — bkz. aşağıda TRUST_PROXY
 }
 ```
 
-That field list is closed. Request bodies, query strings, headers and cookies are never
-logged: the query carries user-supplied filters and search terms, and the headers carry
-session cookies and invitation tokens. `ip` is Express's own `req.ip`, not a raw header —
-unconfigured, this is always the TCP peer, so behind an unconfigured reverse proxy it is the
-proxy's address for every request. See `TRUST_PROXY` below.
+Bu alan listesi kapalıdır. Request body'leri, query string'ler, header'lar ve cookie'ler
+asla loglanmaz: query kullanıcının verdiği filtreleri ve arama terimlerini, header'lar ise
+session cookie'lerini ve davet token'larını taşır. `ip`, ham bir header değil Express'in kendi
+`req.ip`'sidir — yapılandırılmamışsa bu her zaman TCP peer'ıdır, yani yapılandırılmamış bir
+reverse proxy arkasında her istek için proxy'nin adresidir. Aşağıda `TRUST_PROXY`'ye bakın.
 
-The line is written when the response finishes. A request whose connection closes first, which is
-what a client that leaves mid-request looks like, gets its line when the connection closes, with
-`"aborted": true` after `status`. Its `status` is the one the client was sent, so a download cut
-short still reads `200`, or `null` when the connection closed before any status went out; a line
-with no status is `warn`, the level of the `400` the API gives a client that stops sending
-mid-body. Either way a request has one line, never two.
+Satır, response tamamlandığında yazılır. Bağlantısı ondan önce kapanan bir request, ki istek
+ortasında ayrılan bir client böyle görünür, satırını bağlantı kapandığında alır; `status`'ün
+ardında `"aborted": true` bulunur. `status`'ü client'a gönderilmiş olandır, yani yarıda kesilen
+bir indirme yine `200` okur; bağlantı hiçbir status gönderilmeden kapandıysa `null`'dır. Status'ü
+olmayan bir satır `warn`'dır: API'nin gövdenin ortasında göndermeyi bırakan bir client'a verdiği
+`400`'ün seviyesi. Her iki durumda da bir request'in tek bir satırı olur, asla iki değil.
 
-## Authentication
+## Kimlik doğrulama
 
-Two credentials. Every route except the two health probes requires one of them, and the
-OpenAPI document says which on every operation (`security`).
+İki kimlik bilgisi var. Nest router'ındaki her route, iki health probe'u dışında, bunlardan
+birini ister, ve OpenAPI belgesi her operasyonda hangisinin gerektiğini söyler (`security`).
+`/auth/*` altındaki giriş, kayıt, parola sıfırlama ve e-posta doğrulama uçları kimlik istemez;
+`API_DOCS_ENABLED` açıkken `/docs`, `/openapi.json` ve `/docs-yaml` de kimliksizdir.
 
-**A session cookie**, issued by Better Auth at `POST /auth/sign-in/email`. The browser path,
-and what the web app uses. A non-browser client can store and replay it, but that is not what
-cookies are for, which is why the second credential exists.
+**Bir session cookie'si**, Better Auth tarafından `POST /auth/sign-in/email`'de verilir. Tarayıcı
+yolu budur, ve web uygulamasının kullandığı da budur. Tarayıcı olmayan bir client onu saklayıp
+tekrar oynatabilir, ama cookie'ler bunun için değildir; ikinci kimlik bilgisinin var olma sebebi
+de budur.
 
-**A personal access token**, sent as `Authorization: Bearer kurul_pat_...`. Minted by a member
-at `POST /workspaces/:workspaceId/tokens`, shown in that one response and never again; the
-server stores a SHA-256 of it and cannot show it back. Listed (`GET .../tokens`, own tokens
-only, by display prefix) and revoked (`DELETE .../tokens/:tokenId`, immediate) by the person
-who minted it. A token may carry an expiry; an expired one reads exactly like a revoked one,
-which reads exactly like one that never existed: `401` for all three, so a stolen secret learns
-nothing about its own history.
+**Bir kişisel erişim token'ı**, `Authorization: Bearer kurul_pat_...` olarak gönderilir.
+`POST /workspaces/:workspaceId/tokens`'ta bir üye tarafından basılır, yalnızca o tek yanıtta
+gösterilir ve bir daha asla; sunucu onun SHA-256'sını saklar ve geri gösteremez. Basan kişi
+tarafından listelenir (`GET .../tokens`, yalnızca kendi token'ları, görüntü öneki üzerinden) ve
+iptal edilir (`DELETE .../tokens/:tokenId`, anında). Bir token bir son kullanma tarihi
+taşıyabilir; süresi dolmuş biri tıpkı iptal edilmiş biri gibi okunur, o da hiç var olmamış biri
+gibi okunur: üçü için de `401`, böylece çalınmış bir sır kendi geçmişi hakkında hiçbir şey
+öğrenmez.
 
-**A forgotten password is recovered, not reissued by an admin.**
-`POST /auth/request-password-reset` mails a single-use link that is good for one hour, and
-`POST /auth/reset-password` spends it. Both are Better Auth's, and the request endpoint answers
-the same `200` and the same body for an address with no account as for one with an account, so
-it cannot be used to find out who has one. Spending the link revokes every session the account
-held (`revokeSessionsOnPasswordReset`), which is what makes a reset a way to take an account
-back rather than only a way to remember it. Delivery is a hard requirement: see
-[self-hosting](self-hosting.md#email-smtp) for what an instance without SMTP does instead.
+**Unutulmuş bir parola kurtarılır, bir admin tarafından yeniden verilmez.**
+`POST /auth/request-password-reset`, bir saat geçerli ve tek kullanımlık bir bağlantı postalar;
+`POST /auth/reset-password` onu harcar. İkisi de Better Auth'undur ve istek ucu, hesabı olmayan
+bir adres için de hesabı olan bir adres için de aynı `200`'ü ve aynı gövdeyi döner; yani kimin
+hesabı olduğunu öğrenmek için kullanılamaz. Bağlantının harcanması, hesabın sahip olduğu bütün
+oturumları iptal eder (`revokeSessionsOnPasswordReset`); sıfırlamayı yalnızca hatırlamanın değil,
+hesabı geri almanın da yolu yapan budur. İletim zorunludur: SMTP'si olmayan bir kurulumun bunun
+yerine ne yaptığı için [kendi sunucunda barındırma](self-hosting.md#e-posta-smtp).
 
 ```
-POST   /workspaces/:workspaceId/tokens            # mint; the only response carrying the plaintext
-GET    /workspaces/:workspaceId/tokens            # the caller's live tokens, newest first
-DELETE /workspaces/:workspaceId/tokens/:tokenId   # revoke; another member's token is 404
+POST   /workspaces/:workspaceId/tokens            # bas; plaintext'i taşıyan tek yanıt
+GET    /workspaces/:workspaceId/tokens            # çağıranın canlı token'ları, en yeniden eskiye
+DELETE /workspaces/:workspaceId/tokens/:tokenId   # iptal et; başka bir üyenin token'ı 404'tür
 ```
 
-### What a token is, and is not
+### Bir token nedir, ve ne değildir
 
-A token **acts as its owner, in one workspace, with the role the owner holds at the time of
-each request.** There are no scopes: the workspace is the scope, and the role is read live
-from the membership, so demoting or removing the owner changes what every one of their tokens
-can do on the next request (removal and leaving also revoke them outright, so a member re-added
-later does not find old credentials working). A GUEST's token can do what a GUEST can, and
-nothing a token does is unavailable to its owner through the web app. `ROADMAP.md`'s "API 1.0"
-section is explicit that this is **not OAuth** and that per-token scopes are not promised.
+Bir token, **her isteğin anında sahibinin tuttuğu rolle, tek bir workspace'te sahibi olarak
+davranır.** Scope yoktur: workspace scope'tur, ve rol üyelikten canlı okunur; dolayısıyla sahibi
+düşürmek veya çıkarmak, sonraki istekte o kişinin bütün token'larının yapabileceğini değiştirir
+(çıkarma ve ayrılma da token'ları doğrudan iptal eder, böylece sonradan yeniden eklenen bir üye
+eski kimlik bilgilerini çalışır bulmaz). Bir GUEST'in token'ı GUEST'in yapabileceğini yapabilir,
+ve bir token'ın yaptığı hiçbir şey sahibi için web uygulaması üzerinden erişilemez değildir.
+`ROADMAP.md`'nin "API 1.0" bölümü, bunun **OAuth olmadığını** ve token başına scope'ların vaat
+edilmediğini açıkça söyler.
 
-Where a token is accepted follows from that scope:
+Bir token'ın nerede kabul edildiği o scope'tan çıkar:
 
-| Route                                                                                                                                         | With a token                                                                                                                                     |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Anything under the token's own `/workspaces/:workspaceId/...`                                                                                 | As the owner, with the owner's current role                                                                                                      |
-| Any other `/workspaces/:workspaceId/...`                                                                                                      | `404`, exactly as for a non-member; whether the owner belongs to that workspace too makes no difference                                          |
-| A route with no workspace in its path: `/me`, `GET /workspaces`, `POST /workspaces`, `/config`, `/instance/*`                                 | `403`; a workspace-bound credential has no scope to compare there                                                                                |
-| The three token routes above                                                                                                                  | `403`; a credential must not mint, list or revoke credentials                                                                                    |
-| The workspace-administration writes Better Auth performs: rename and delete, invite, revoke and accept, remove a member, change a role, leave | `403`; these run on the caller's own Better Auth session, which a token does not carry. The reads beside them (roster, pending invitations) work |
+| Route                                                                                                                                                                   | Token ile                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token'ın kendi `/workspaces/:workspaceId/...`'ının altındaki her şey                                                                                                    | Sahibi olarak, sahibinin güncel rolüyle                                                                                                             |
+| Başka herhangi bir `/workspaces/:workspaceId/...`                                                                                                                       | `404`, tam olarak üye olmayan biri için olduğu gibi; sahibin o workspace'e de üye olup olmaması hiçbir fark yaratmaz                                |
+| Path'inde workspace olmayan bir route: `/me`, `GET /workspaces`, `POST /workspaces`, `/config`, `/instance/*`                                                           | `403`; workspace'e bağlı bir kimlik bilgisinin orada karşılaştıracağı bir scope yoktur                                                              |
+| Yukarıdaki üç token route'u                                                                                                                                             | `403`; bir kimlik bilgisi kimlik bilgisi basamaz, listeleyemez veya iptal edemez                                                                    |
+| Better Auth'un yaptığı workspace-yönetimi yazmaları: yeniden adlandırma ve silme, davet etme, iptal etme ve kabul etme, bir üyeyi çıkarma, bir rolü değiştirme, ayrılma | `403`; bunlar çağıranın kendi Better Auth session'ında çalışır, ve bir token onu taşımaz. Yanlarındaki okumalar (roster, bekleyen davetler) çalışır |
 
-The last row is the slice boundary, named rather than hidden: lifting it means moving those
-writes out from under the organization plugin, and that is a `/v1` decision
-([ADR 0031](decisions/0031-api-versioning.md)), not a token one.
+Son satır dilim sınırıdır, gizlenmek yerine adlandırılmıştır: onu kaldırmak, o yazmaları
+organization plugin'inin altından çıkarmak demektir, ve bu bir `/v1` kararıdır
+([ADR 0031](decisions/0031-api-versioning.md)), bir token kararı değil.
 
-**A request that carries a Bearer header is decided by that header alone.** It never falls
-back to a cookie the request also happens to send, and a Bearer credential that is not a
-`kurul_pat_` token is `401` rather than ignored: a client that sends a token expects to be the
-identity that token names.
+**Bir Bearer header'ı taşıyan istek, yalnızca o header'a göre karar verilir.** İsteğin taşıdığı
+bir cookie'ye asla geri düşmez, ve `kurul_pat_` bir token olmayan bir Bearer kimlik bilgisi, yok
+sayılmak yerine `401`'dir: bir token gönderen bir client, o token'ın adlandırdığı kimlik olmayı
+bekler.
 
-### Properties every token has
+### Her token'ın taşıdığı özellikler
 
-- **Hashed at rest.** The row holds `sha256(plaintext)` and a display `prefix` (`kurul_pat_`
-  plus eight characters). A database dump yields no usable credential. SHA-256 rather than a
-  slow password hash because the secret is 256 random bits: there is nothing to guess, and a
-  slow hash would only tax every request.
-- **Workspace-bound at the guard.** `SessionAuthGuard` resolves the token to a user and a
-  workspace, and `WorkspaceGuard` refuses any other `:workspaceId` before the membership lookup
-  runs. The tenant isolation rule in [architecture.md](architecture.md) holds for tokens by the
-  same code path that holds it for cookies.
-- **Revocation is immediate** and is a timestamp, not a delete: the row stays as evidence
-  beside the `token.revoked` activity entry. Minting writes `token.created`. Both are in the
-  audit subset (`AUDIT_ACTIVITY_TYPES`) and neither payload carries the secret.
-- **Rate limited like everything else.** The throttler runs ahead of authentication and keys on
-  client IP and route, so a script replaying a token spends the same budget a browser session
-  does ([Rate limiting](#rate-limiting)).
-- **`lastUsedAt`** is stamped on first use and then at most once a minute, so a polling script
-  does not turn every read into a write.
-- **Account deletion deletes the tokens**, every workspace, inside the same transaction that
-  anonymises the account ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
+- **Yerinde hashlenir.** Satır `sha256(plaintext)`'i ve bir görüntü `prefix`'i (`kurul_pat_` artı
+  sekiz karakter) tutar. Bir veritabanı dump'ı kullanılabilir bir kimlik bilgisi vermez. SHA-256,
+  yavaş bir parola hash'i yerine, çünkü sır 256 rastgele bittir: tahmin edilecek bir şey yoktur,
+  ve yavaş bir hash yalnızca her isteğe vergi koyardı.
+- **Guard'da workspace'e bağlıdır.** `SessionAuthGuard`, token'ı bir kullanıcıya ve bir
+  workspace'e çözer, ve `WorkspaceGuard`, üyelik sorgusu çalışmadan önce başka herhangi bir
+  `:workspaceId`'yi reddeder. [architecture.md](architecture.md)'deki tenant izolasyon kuralı,
+  token'lar için de cookie'ler için tuttuğu aynı kod yoluyla tutar.
+- **İptal anındadır** ve bir silme değil bir zaman damgasıdır: satır, `token.revoked` activity
+  girdisinin yanında kanıt olarak kalır. Basmak `token.created` yazar. İkisi de audit alt
+  kümesindedir (`AUDIT_ACTIVITY_TYPES`) ve hiçbir payload sırrı taşımaz.
+- **Her şey gibi rate limitlidir.** Throttler kimlik doğrulamadan önce çalışır ve client IP'sine
+  ve route'a göre anahtarlanır, böylece bir token'ı tekrar oynatan bir script, bir tarayıcı
+  session'ının harcadığı aynı bütçeyi harcar ([Rate limiting](#rate-limiting)).
+- **`lastUsedAt`**, ilk kullanımda ve sonrasında en fazla dakikada bir damgalanır, böylece
+  polling yapan bir script her okumayı bir yazmaya çevirmez.
+- **Hesap silme token'ları siler**, her workspace'te, hesabı anonimleştiren aynı transaction
+  içinde ([ADR 0026](decisions/0026-account-deletion-anonymisation.md)).
 
-### Why a first-party model rather than Better Auth's API-key plugin
+### Neden Better Auth'un API-key eklentisi yerine ilk taraf bir model
 
-Better Auth 1.7 ships its API-key plugin as a separate package that is not in this tree, and
-its key is bound to a user with free-form `metadata`, not to an organization: workspace scoping
-would have been a JSON field the guards parse rather than a foreign key the database enforces,
-and verification goes through `getSession`, which would hand `WorkspaceGuard` a session with no
-workspace on it. The plugin also brings its own per-key rate limiter and permission model, both
-of which this slice deliberately does not want. A 40-line Prisma model, one service and one
-branch in the existing guard express the scope exactly, keep revocation and listing under
-Kurul's own activity log, and leave the existing controllers untouched.
+Better Auth 1.7, API-key eklentisini bu ağaçta olmayan ayrı bir paket olarak sunar, ve anahtarı
+bir organization'a değil, serbest biçimli `metadata`'sı olan bir kullanıcıya bağlar: workspace
+scoping, veritabanının zorladığı bir foreign key yerine guard'ların ayrıştırdığı bir JSON alanı
+olurdu, ve doğrulama `getSession`'dan geçer, ki bu da `WorkspaceGuard`'a üzerinde workspace
+olmayan bir session verirdi. Eklenti ayrıca anahtar başına çalışan kendi rate limiter'ını ve
+izin modelini getirir; bu dilim ikisini de bilinçli olarak istemiyor. 40 satırlık bir Prisma modeli, bir servis ve mevcut
+guard'da bir dal, scope'u tam olarak ifade eder, iptali ve listelemeyi Kurul'un kendi activity
+log'unun altında tutar ve mevcut controller'ları dokunulmamış bırakır.
 
-## Cross-origin requests
+## Cross-origin istekler
 
-Authentication is a **cookie** for the web app, so every request a browser makes to this API carries the
-caller's session automatically — including one initiated by a page the caller did not intend
-to act on. Three rules decide what the API does about that.
+Kimlik doğrulama, web uygulaması için bir **cookie**'dir, dolayısıyla tarayıcının bu API'ye
+yaptığı her istek çağıranın session'ını otomatik olarak taşır, çağıranın üzerinde işlem yapmayı
+hiç istemediği bir sayfanın başlattığı istek dahil. Bu konuda API'nin ne yaptığına üç kural
+karar verir.
 
-**Reads are governed by CORS.** `WEB_URL` is the single allowed origin, with
-`credentials: true`. A `GET` from anywhere else still reaches a handler, but the browser
-refuses to hand the response to the calling script.
+**Okumaları CORS yönetir.** `WEB_URL` tek izinli origin'dir ve `credentials: true` ile
+gelir. Başka bir yerden gelen `GET` yine bir handler'a ulaşır, ancak tarayıcı yanıtı çağıran
+script'e vermeyi reddeder.
 
-**Writes must also announce an allowed origin.** `POST`, `PUT`, `PATCH` and `DELETE` are
-checked server-side against an allowlist — the same one value, `WEB_URL`, so the browser-side
-and server-side lists cannot drift. A request that announces a different origin, in `Origin`
-or (when that is absent) in `Referer`, is refused with `403` and the standard error envelope
-before it reaches a handler. `Origin: null` — what a sandboxed document or a laundering
-redirect sends — is not on the list either. The check covers `/auth/*` as well as the Nest
-routes, and Better Auth's own `originCheck` still runs underneath it.
+**Yazmalar ayrıca izinli bir origin bildirmek zorundadır.** `POST`, `PUT`, `PATCH` ve
+`DELETE` sunucu tarafında bir allowlist'e karşı denetlenir — aynı tek değer, `WEB_URL`, öyle
+ki tarayıcı tarafındaki ve sunucu tarafındaki listeler birbirinden ayrışamaz. Farklı bir
+origin bildiren istek — `Origin`'de ya da o yoksa `Referer`'da — bir handler'a ulaşmadan
+`403` ve standart hata zarfıyla reddedilir. Sandbox'lanmış bir dokümanın ya da origin'i
+silen bir yönlendirmenin gönderdiği `Origin: null` de listede değildir. Denetim Nest
+route'larının yanı sıra `/auth/*`'ı da kapsar ve Better Auth'un kendi `originCheck`'i altında
+çalışmaya devam eder.
 
-**A request that announces no origin at all is allowed.** That is a deliberate boundary, not
-an oversight: browsers are required to send `Origin` on every request whose method is not
-`GET`/`HEAD`, `fetch`, XHR and form submissions alike, so there is no cross-site request
-shape that carries a victim's cookie _and_ omits the header. Everything left in the
-header-less case — `curl`, a CI script, a native client, the web app's own server-side
-session lookup in `apps/web/proxy.ts` — cannot be induced by a hostile page to replay
-someone else's ambient credentials, which is the entire mechanism the rule defends against.
-Rejecting it would break every non-browser caller and close nothing.
+**Hiçbir origin bildirmeyen istek geçer.** Bu bir gözden kaçırma değil, bilinçli bir
+sınırdır: tarayıcılar metodu `GET`/`HEAD` olmayan her istekte `Origin` göndermek
+zorundadır — `fetch`, XHR ve form gönderimleri dahil — yani kurbanın cookie'sini taşıyıp
+_aynı zamanda_ header'ı atlayan bir cross-site istek şekli yoktur. Header'sız durumda geriye
+kalan her şey — `curl`, bir CI script'i, native bir istemci, web uygulamasının
+`apps/web/proxy.ts` içindeki kendi sunucu tarafı session sorgusu — düşmanca bir sayfa
+tarafından başkasının ambient kimlik bilgilerini tekrar oynatmaya ikna edilemez; kuralın
+savunduğu mekanizma tam olarak budur. Bu durumu reddetmek her tarayıcı-dışı çağıranı kırar
+ve hiçbir şeyi kapatmaz.
 
-The reason the second rule exists at all is that the first is not a fallback for it. A
-cross-site `<form method="POST" enctype="application/x-www-form-urlencoded">` is a _simple
-request_: the browser sends it with no preflight, so CORS never gets to decide anything, and
-the body is parsed and acted on before the response the attacker never needed to read is
-discarded. In a deployment where the session cookie is `SameSite=Lax` — which is what
-[self-hosting](self-hosting.md)'s single-origin reverse proxy produces, and what Better Auth
-emits by default — that request never carries the cookie and the point is moot. The origin
-allowlist is what keeps the answer the same in a deployment that publishes the API on its own
-domain, where the cookie has to be `SameSite=None` and `Lax` protects nothing.
+İkinci kuralın var olma sebebi, birincisinin onun yerine geçemiyor olmasıdır. Cross-site bir
+`<form method="POST" enctype="application/x-www-form-urlencoded">` bir _simple request_'tir:
+tarayıcı preflight göndermeden yollar, yani CORS hiçbir şeye karar verme fırsatı bulamaz ve
+saldırganın zaten okumaya ihtiyaç duymadığı yanıt atılmadan önce body ayrıştırılıp işlenir.
+Session cookie'sinin `SameSite=Lax` olduğu bir dağıtımda — [self-hosting](self-hosting.md)
+rehberindeki tek origin'li reverse proxy'nin ürettiği ve Better Auth'un varsayılan olarak
+gönderdiği durum — o istek cookie'yi hiç taşımaz ve mesele ortadan kalkar. Origin allowlist,
+API'yi kendi domain'inde yayınlayan bir dağıtımda — cookie'nin `SameSite=None` olmak zorunda
+kaldığı ve `Lax`'ın hiçbir şey korumadığı yerde — cevabın aynı kalmasını sağlayan şeydir.
 
-Operator-facing consequence: **`WEB_URL` must be the exact origin the browser loads the app
-from.** A wrong value now costs writes as well as reads. Any spelling of the right origin
-works — trailing slash, a path, an explicit `:443` — because the value is reduced to the
-origin serialisation a browser sends. A value that is not a URL fails the process at start
-rather than producing an allowlist nothing matches.
+Operatör açısından sonucu: **`WEB_URL`, tarayıcının uygulamayı yüklediği origin'in tam
+kendisi olmalıdır.** Yanlış bir değer artık okumaların yanı sıra yazmalara da mal olur. Doğru
+origin'in her yazımı çalışır — sondaki slash, bir path, açıkça yazılmış `:443` — çünkü değer
+tarayıcının gönderdiği origin serileştirmesine indirgenir. URL olmayan bir değer, hiçbir
+şeyin eşleşmediği bir allowlist üretmek yerine süreci başlangıçta düşürür.
 
 ## Rate limiting
 
-Every endpoint has a request budget. Going over it returns `429` in the error envelope above,
-with a `Retry-After` header giving the seconds to wait. Requests still under budget carry
-`X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+Her endpoint'in bir istek bütçesi vardır. Bütçe aşıldığında yukarıdaki hata zarfıyla `429`
+döner; `Retry-After` header'ı kaç saniye beklenmesi gerektiğini söyler. Bütçe içindeki
+istekler `X-RateLimit-Limit`, `X-RateLimit-Remaining` ve `X-RateLimit-Reset` taşır.
 
-Budgets are counted **per client IP and per route** over a rolling minute — one endpoint
-running hot never spends another endpoint's allowance.
+Bütçeler **client IP'si ve route başına**, kayan bir dakikalık pencerede sayılır — yoğun
+çalışan bir endpoint asla başka bir endpoint'in payını harcamaz.
 
-| Endpoint                                       | Budget        | Why                                                                                    |
-| ---------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
-| Any endpoint, unless listed below              | 100 / min     | Well clear of what a person generates; caps a script                                   |
-| `POST /workspaces/:workspaceId/invitations`    | 10 / min      | Each call hands a message to the SMTP relay, addressed by the caller                   |
-| `GET .../boards/:boardId/tasks?q=`             | 30 / min      | `q=` is a trigram scan; the same route without `q=` keeps the default                  |
-| `POST .../tasks/:taskId/attachments`           | 20 / min      | The one endpoint where a single request can cost `ATTACHMENT_MAX_BYTES` of disk        |
-| `POST .../tasks/:taskId/attachments` (bytes)   | 256 MiB / min | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`: the same route also has a byte budget, see below |
-| `POST /workspaces/:workspaceId/imports/trello` | 3 / min       | A 20 MiB body parsed into heap, then thousands of rows in one transaction              |
-| `GET .../attachments/:attachmentId/content`    | 300 / min     | _Above_ the default: a panel with ten image attachments issues ten requests on open    |
-| `/auth/sign-in*`, `/auth/sign-up*`             | 3 / 10s       | Better Auth's built-in rule for credential endpoints                                   |
-| `/auth/request-password-reset`                 | 3 / 60s       | Built-in too: each call mails a link to an address the caller did not prove they own   |
-| `/auth/*` otherwise                            | 100 / min     | Better Auth's own limiter — `/auth/*` bypasses the Nest router (ADR 0004)              |
-| `GET /health`, `GET /health/ready`             | exempt        | A throttled probe would report a healthy API as down                                   |
+| Endpoint                                                        | Bütçe        | Neden                                                                                |
+| --------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------ |
+| Aşağıda sayılmayan her endpoint                                 | 100 / dk     | Bir insanın üreteceğinin çok üstünde; script'i sınırlar                              |
+| `POST /workspaces/:workspaceId/invitations`                     | 10 / dk      | Her çağrı, adresini çağıranın seçtiği bir mesajı SMTP relay'ine verir                |
+| `GET .../boards/:boardId/tasks?q=`                              | 30 / dk      | `q=` bir trigram taramasıdır; aynı route `q=` olmadan varsayılanda kalır             |
+| `POST .../tasks/:taskId/attachments`                            | 20 / dk      | Tek bir isteğin `ATTACHMENT_MAX_BYTES` kadar diske mal olabildiği tek uç             |
+| `POST .../tasks/:taskId/attachments` (bayt)                     | 256 MiB / dk | `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE`: aynı route'un bir de bayt bütçesi var, aşağıda |
+| `POST /workspaces/:workspaceId/imports/trello`                  | 3 / dk       | Heap'e ayrıştırılan 20 MiB'lık gövde, ardından tek transaction'da binlerce satır     |
+| `GET .../attachments/:attachmentId/content`                     | 300 / dk     | Varsayılanın _üstünde_: on görsel ekli bir panel açılışta on istek üretir            |
+| `/auth/sign-in*`, `/auth/sign-up*`, `/auth/change-password`     | 3 / 10sn     | Better Auth'un kimlik endpoint'leri için yerleşik kuralı                             |
+| `/auth/request-password-reset`, `/auth/send-verification-email` | 3 / 60sn     | O da yerleşik: her çağrı, çağıranın sahipliğini kanıtlamadığı adrese bağlantı yollar |
+| Diğer `/auth/*`                                                 | 100 / dk     | Better Auth'un kendi limiter'ı — `/auth/*` Nest router'ını atlar (ADR 0004)          |
+| `GET /health`, `GET /health/ready`                              | muaf         | Throttle edilen bir probe, sağlıklı bir API'yi çökmüş gösterir                       |
 
-**The upload request budget is named as insufficient rather than presented as enough.** The
-throttler counts requests per IP per route, which is the wrong unit twice for an upload: twenty
-25 MiB requests and twenty 10 kB requests spend the same allowance, and an office behind one NAT
-shares a single bucket. The unit that was missing is bytes, and since 2026-08-21 the route
-charges them too: `ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (default `268435456`, 256 MiB, about ten
-max-size uploads; `0` switches it off) is the most one client IP may submit to the route in a
-fixed minute. The charge is the request's `Content-Length`, taken before the body is read, so a
-refused request costs the API no heap; a multipart request that declares no length is charged
-`ATTACHMENT_MAX_BYTES`, and a JSON body (a LINK, which stores nothing) is not charged at all.
-Over budget is `429` with `error: "Upload Budget Exceeded"` where the request throttle's `429`
-carries `"Too Many Requests"`, plus `Retry-After` with the rest of the minute; clients branch on
-`statusCode` and `error`, never on `message` ([Errors](#errors)). The budget keys on the same
-client IP as the request throttle, honours `RATE_LIMIT_ENABLED`, keeps its counters in Redis
-when `REDIS_URL` is set and degrades to a per-process counter on Redis errors, exactly as the
-`/auth/*` limiter below does. The NAT caveat still applies. What bounds the total is the
-per-file size limit plus the per-workspace and per-instance quotas described under
-[File uploads and downloads](#file-uploads-and-downloads) ([ADR 0027](decisions/0027-attachment-quotas.md)).
-**The import budget is under the same honest caveat and set
-lower for it:** three requests is well below the upload budget because one import request costs a
-20 MiB parse plus the longest-lived write transaction in this API, and a throttler that counts
-requests cannot tell a four-card board from a five-hundred-card one.
+**Yükleme istek bütçesi yeterliymiş gibi sunulmuyor, yetersiz diye adlandırılıyor.** Throttler
+IP başına, route başına istek sayar; bu bir yükleme için iki kez yanlış birimdir: yirmi 25
+MiB'lık istek ile yirmi 10 kB'lık istek aynı bütçeyi harcar, ve tek bir NAT arkasındaki ofis tek
+bir kovayı paylaşır. Eksik olan birim bayttı ve 2026-08-21'den beri route onu da düşüyor:
+`ATTACHMENT_UPLOAD_BYTES_PER_MINUTE` (varsayılan `268435456`, 256 MiB, yaklaşık on tam boy
+yükleme; `0` kapatır) bir istemci IP'sinin sabit bir dakikada route'a gönderebileceği en fazla
+bayttır. Düşülen miktar isteğin `Content-Length`'idir ve gövde okunmadan önce alınır; reddedilen
+istek API'ye heap'e mal olmaz. Uzunluk bildirmeyen bir multipart istek `ATTACHMENT_MAX_BYTES`
+kadar düşülür; JSON gövde (hiçbir şey saklamayan bir LINK) hiç düşülmez. Bütçe aşımı, istek
+throttle'ının `429`'u `"Too Many Requests"` taşırken `error: "Upload Budget Exceeded"` taşıyan
+bir `429`'dur; yanında dakikanın kalanını söyleyen `Retry-After` vardır. İstemciler `statusCode`
+ile `error` üzerinden dallanır, asla `message` üzerinden değil ([Hatalar](#hatalar)). Bütçe,
+istek throttle'ıyla aynı istemci IP'sine göre anahtarlanır, `RATE_LIMIT_ENABLED`'a uyar,
+sayaçlarını `REDIS_URL` ayarlıyken Redis'te tutar ve Redis hatasında tıpkı aşağıdaki `/auth/*`
+limiter'ı gibi süreç başına sayaca düşer. NAT şerhi hâlâ geçerlidir. Toplamı sınırlayan şey ise
+dosya başına boyut limiti artı [Dosya yükleme ve indirme](#dosya-yükleme-ve-indirme)
+bölümünde anlatılan workspace başına ve instance başına kotalardır ([ADR 0027](decisions/0027-attachment-quotas.md)).
+**Import bütçesi de aynı dürüstlük şerhi altında ve tam da bu yüzden daha
+düşük ayarlı:** üç istek, yükleme bütçesinin epey altında, çünkü tek bir import isteği 20 MiB'lık
+bir ayrıştırma artı bu API'nin açtığı en uzun ömürlü yazma transaction'ı demek — ve istek sayan
+bir throttler dört kartlık bir board ile beş yüz kartlık bir board'u ayırt edemez.
 
-Two limiters cover the surface because there are two routers. `/auth/*` is served by raw
-Express below Nest, so `ThrottlerGuard` never sees it and Better Auth's own limiter handles
-it. Better Auth's counters live in Redis when `REDIS_URL` is set — shared across instances,
-surviving restarts — and in process memory otherwise, which is a supported single-instance
-configuration. The Nest throttler's counters are always per-instance.
+İki router olduğu için iki limiter var. `/auth/*` Nest'in altındaki ham Express tarafından
+sunulur, dolayısıyla `ThrottlerGuard` onu hiç görmez ve işi Better Auth'un kendi limiter'ı
+yapar. Better Auth'un sayaçları `REDIS_URL` tanımlıysa Redis'te tutulur — instance'lar arası
+paylaşılır, restart'ı atlatır — değilse process belleğinde, ki bu da desteklenen tek-instance
+konfigürasyonudur. Nest throttler'ının sayaçları her zaman instance başınadır.
 
-If Redis is configured but a call to it fails mid-operation — an outage, not an unset
-`REDIS_URL` — the `/auth/*` limiter does not open up. Each API process falls back to its own
-in-memory counter enforcing the same rule until Redis answers again, logged at error level on
-the way down and the way back. That fallback is a per-process floor, not the shared limit:
-behind N replicas the effective ceiling during the outage is the rule's limit times N, not the
-rule's limit — still bounded, unlike allowing every request through.
+Redis tanımlıyken bir çağrı ortasında başarısız olursa — `REDIS_URL` boş bırakılmış olması
+değil, bir outage — `/auth/*` limiter'ı sınırsız açılmaz. Her API process'i, Redis tekrar
+cevap verene kadar aynı kuralı uygulayan kendi in-memory sayacına düşer; iniş ve çıkış anları
+error seviyesinde loglanır. Bu fallback paylaşılan limit değil, process başına bir tabandır:
+N replica arkasında outage sırasındaki etkin tavan, kuralın limiti değil, kuralın limiti çarpı
+N'dir — yine de her isteğe izin vermekten farklı olarak sınırlıdır.
 
-Both limiters key on the same resolved client IP, driven by one setting: `TRUST_PROXY`
-(unset/`false` by default). Off, the app trusts nothing about a request beyond the raw TCP
-connection — `req.ip` is always the socket peer, and any `X-Forwarded-For` a client sends is
-ignored outright, which is what makes a directly-exposed instance safe from a client spoofing
-its way into its own rate-limit bucket. Behind a reverse proxy (Caddy/Traefik terminating TLS
-in front of the app), leaving it off means every request looks like it came from the proxy —
-one shared budget for every real client, and the access log's `ip` field is equally useless.
-Set `TRUST_PROXY` to the hop count (`1` for a single proxy) or the proxy's IP/CIDR, and Express
-resolves the real client from `X-Forwarded-For` the same way for both routers. Better Auth
-never consults this setting on its own — it re-parses `X-Forwarded-For` itself and would
-otherwise accept a spoofed single-value header even with no proxy in front of the app at all —
-so `auth/auth.ts` instead points Better Auth's `advanced.ipAddress.ipAddressHeaders` at a
-private header the app stamps with the same Express-resolved address on every request,
-overwriting anything a client sent. `TRUST_PROXY=true` trusts the entire forwarded chain with
-no verification and must only be used when the API is unreachable except through the proxy —
-on a directly-exposed instance it hands every attacker an unlimited budget.
+İki limiter da aynı çözümlenmiş client IP'sini kullanır, tek bir ayarla sürülür:
+`TRUST_PROXY` (varsayılan boş/`false`). Kapalıyken uygulama, ham TCP bağlantısının ötesinde
+istek hakkında hiçbir şeye güvenmez — `req.ip` her zaman socket peer'ıdır ve bir client'ın
+gönderdiği herhangi bir `X-Forwarded-For` tamamen yok sayılır; doğrudan expose edilen bir
+kurulumu bir client'ın kendi rate-limit bucket'ına sızmasına karşı güvenli kılan da budur.
+Reverse proxy arkasında (Caddy/Traefik uygulamanın önünde TLS sonlandırıyor) bunu kapalı
+bırakmak, her isteğin proxy'den gelmiş gibi görünmesi demektir — gerçek her client için tek
+bir paylaşılan bütçe, ve erişim logundaki `ip` alanı da aynı şekilde işe yaramaz hale gelir.
+`TRUST_PROXY`'yi hop sayısına (tek proxy için `1`) ya da proxy'nin IP/CIDR'ine ayarlayın;
+Express gerçek client'ı `X-Forwarded-For`'dan her iki router için de aynı şekilde çözer.
+Better Auth bu ayara kendiliğinden hiç bakmaz — `X-Forwarded-For`'u kendi başına yeniden
+parse eder ve uygulamanın önünde hiç proxy olmasa bile tek-değerli, taklit edilmiş bir
+header'ı kabul ederdi — bu yüzden `auth/auth.ts`, Better Auth'un
+`advanced.ipAddress.ipAddressHeaders` ayarını, uygulamanın her istekte aynı
+Express-çözümlü adresle damgaladığı ve client'ın gönderdiği her şeyin üzerine yazdığı özel
+bir header'a yönlendirir. `TRUST_PROXY=true`, hiçbir doğrulama yapmadan iletilen zincirin
+tamamına güvenir ve yalnızca API proxy dışında erişilemezken kullanılmalıdır — doğrudan
+expose edilen bir kurulumda her saldırgana sınırsız bütçe verir.
 
-`RATE_LIMIT_ENABLED=false` turns both limiters and the upload byte budget off. It exists for the
-integration suite, which drives hundreds of requests per route from one address; a deployment
-that sets it has no brute-force ceiling.
+`RATE_LIMIT_ENABLED=false` her iki limiter'ı ve yükleme bayt bütçesini kapatır. Tek bir adresten
+route başına yüzlerce istek süren entegrasyon testleri için vardır; bunu ayarlayan bir
+deployment'ın brute-force tavanı yoktur.
 
 ## Pagination
 
-**Cursor pagination is the default.** Page-number pagination is acceptable only for
-genuinely bounded collections (a board's columns) where the total count is small by
-construction rather than by expectation.
+**Cursor pagination varsayılandır.** Sayfa numarası pagination'ı yalnızca gerçekten sınırlı
+koleksiyonlar (bir board'un column'ları) için kabul edilebilir — yani toplam sayının
+beklentiyle değil, yapısı gereği küçük olduğu yerlerde.
 
-"Members are always few" was that expectation, and it is how the roster spent a phase
-returning a plain array behind `take: 1000` — a workspace past that simply lost its tail,
-with nothing in the response saying so. A collection whose size is the user's decision gets
-a cursor: an unpaginated list is a promise that the server can always return all of it.
+"Üye sayısı zaten azdır" tam olarak böyle bir beklentiydi ve roster'ın bir faz boyunca
+`take: 1000` arkasında düz bir dizi döndürmesinin nedeni buydu: bu sınırı aşan bir workspace
+kuyruğunu sessizce kaybediyordu, yanıtta bunu söyleyen hiçbir alan olmadan. Boyutuna
+kullanıcının karar verdiği bir koleksiyon cursor alır: sayfalanmamış bir liste, sunucunun
+onu her zaman bütün döndürebileceği vaadidir.
 
-Why cursor by default:
+Neden varsayılan olarak cursor:
 
-- `OFFSET` degrades linearly on large tables; keyset lookups stay flat.
-- Rows are inserted underneath the client mid-session — by another user, and via the
-  realtime layer, visibly. Offset pagination handles that worst: every insert before
-  the client's window shifts the whole list and the next page repeats or skips rows.
+- `OFFSET`, büyük tablolarda doğrusal olarak bozulur; keyset lookup'lar sabit kalır.
+- Satırlar session ortasında client'ın altına ekleniyor — başka bir kullanıcı tarafından,
+  ve realtime katmanı üzerinden görünür biçimde. Offset pagination bunu en kötü
+  ele alan yöntem: client'ın penceresinden önceki her ekleme tüm listeyi kaydırır ve
+  sonraki sayfa satırları ya tekrarlar ya da atlar.
 
-### The cursor key is always `id`, never `position`
+### Cursor anahtarı her zaman `id`'dir, asla `position` değil
 
-**This is a correctness rule, not a preference.** A keyset cursor only guarantees no dropped
-rows if the field it is keyed on is _immutable_ for rows the client has not seen yet.
-`Task.position` is the opposite of immutable: fractional indexing rewrites it on every
-drag-and-drop ([`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)).
-A task sitting past the client's cursor that someone drags to the top of the column now has
-a `position` _below_ the cursor value — `WHERE position > :cursor` will never return it
-again, and the row is silently dropped. Concurrent reordering is exactly why `position`
-cannot be the cursor key.
+**Bu bir tercih değil, doğruluk kuralıdır.** Bir keyset cursor'ın hiçbir satırı
+düşürmemeyi garanti etmesi, ancak üzerine key'lendiği alan client'ın henüz görmediği
+satırlar için _değişmez (immutable)_ ise mümkündür. `Task.position` değişmezliğin tam
+tersidir: fractional indexing onu her drag-and-drop'ta yeniden yazar
+([`decisions/0006-fractional-indexing.md`](decisions/0006-fractional-indexing.md)).
+Client'ın cursor'ının ötesinde oturan bir task, biri onu column'un en üstüne sürüklediğinde
+artık cursor değerinin _altında_ bir `position`'a sahip oluyor — `WHERE position > :cursor`
+onu bir daha asla döndürmeyecek ve satır sessizce düşecek. Eşzamanlı yeniden sıralama, tam
+olarak `position`'ın neden cursor anahtarı olamayacağının nedenidir.
 
-`id` has the properties the cursor needs: it is a **UUIDv7**
-([Data types](#data-types)), so it is immutable for the life of the row, monotonic with
-insertion time, and index-local — a real keyset, not a random seek.
+`id`, cursor'ın ihtiyaç duyduğu özelliklere sahip: bir **UUIDv7**
+([Veri tipleri](#veri-tipleri)), dolayısıyla satırın ömrü boyunca değişmez, ekleme
+zamanına göre monotonik ve index-local — rastgele bir seek değil, gerçek bir keyset.
 
-Board rendering still orders tasks by `position`; the two are separate concerns. `position`
-decides where a card _appears_, `id` decides where the _page boundary_ falls. A client
-paginating a large task list receives every row exactly once and sorts the accumulated set
-by `position` for display.
+Board rendering hâlâ task'ları `position`'a göre sıralıyor; bu ikisi ayrı kaygılar.
+`position` bir kartın _nerede göründüğüne_ karar verir, `id` _sayfa sınırının nerede
+düştüğüne_ karar verir. Büyük bir task listesini sayfalayan bir client, her satırı tam
+olarak bir kez alır ve gösterim için biriktirilmiş kümeyi `position`'a göre sıralar.
 
-### Cursor request and response
+### Cursor request ve response
 
 ```
 GET /workspaces/w_1/boards/b_1/tasks?limit=50&cursor=0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d
 ```
 
-| Param    | Default | Max | Notes                                                                                |
-| -------- | ------- | --- | ------------------------------------------------------------------------------------ |
-| `limit`  | 50      | 100 | Values above the max are clamped, not rejected                                       |
-| `cursor` | —       | —   | Opaque. The `id` of the last item from the previous page. Clients must not parse it. |
+| Param    | Varsayılan | Maks | Notlar                                                                         |
+| -------- | ---------- | ---- | ------------------------------------------------------------------------------ |
+| `limit`  | 50         | 100  | Maksimumun üzerindeki değerler reddedilmez, kırpılır (clamp)                   |
+| `cursor` | —          | —    | Opak. Önceki sayfanın son item'ının `id`'si. Client'lar onu parse etmemelidir. |
 
 ```jsonc
 {
-  "items": [/* … resources … */],
-  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70", // null on the last page
+  "items": [/* … kaynaklar … */],
+  "nextCursor": "0198e2c1-8b6d-7e93-a015-4c2f8d1e6b70", // son sayfada null
   "hasMore": true,
 }
 ```
 
-### Page-based (small collections only)
+### Sayfa bazlı (yalnızca küçük koleksiyonlar)
 
 ```
 GET /workspaces/w_1/some-bounded-collection?page=1&perPage=25
@@ -1023,144 +1086,154 @@ GET /workspaces/w_1/some-bounded-collection?page=1&perPage=25
 }
 ```
 
-No endpoint uses this shape today — every paginated list is a `CursorPage<T>` from
-`@kurul/shared-types`. A collection that genuinely needs page numbers may return the
-inline shape above until a dedicated type is worth it; do not invent a second shared
-pagination default.
+Bugün hiçbir endpoint bu şekli kullanmıyor — sayfalanan her liste
+`@kurul/shared-types` içindeki `CursorPage<T>`. Gerçekten sayfa numarasına ihtiyaç duyan
+bir koleksiyon, ayrı bir tip yazmaya değene kadar yukarıdaki satır içi şekli kullanabilir;
+ikinci bir varsayılan paylaşılan sayfalama tipi eklemeyin.
 
-A list that fits in one page is still a page. `GET .../members` defaults `limit` to the
-`100` ceiling, so an ordinary workspace is one request that answers `hasMore: false` — the
-client walks the cursor only when there is something left to walk to.
+Tek sayfaya sığan bir liste de bir sayfadır. `GET .../members`, `GET .../invitations` ve
+`GET .../tasks/:taskId/comments`, `limit` varsayılanını `100` tavanına ayarlar; dolayısıyla
+sıradan bir workspace (ya da task) tek istekte `hasMore: false` yanıtı alır — client cursor'ı
+yalnızca gidilecek bir yer kaldığında yürütür.
 
-## Filtering, sorting, field selection
+## Filtreleme, sıralama, alan seçimi
 
-| Concern              | Convention                                    | Example                                                                                                                |
-| -------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Equality filter      | `?field=value`                                | `?priority=HIGH`                                                                                                       |
-| Multiple values (OR) | Repeated or comma-separated                   | `?priority=HIGH,URGENT`                                                                                                |
-| Relation filter      | `?relationId=value`                           | `?assigneeId=usr_1&labelId=lbl_2`                                                                                      |
-| Range                | `?field[gte]=`, `?field[lte]=`                | `?dueDate[lte]=2026-09-01T00:00:00Z`                                                                                   |
-| Null check           | `?field=null`                                 | `?dueDate=null`                                                                                                        |
-| Free-text search     | `?q=`                                         | `?q=indexing`                                                                                                          |
-| Sorting              | `?sort=field` / `?sort=-field` for descending | Reserved convention — **no list endpoint accepts `sort` yet**; unknown query keys are `400` via `forbidNonWhitelisted` |
-| Multi-sort           | Comma-separated, priority left to right       | Same — not wired on any DTO today                                                                                      |
+| Kaygı               | Konvansiyon                                | Örnek                                                                                                                                              |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Eşitlik filtresi    | `?field=value`                             | `?priority=HIGH`                                                                                                                                   |
+| Çoklu değer (OR)    | Tekrarlanan veya virgülle ayrılmış         | `?priority=HIGH,URGENT`                                                                                                                            |
+| İlişki filtresi     | `?relationId=value`                        | `?assigneeId=usr_1&labelId=lbl_2`                                                                                                                  |
+| Aralık              | `?field[gte]=`, `?field[lte]=`             | `?dueDate[lte]=2026-09-01T00:00:00Z`                                                                                                               |
+| Null kontrolü       | `?field=null`                              | `?dueDate=null`                                                                                                                                    |
+| Serbest metin arama | `?q=`                                      | `?q=indexing`                                                                                                                                      |
+| Sıralama            | `?sort=field` / azalan için `?sort=-field` | Ayrılmış konvansiyon — **henüz hiçbir liste endpoint'i `sort` kabul etmiyor**; bilinmeyen query anahtarları `forbidNonWhitelisted` ile `400` döner |
+| Çoklu sıralama      | Virgülle ayrılmış, önceliği soldan sağa    | Aynı — bugün hiçbir DTO'ya bağlı değil                                                                                                             |
 
-- Combined filters are **AND**; repeated values within one filter are **OR**.
-- Only whitelisted fields are filterable and sortable, declared in the query DTO. An unknown
-  filter is a `400`, never silently ignored — a silently dropped filter shows the user data
-  they asked not to see.
-- Default **display** sort for tasks is `position` ascending; for everything else,
-  `-createdAt`. Note that a paginated task list is _walked_ by `id` regardless of the
-  requested sort — see [Pagination](#the-cursor-key-is-always-id-never-position).
-- No `?fields=` sparse-fieldset support. Response shapes are fixed by their DTO; if a client
-  needs less, that is not worth the caching and typing complexity.
+- Birleşik filtreler **AND**'dir; bir filtre içindeki tekrarlanan değerler **OR**'dur.
+- Yalnızca query DTO'sunda deklare edilen whitelist'lenmiş alanlar filtrelenebilir ve
+  sıralanabilir. Bilinmeyen bir filtre sessizce yok sayılmaz, her zaman `400`'dür — sessizce
+  düşürülen bir filtre kullanıcıya görmemesi gereken veriyi gösterir.
+- Task'lar için varsayılan **gösterim** sıralaması artan `position`'dır. Diğer listelerin sırası
+  ucuna göre sabittir: activity, notification, attachment ve token listeleri en yeniden eskiye
+  (`id` azalan); yorumlar, üyeler ve davetler en eskiden yeniye (`id` artan); workspace listesi
+  çağıranın üyelik sırasıyla, board listesi oluşturulma sırasıyla; label'lar ada, column'lar
+  `position`'a göre. Dikkat: sayfalı bir task listesi, istenen sıralamadan bağımsız olarak
+  her zaman `id`'ye göre _dolaşılır_ — bkz.
+  [Pagination](#cursor-anahtarı-her-zaman-iddir-asla-position-değil).
+- `?fields=` sparse-fieldset desteği yok. Response şekilleri DTO'ları tarafından
+  sabitlenmiştir; bir client daha azına ihtiyaç duyuyorsa, bu caching ve tipleme
+  karmaşıklığına değmez.
 
-## DTO naming
+## DTO adlandırma
 
-| Purpose                  | Pattern                   | Example                          |
-| ------------------------ | ------------------------- | -------------------------------- |
-| Create request           | `Create<Entity>Dto`       | `CreateTaskDto`                  |
-| Full/partial update      | `Update<Entity>Dto`       | `UpdateTaskDto`                  |
-| Action request           | `<Verb><Entity>Dto`       | `MoveTaskDto`, `InviteMemberDto` |
-| List query params        | `<Entity>QueryDto`        | `TaskQueryDto`                   |
-| Single resource response | `<Entity>ResponseDto`     | `TaskResponseDto`                |
-| List response            | `<Entity>ListResponseDto` | `TaskListResponseDto`            |
+| Amaç                    | Desen                     | Örnek                                                             |
+| ----------------------- | ------------------------- | ----------------------------------------------------------------- |
+| Oluşturma request'i     | `Create<Entity>Dto`       | `CreateTaskDto`                                                   |
+| Tam/kısmi güncelleme    | `Update<Entity>Dto`       | `UpdateTaskDto`                                                   |
+| Aksiyon request'i       | `<Verb><Entity>Dto`       | `MoveTaskDto`, `AddAssigneeDto`                                   |
+| Liste query param'ları  | `<Entity>QueryDto`        | `TaskQueryDto`                                                    |
+| Tekil kaynak response'u | `<Entity>Dto`             | `TaskDto` (`@kurul/shared-types`)                                 |
+| Liste response'u        | `CursorPage<<Entity>Dto>` | `CursorPage<TaskDto>`; sınırlı listelerde düz dizi (`BoardDto[]`) |
 
-- One DTO per file, in the module's `dto/` folder, named in kebab-case:
+- Dosya başına bir DTO, modülün `dto/` klasöründe, kebab-case adlandırılmış:
   `create-task.dto.ts`.
-- `UpdateXDto` derives from `CreateXDto` via `PartialType` rather than restating fields.
-- Request DTOs carry `class-validator` decorators; response DTOs are plain shapes mirrored in
-  `@kurul/shared-types`.
+- `UpdateXDto` alanlarını kendisi bildirir: nullable bir sütunun alanı `@OptionalNullable()`
+  taşır (atlanırsa dokunulmaz, `null` temizler), nullable olmayanınki `@OptionalNonNullable()`
+  (atlanırsa dokunulmaz, `null` `400`'dür).
+- Request DTO'ları `class-validator` decorator'ları taşır; response DTO'ları
+  `@kurul/shared-types`'ta yansıtılan düz şekillerdir.
 
-Full DTO/validation rules: [coding-standards.md](coding-standards.md#dtos-and-validation).
+Tam DTO/validation kuralları: [coding-standards.md](coding-standards.md#dtolar-ve-validation).
 
-## Data types
+## Veri tipleri
 
-| Type            | Representation                                                                                                                                                   | Example                                  |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Identifier      | **UUIDv7**, generated by Prisma's `@default(uuid(7))` (available since Prisma 5.18). Opaque to clients: never parsed, never sorted, never generated client-side. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
-| Date/time       | **ISO 8601, always UTC, always with `Z`**                                                                                                                        | `"2026-08-08T09:12:31.114Z"`             |
-| Date-only value | Still a full ISO 8601 timestamp at `T00:00:00.000Z`                                                                                                              | `"2026-09-01T00:00:00.000Z"`             |
-| Duration        | Integer minutes (`estimatedMinutes`) — never a formatted string                                                                                                  | `240`                                    |
-| Position        | `Float` (fractional indexing) — never assume integers or contiguity                                                                                              | `1024.5`                                 |
-| Enum            | UPPER_SNAKE string, defined in shared types                                                                                                                      | `"HIGH"`, `"OWNER"`                      |
-| Money           | Not used yet. When it is: integer minor units + currency code.                                                                                                   | —                                        |
+| Tip                   | Gösterim                                                                                                                                                                                | Örnek                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Identifier            | **UUIDv7**, Prisma'nın `@default(uuid(7))`'i tarafından üretilir (Prisma 5.18'den beri mevcut). Client'lara opak: asla parse edilmez, asla sıralanmaz, asla client tarafında üretilmez. | `"0198e2c1-4f3a-7b21-9c4d-5e6f7a8b9c0d"` |
+| Tarih/saat            | **ISO 8601, her zaman UTC, her zaman `Z` ile**                                                                                                                                          | `"2026-08-08T09:12:31.114Z"`             |
+| Yalnızca tarih değeri | Yine de `T00:00:00.000Z`'de tam bir ISO 8601 timestamp'i                                                                                                                                | `"2026-09-01T00:00:00.000Z"`             |
+| Süre                  | Tam sayı dakika (`estimatedMinutes`) — asla formatlanmış bir string değil                                                                                                               | `240`                                    |
+| Position              | `Float` (fractional indexing) — asla tam sayı veya bitişiklik varsaymayın                                                                                                               | `1024.5`                                 |
+| Enum                  | Shared types'ta tanımlanmış UPPER_SNAKE string                                                                                                                                          | `"HIGH"`, `"OWNER"`                      |
+| Para                  | Henüz kullanılmıyor. Kullanıldığında: tam sayı minor unit + para birimi kodu.                                                                                                           | —                                        |
 
-The API never returns local time or a timezone offset. Formatting for the user's locale is
-the frontend's job.
+API asla lokal saat veya bir timezone offset'i döndürmez. Kullanıcının locale'ine göre
+formatlamak frontend'in işidir.
 
-"Opaque" cuts both ways. UUIDv7 embeds a timestamp, and the server relies on that ordering
-for cursor pagination — but clients must not. A client that sorts by `id` or reads a
-creation time out of it is depending on an implementation detail that a future id strategy
-would break. URL examples in this document abbreviate ids (`w_1`, `b_1`, `t_1`) for
-readability; real ones are 36-character UUIDv7 strings.
+"Opak" ifadesi iki yönlü işliyor. UUIDv7 bir timestamp gömer ve sunucu cursor pagination
+için bu sıralamaya güvenir — ama client'lar güvenmemelidir. `id`'ye göre sıralayan veya
+içinden bir oluşturulma zamanı okuyan bir client, gelecekteki bir id stratejisinin
+kırabileceği bir implementasyon detayına bağımlı olmuş olur. Bu belgedeki URL örnekleri
+okunabilirlik için id'leri kısaltır (`w_1`, `b_1`, `t_1`); gerçek olanlar 36 karakterlik
+UUIDv7 string'leridir.
 
-## The OpenAPI document
+## OpenAPI belgesi
 
-This document is prose. The machine-readable one is **[`apps/api/openapi.json`](../apps/api/openapi.json)**,
-generated from the running application — every path, parameter, request body and response in it
-is what the NestJS router and the DTO classes actually declare.
+Bu sayfa düz metin. Makine tarafından okunabilir olanı
+**[`apps/api/openapi.json`](../apps/api/openapi.json)** — çalışan uygulamadan üretiliyor;
+içindeki her path, parametre, request body ve response, NestJS router'ının ve DTO sınıflarının
+gerçekten beyan ettiği şey.
 
-**The two are not ranked.** Where the spec and this page disagree, one of them is wrong and
-neither wins by default: this page carries the reasons, the spec carries the shapes, and a
-disagreement means somebody changed a shape without revisiting the reason. Fix the wrong one.
+**İkisi arasında bir sıralama yok.** Spec ile bu sayfa çeliştiğinde ikisinden biri yanlıştır ve
+hiçbiri varsayılan olarak kazanmaz: gerekçeler bu sayfada, şekiller spec'te duruyor, çelişki de
+birinin bir şekli değiştirirken gerekçesine dönmediği anlamına gelir. Yanlış olanı düzeltin.
 
-|                       |                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| Interactive console   | `GET /docs`                                                                                       |
-| Document              | `GET /openapi.json` — byte-identical to the committed file                                        |
-| Same document as YAML | `GET /docs-yaml` — `@nestjs/swagger` serves it alongside; the JSON is the one this project checks |
-| Committed snapshot    | `apps/api/openapi.json`                                                                           |
-| Regenerate            | `pnpm openapi` (builds the API first)                                                             |
-| Verify                | `pnpm openapi:check` — exits non-zero on any difference                                           |
+|                      |                                                                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Etkileşimli konsol   | `GET /docs`                                                                                                                               |
+| Belge                | `GET /openapi.json` — versiyon kontrolündeki dosyayla aynı belge; içerik aynı, biçim farklı (depodaki kopya prettier ile biçimlenir)      |
+| Aynı belgenin YAML'ı | `GET /docs-yaml` — `@nestjs/swagger` onu da yanında sunuyor; bu projenin kontrol ettiği JSON olanı                                        |
+| Kayıtlı snapshot     | `apps/api/openapi.json`                                                                                                                   |
+| Yeniden üret         | `pnpm openapi` (önce API'yi build eder)                                                                                                   |
+| Doğrula              | `pnpm openapi:check` — derlenmiş `dist/` üzerinden çalışır, önce `pnpm build` gerekir; herhangi bir fark varsa sıfırdan farklı çıkış kodu |
 
-**`/docs` is off in production unless `API_DOCS_ENABLED=true`.** Development gets it by
-default. That asymmetry is a decision about a self-hosted service, and it has three parts: the
-document itself leaks little (this is an AGPL project and the routes are public), but `/docs`
-is an unauthenticated **HTML page** on a service that renders no documents and locks itself to
-`default-src 'none'` — so publishing it means carving a Content-Security-Policy exception for
-one path — and its "Try it out" console issues real same-origin requests carrying the reader's
-own session cookie. An operator who never chose this API should get that on purpose, not by
-inheritance. Turning it off costs no discoverability: the identical document is in the
-repository.
+**`API_DOCS_ENABLED=true` denmedikçe `/docs`, `/openapi.json` ve `/docs-yaml` production'da kapalı.** Development'ta varsayılan
+olarak açık. Bu asimetri, self-host edilen bir servis hakkında verilmiş bir karar ve üç parçası
+var: belgenin kendisi neredeyse hiçbir şey sızdırmıyor (bu AGPL bir proje, route'lar zaten açık),
+ama `/docs` hiç doküman render etmeyen ve kendini `default-src 'none'` ile kilitleyen bir servisin
+üzerinde **kimlik doğrulaması olmayan bir HTML sayfası** — yani onu yayınlamak tek bir path için
+Content-Security-Policy istisnası açmak demek — ve içindeki "Try it out" konsolu okuyucunun kendi
+oturum çerezini taşıyan gerçek same-origin istekler atıyor. Bu API'yi hiç seçmemiş bir operatör
+bunu miras olarak değil, bilerek almalı. Kapatmak keşfedilebilirlikten bir şey götürmüyor: aynı
+belge deponun içinde duruyor.
 
-**CI fails when the spec drifts.** The `build` job regenerates the document and compares it to
-the committed file, so adding an endpoint, renaming a field, widening a `@MaxLength` or
-changing a role gate all turn CI red until `apps/api/openapi.json` is regenerated in the same
-change. The gate is the generator's own exit code, not a grep over its output.
+**Spec kaydığında CI kırmızıya dönüyor.** `build` job'ı belgeyi yeniden üretip kayıtlı dosyayla
+karşılaştırıyor; yani bir endpoint eklemek, bir alanı yeniden adlandırmak, bir `@MaxLength`
+genişletmek ya da bir rol kapısını değiştirmek, `apps/api/openapi.json` aynı değişiklik içinde
+yeniden üretilene kadar CI'yı kırıyor. Kapının kendisi üreticinin çıkış kodu; çıktısında grep
+değil.
 
-Two things are deliberately **absent** from the spec, and both are absent because they are not
-Nest routes:
+Spec'te bilinçli olarak **bulunmayan** iki şey var ve ikisi de Nest route'u olmadıkları için yok:
 
-- **`/auth/*`.** Better Auth is mounted on raw Express below the Nest router
-  ([ADR 0004](decisions/0004-auth-better-auth.md)), so there is no controller to scan.
-- **The Socket.io contract.** Not HTTP. It lives in `@kurul/shared-types` and in
-  [architecture.md](architecture.md).
+- **`/auth/*`.** Better Auth, Nest router'ının altında ham Express üzerine mount ediliyor
+  ([ADR 0004](decisions/0004-auth-better-auth.md)), dolayısıyla taranacak bir controller yok.
+- **Socket.io kontratı.** HTTP değil. `@kurul/shared-types` içinde ve
+  [architecture.md](architecture.md)'de yaşıyor.
 
-## Versioning
+## Versiyonlama
 
-**No `/v1` prefix before 1.0.** Adding a version segment now would imply a compatibility
-promise the project is not making — and would have to be bumped repeatedly during the very
-period the API is expected to churn. See
-[git-strategy.md](git-strategy.md#versioning-policy-semver).
+**1.0 öncesi `/v1` öneki yok.** Şimdi bir versiyon segmenti eklemek, projenin vermediği bir
+uyumluluk sözü ima eder — ve tam da API'nin çalkalanması beklenen dönemde tekrar tekrar
+bump edilmesi gerekirdi. Bkz.
+[git-strategy.md](git-strategy.md#versiyonlama-politikası-semver).
 
-Until 1.0:
+1.0'a kadar:
 
-- Breaking API changes may ship in any `0.y.0` release.
-- Every one is documented in `CHANGELOG.md` under `### Changed` / `### Removed`, with the
-  old and new shape and a migration note.
-- `@kurul/shared-types` is versioned with the monorepo, so a client that pins the package
-  version pins the contract.
+- Breaking API değişiklikleri herhangi bir `0.y.0` release'inde gelebilir.
+- Her biri, eski ve yeni şekil ile bir migration notuyla birlikte `CHANGELOG.md`'de
+  `### Changed` / `### Removed` altında belgelenir.
+- `@kurul/shared-types` monorepo ile birlikte versiyonlanır, dolayısıyla paket
+  versiyonunu pinleyen bir client kontratı da pinler.
 
-At 1.0, the API is frozen behind SemVer and every route gains a `/v1` URI prefix, with
-`/auth/*` and the two health probes outside it. The scheme, the rejection of header negotiation
-and of no-versioning, and the order the 1.0 surface ships in (personal access tokens, then
-`/v1`, then webhooks) are decided in [ADR 0031](decisions/0031-api-versioning.md); this section
-is the pre-1.0 rule set that record keeps in force until the prefix lands.
+1.0'da API SemVer'ın arkasında dondurulur ve her route, `/auth/*` ile iki health probe'u dışında
+kalacak şekilde bir `/v1` URI önekini kazanır. Şema, header negotiation'ın ve versiyonsuzluğun
+reddi, ve 1.0 yüzeyinin gönderilme sırası (önce kişisel erişim token'ları, sonra `/v1`, sonra
+webhook'lar) [ADR 0031](decisions/0031-api-versioning.md)'de karara bağlanır; bu bölüm, o kaydın
+önek gelene kadar yürürlükte tuttuğu 1.0-öncesi kural kümesidir.
 
-## See also
+## Ayrıca bakınız
 
-- [architecture.md](architecture.md) — module map, data model, socket contract
-- [coding-standards.md](coding-standards.md) — DTOs, validation, module boundaries
-- [testing.md](testing.md) — what endpoint tests assert
-- [git-strategy.md](git-strategy.md) — SemVer and changelog policy
+- [architecture.md](architecture.md) — modül haritası, veri modeli, socket kontratı
+- [coding-standards.md](coding-standards.md) — DTO'lar, validation, modül sınırları
+- [testing.md](testing.md) — endpoint testlerinin neyi assert ettiği
+- [git-strategy.md](git-strategy.md) — SemVer ve changelog politikası

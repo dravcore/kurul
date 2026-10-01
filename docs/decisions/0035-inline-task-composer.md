@@ -1,174 +1,189 @@
-# 0035. Inline Task Composer: One Creation Path at the Foot of the Column, and No Dialog for a Title
+# 0035. Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok
 
-**Status:** Accepted
-**Date:** 2026-08-26
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-26
+**Güncellendi:** 2026-10-01 — (1) Karar §5'teki "Guard, `/` kısayolunun zaten kullandığı guard'dır"
+ifadesi bugünkü kodla örtüşmüyor: `c` guard'ı `/`'ninkinden geniştir, açık bir dialog'un ya da task
+panelinin içinde de döner ve panel 768 px altında board'u örterken kısayol kapalıdır
+(`apps/web/components/board/use-create-task-shortcut.ts`). Board'da açık bir composer varsa `c` onu
+odaklar; ilk column'un composer'ı yalnız hiçbiri açık değilken açılır, çünkü yazılmış bir başlık §2
+gereği kaybolmamalıdır (`apps/web/components/board/board-canvas.tsx`). (2) Sonuçlar'daki "arrow'ların
+onun içinde hareket ettiği" ifadesi de bugünkü davranışı anlatmıyor: board'un roving tab durağı
+column başlıkları arasındadır ve `Home`, `End` ile `Ctrl` + ok tuşlarıyla gezilir; çıplak ok
+tuşlarını board hiç bağlamaz, onlar bir column içindeki klavye sürüklemesine ve composer'daki imlece
+aittir (`board-canvas.tsx`). Bkz. [design.md](../design.md) §5.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0035-inline-task-composer.md)
+## Bağlam
 
-## Context
+[design.md](../design.md) §5, board'u bloklamasına izin verilen etkileşimleri sayıyor:
+"Confirmation'lar, board oluşturma ve destructive aksiyonlar **dialog** olarak kalır; onların
+gerçekten block etmesi gerekir." Task oluşturmak bu listede yok, hiçbir zaman da olmadı. Yine de bir
+dialog'u var.
 
-[design.md](../design.md) §5 states which interactions are allowed to block the board:
-"Confirmations, board creation, and destructive actions stay **dialogs**; those genuinely need to
-block." Creating a task is not on that list, and it never was. It has a dialog anyway.
+`apps/web/components/task/create-task-dialog.tsx` 68 satır. Tek bir `Input`'u `title`'a bağlayan
+bir `FormDialog` render ediyor, `{ title, columnId }` gövdesini
+`/workspaces/{workspaceId}/boards/{boardId}/tasks` adresine POST ediyor, oluşan `TaskDto`'yu
+`onCreated` ile geri veriyor ve kendini temizliyor. Başka hiçbir şey toplamıyor.
+`apps/web/components/board/board-dialogs.tsx` içinden mount ediliyor ve `useBoardDialogs`
+tarafından sürülüyor; onun `createTaskColumnId` alanını da her column'un dibindeki ghost
+`Add task` butonu ayarlıyor (`apps/web/components/board/board-column.tsx`, 264 ile 275. satırlar,
+yalnızca `canMutateTasks` iken render ediliyor).
 
-`apps/web/components/task/create-task-dialog.tsx` is 68 lines. It renders a `FormDialog` with one
-`Input` bound to `title`, posts `{ title, columnId }` to
-`/workspaces/{workspaceId}/boards/{boardId}/tasks`, hands the created `TaskDto` back through
-`onCreated` and clears itself. Nothing else is collected. It is mounted from
-`apps/web/components/board/board-dialogs.tsx` and driven by `useBoardDialogs`, whose
-`createTaskColumnId` is set by the ghost `Add task` button at the foot of every column
-(`apps/web/components/board/board-column.tsx`, lines 264 to 275, rendered only when
-`canMutateTasks`).
-
-So the board is covered by a scrim, focus is trapped and the surrounding cards are hidden, in
-order to read one string that the task panel can already edit. Everything else a task has,
-description, priority, due date, estimate, assignees, labels, checklists, attachments, is filled
-in the right-side panel afterwards, because the panel is where those fields live
+Yani task panel'in zaten düzenleyebildiği tek bir dizgeyi okumak için board bir scrim ile
+örtülüyor, focus tuzağa alınıyor ve çevredeki kartlar gizleniyor. Bir task'ın sahip olduğu diğer
+her şey, açıklama, öncelik, bitiş tarihi, tahmin, atananlar, etiketler, checklist'ler, ek'ler,
+sonrasında sağdaki panel'de dolduruluyor, çünkü o alanların yaşadığı yer panel
 (`task-panel.tsx`, `task-detail-fields.tsx`, `task-metadata-panel.tsx`).
 
-The cost is paid per card, and cards are not created one at a time. Filling a column during
-planning means open, type, submit, wait for the dialog to close, click the button again. The
-context that makes the next title obvious, the cards already in the column, is exactly what the
-modal covers while the title is being typed.
+Bu bedel kart başına ödeniyor ve kartlar teker teker oluşturulmuyor. Planlama sırasında bir
+column'u doldurmak demek aç, yaz, gönder, dialog'un kapanmasını bekle, butona yeniden tıkla
+demek. Bir sonraki başlığı bariz kılan bağlam, yani column'da hâlihazırda duran kartlar, tam da
+modal'ın başlık yazılırken örttüğü şey.
 
-design.md §5 also reserves a set of bare-letter shortcuts for "Phase 4+": `⌘K` command palette,
-`C` create task, `/` filter, `?` help. Only `/` is implemented today
-(`apps/web/components/board/board-filter-search.tsx`, lines 35 to 51). Deciding how a task is
-created therefore also decides what the create shortcut focuses and what a future command palette
-is allowed to open, which is why this is a decision record and not an implementation detail.
+design.md §5 ayrıca "Faz 4+" için bir çıplak harf kısayolu kümesini reserve ediyor: `⌘K` command
+palette, `C` create task, `/` filter, `?` help. Bugün yalnızca `/` uygulanmış durumda
+(`apps/web/components/board/board-filter-search.tsx`, 35 ile 51. satırlar). Bu yüzden bir task'ın
+nasıl oluşturulduğuna karar vermek, aynı zamanda oluşturma kısayolunun neyi odaklayacağına ve
+gelecekteki bir command palette'in neyi açmaya hakkı olduğuna da karar veriyor; bunun bir karar
+kaydı olmasının, bir uygulama detayı olmamasının sebebi bu.
 
-## Decision
+## Karar
 
-### 1. The `Add task` button becomes the field it opens
+### 1. `Add task` butonu, açtığı alanın kendisi olur
 
-Clicking `Add task` replaces the button in place with a single-line text field of the same width,
-at the same foot-of-column position. There is no surface, no scrim, no header and no title: the
-column keeps its ground, and every card above the field stays visible and clickable.
+`Add task`'a tıklamak, butonun yerine aynı genişlikte tek satırlık bir metin alanını, column'un
+dibindeki aynı konuma koyar. Yüzey yok, scrim yok, header yok, başlık yok: column kendi zeminini
+korur ve alanın üstündeki her kart görünür ve tıklanabilir kalır.
 
-The field is a form field like any other in this tree, so it takes the field rules unchanged:
-`text-base md:text-body` (16px below 768px, 13/18 above it) and a 44px touch target below 768px.
-It draws the one `:focus-visible` outline from `@layer base` and adds no ring of its own.
+Alan, bu ağaçtaki diğer form alanları gibi bir form alanıdır, dolayısıyla alan kurallarını
+olduğu gibi alır: `text-base md:text-body` (768px altında 16px, üstünde 13/18) ve 768px altında
+44px dokunma hedefi. Tek `:focus-visible` outline'ını `@layer base`'den çizer, kendine ait bir
+ring eklemez.
 
-### 2. `Enter` creates and stays, `Escape` and an empty blur return the button
+### 2. `Enter` oluşturur ve kalır, `Escape` ile boş alandaki blur butona döner
 
-`Enter` creates the task from the trimmed title, appends the card to the column, empties the field
-and leaves focus in it. The next title is typed immediately, with no pointer and no second click.
+`Enter`, kırpılmış başlıktan task'ı oluşturur, kartı column'a ekler, alanı boşaltır ve focus'u
+alanın içinde bırakır. Bir sonraki başlık, imleç ve ikinci bir tıklama olmadan hemen yazılır.
 
-`Escape` closes the composer and returns focus to the `Add task` button. Blurring an **empty**
-field does the same. Blurring a field that still has text leaves the composer open: a typed title
-is never discarded by a stray click, and the only way to lose one is to clear it.
+`Escape` composer'ı kapatır ve focus'u `Add task` butonuna geri verir. **Boş** bir alandan blur
+olmak da aynısını yapar. İçinde hâlâ metin olan bir alandan blur olmak composer'ı açık bırakır:
+yazılmış bir başlık kaçak bir tıklamayla asla atılmaz, onu kaybetmenin tek yolu silmektir.
 
-While the create request is in flight the composer keeps its shape. It does not swap its label for
-a pending string; it uses the existing `Button` `loading` state (`aria-busy` plus `disabled`, the
-label kept underneath) for any control that has to wait, and the pending state never moves focus
-out of the field.
+Oluşturma isteği yoldayken composer biçimini korur. Etiketini bir bekleme dizgesiyle
+değiştirmez; beklemesi gereken her kontrol için mevcut `Button` `loading` durumunu kullanır
+(`aria-busy` ve `disabled` birlikte, etiket altta durur) ve bekleme durumu focus'u alanın
+dışına asla taşımaz.
 
-### 3. One extra control, `Open details`, and it opens the panel
+### 3. Tek bir ek kontrol, `Open details`, ve panel'i açar
 
-Beside the field the composer carries exactly one control: `Open details`. It creates the task
-from what is typed and opens the new card's task panel. It is disabled while the field is empty,
-because there is no card to open yet. It does not open a dialog, and it is not a second form.
+Composer, alanın yanında tam olarak tek bir kontrol taşır: `Open details`. Yazılmış olandan
+task'ı oluşturur ve yeni kartın task panel'ini açar. Alan boşken devre dışıdır, çünkü açılacak bir
+kart henüz yoktur. Bir dialog açmaz ve ikinci bir form değildir.
 
-That is the whole answer to "what about the other fields": they are filled where they already live.
-The composer collects a title because a title is the only thing a card needs to exist.
+"Peki diğer alanlar ne olacak" sorusunun tüm cevabı budur: zaten yaşadıkları yerde doldurulurlar.
+Composer bir başlık toplar, çünkü bir kartın var olmak için ihtiyaç duyduğu tek şey bir başlıktır.
 
-### 4. `CreateTaskDialog` is deleted, and nothing replaces it
+### 4. `CreateTaskDialog` silinir ve yerine bir şey gelmez
 
-`apps/web/components/task/create-task-dialog.tsx` is removed, along with its mount in
-`board-dialogs.tsx` and the `createTaskColumnId` state in `useBoardDialogs`. No other surface in
-the product creates a task. This is the binding half of the decision: not "the board prefers the
-composer" but "the composer is the only way", so that there is one set of behaviours to get right,
-one place to fix a bug, and no drift between two forms that collect the same field.
+`apps/web/components/task/create-task-dialog.tsx`, `board-dialogs.tsx` içindeki mount'u ve
+`useBoardDialogs` içindeki `createTaskColumnId` state'i ile birlikte kaldırılır. Üründe başka
+hiçbir yüzey task oluşturmaz. Kararın bağlayıcı yarısı budur: "board composer'ı tercih eder"
+değil, "composer tek yoldur"; böylece doğru yapılacak tek bir davranış kümesi, bir hatanın
+düzeltileceği tek bir yer ve aynı alanı toplayan iki form arasında sürüklenme ihtimali olmaz.
 
-### 5. `c` opens and focuses the first column's composer
+### 5. `c` ilk column'un composer'ını açar ve odaklar
 
-A bare `c`, with no modifier, opens the composer of the board's first column and puts the caret in
-it. The guard is the one the `/` shortcut already uses: the handler returns when `metaKey`,
-`ctrlKey` or `altKey` is held, and returns when the event target is an `INPUT`, a `TEXTAREA` or a
-`contentEditable` element, so a `c` typed into a field is a letter and not a shortcut. Only then
-does it call `preventDefault` and move focus.
+Modifier'sız çıplak bir `c`, board'un ilk column'undaki composer'ı açar ve imleci içine koyar.
+Guard, `/` kısayolunun zaten kullandığı guard'dır: handler, `metaKey`, `ctrlKey` veya `altKey`
+basılıysa döner ve event target'ı bir `INPUT`, bir `TEXTAREA` ya da `contentEditable` bir eleman
+ise döner, böylece bir alana yazılan `c` bir harftir, kısayol değil. Ancak bundan sonra
+`preventDefault` çağırır ve focus'u taşır.
 
-This is the letter design.md §5 already reserves for create task. The ADR does not claim a new
-key; it maps the reserved one, and what it decides is what that key does, which is to focus the
-composer rather than to open anything. design.md writes the letter as `C` in its reserved list;
-the key the handler matches is the unshifted `c`, since Shift would make it a modified key. The
-rest of the reserved list is untouched.
+Bu, design.md §5'in create task için zaten reserve ettiği harftir. ADR yeni bir tuş talep etmez;
+reserve edilmiş olanı map eder ve karara bağladığı şey o tuşun ne yaptığıdır: bir şey açmak değil,
+composer'ı odaklamak. design.md reserve listesinde harfi `C` olarak yazar; handler'ın eşleştirdiği
+tuş, Shift'siz `c`'dir, çünkü Shift onu modifier'lı bir tuş yapardı. Reserve listesinin kalanına
+dokunulmaz.
 
-### 6. A future command palette gets no create-task dialog
+### 6. Gelecekteki command palette kendine ait bir create-task dialog'u almaz
 
-When `⌘K` lands, its create-task action focuses the composer, exactly as `c` does. The palette is
-a way to reach the one creation path, never a second one. This is stated now, before the palette
-exists, because "the palette needs its own quick-add dialog" is the obvious way for the second
-path to come back.
+`⌘K` geldiğinde, onun task oluşturma aksiyonu tıpkı `c` gibi composer'ı odaklar. Palette, tek
+oluşturma yoluna ulaşmanın bir yoludur, asla ikinci bir yol değildir. Bu, palette daha ortada
+yokken şimdi söyleniyor, çünkü ikinci yolun geri gelmesinin en bariz biçimi "palette'in kendi
+hızlı ekleme dialog'una ihtiyacı var" cümlesidir.
 
-## Rationale
+## Gerekçe
 
-- **The dialog was already outside the written rule.** design.md §5 draws the blocking line at
-  confirmations, board creation and destructive actions. A create-task modal was never inside it;
-  it survived because it was the first thing built, not because a decision put it there. Removing
-  it makes the code match the document instead of the document match the code.
+- **Dialog zaten yazılı kuralın dışındaydı.** design.md §5 bloklama çizgisini onay, board
+  oluşturma ve yıkıcı eylemlerde çiziyor. Bir create-task modal'ı hiçbir zaman bu çizginin içinde
+  olmadı; bir karar onu oraya koyduğu için değil, ilk yapılan şey olduğu için hayatta kaldı. Onu
+  kaldırmak, dokümanı koda değil kodu dokümana uydurur.
 
-- **Creation on a board is repetitive, and modality taxes repetition.** Each card costs an open
-  and a close on top of the typing. The composer's `Enter` loop removes both and keeps the cursor
-  where the next title goes, so filling a column is one continuous act.
+- **Board'da oluşturmak tekrarlıdır ve modalite tekrarı vergilendirir.** Her kart, yazmanın
+  üstüne bir açma ve bir kapama maliyeti getirir. Composer'ın `Enter` döngüsü ikisini de kaldırır
+  ve imleci bir sonraki başlığın gideceği yerde tutar, böylece bir column'u doldurmak kesintisiz
+  tek bir eylem olur.
 
-- **The surrounding cards are the input.** What belongs in a column is decided by what is already
-  in it. A modal hides precisely that, and hides the card that just appeared, so the user cannot
-  see the result of the last create while typing the next.
+- **Çevredeki kartlar girdinin kendisidir.** Bir column'a neyin ait olduğuna, orada zaten duran
+  şey karar verir. Bir modal tam olarak onu gizler, üstelik az önce beliren kartı da gizler,
+  yani kullanıcı bir sonrakini yazarken son oluşturmanın sonucunu göremez.
 
-- **One path is a behaviour budget, not a preference.** Two creation surfaces means two focus
-  stories, two pending states, two error states, two sets of message keys and two chances to
-  disagree. The keyboard shortcut and the future palette pointing at the same field is what keeps
-  that budget at one.
+- **Tek yol bir tercih değil, bir davranış bütçesidir.** İki oluşturma yüzeyi demek iki focus
+  hikâyesi, iki bekleme durumu, iki hata durumu, iki mesaj anahtarı kümesi ve bunların
+  çelişmesi için iki şans demektir. Klavye kısayolunun ve gelecekteki palette'in aynı alanı
+  göstermesi, bu bütçeyi bir'de tutan şeydir.
 
-- **The panel is the form.** Every field the composer does not collect is already implemented,
-  laid out and permission-checked in the task panel. A second form that collects a subset of them
-  would duplicate that work in a place with less room and no room to grow.
+- **Form zaten panel'dir.** Composer'ın toplamadığı her alan task panel'de zaten uygulanmış,
+  yerleşimi yapılmış ve izin kontrolünden geçmiş durumda. Onların bir alt kümesini toplayan
+  ikinci bir form, bu işi daha az yerin olduğu ve büyümeye yerin olmadığı bir noktada
+  çoğaltırdı.
 
-- **A reserved letter is only real once something answers it.** design.md §5 has reserved `C` for
-  create task since before there was anything for it to open. The composer is what it opens, so
-  the ADR that creates the composer is where that reservation stops being a note and starts
-  binding.
+- **Reserve bir harf, ancak ona cevap veren bir şey olduğunda gerçek olur.** design.md §5,
+  `C`'yi create task için, ona açacak bir şey daha ortada yokken reserve etti. Onun açtığı şey
+  composer'dır, dolayısıyla composer'ı yaratan ADR, o reservasyonun not olmaktan çıkıp bağlayıcı
+  hale geldiği yerdir.
 
-## Consequences
+## Sonuçlar
 
-- **A regression in the composer makes task creation impossible.** There is no dialog left to fall
-  back to, and the failure is total rather than degraded. Both paths are therefore covered by
-  `e2e/tests/board-composer.spec.ts` (`pnpm test:browser`): the keyboard path (reach `Add task`,
-  `Enter`, type, `Enter`, twice over, with focus still in the emptied field and `Escape` handing
-  it back to the button) and the pointer path (click `Add task`, type, `Open details`, the panel
-  opens on the new task). Both end on a reload, so what is asserted is what the server stored.
-  Component tests cannot stand in for this, because what breaks is focus and key handling in a
-  real browser.
+- **Composer'daki bir regresyon task oluşturmayı imkânsız kılar.** Geri düşülecek bir dialog
+  kalmadı ve hata kısmi değil tam bir hatadır. Bu yüzden iki yol da
+  `e2e/tests/board-composer.spec.ts` ile kapsanır (`pnpm test:browser`): klavye yolu
+  (`Add task`'a ulaş, `Enter`, yaz, `Enter`, iki kez üst üste; focus hâlâ boşalmış alandadır ve
+  `Escape` onu butona geri verir) ve imleç yolu (`Add task`'a tıkla, yaz, `Open details`, panel
+  yeni task üzerinde açılır). İkisi de bir reload ile biter, yani doğrulanan şey sunucunun
+  sakladığıdır. Bileşen testleri bunun yerine geçemez, çünkü bozulan şey gerçek bir tarayıcıdaki
+  focus ve tuş işleyişidir.
 
-- **Touch and small screens are inside the decision, not after it.** The field is 16px below 768px
-  (which the 360px e2e sweep enforces, and which is what stops iOS from zooming the board on
-  focus) and the composer row keeps the 44px touch target. A field that fails either of those is a
-  board that cannot be used on a phone, since it is now the only way in.
+- **Dokunma ve küçük ekranlar kararın sonrasında değil içindedir.** Alan 768px altında 16px'tir
+  (bunu 360px e2e taraması zorlar ve iOS'un focus'ta board'u zoomlamasını durduran şey budur) ve
+  composer satırı 44px dokunma hedefini korur. Bu ikisinden birinde başarısız olan bir alan,
+  artık tek giriş yolu olduğu için, telefonda kullanılamayan bir board demektir.
 
-- **Arrow keys belong to the caret while the composer has focus.** The board is a composite
-  widget where `Tab` reaches a column and arrows move within it. A focused text field takes the
-  arrow keys for caret movement; the board's roving focus resumes when the composer closes.
+- **Composer odaktayken arrow tuşları imlecindir.** Board, `Tab`'ın bir column'a ulaştığı ve
+  arrow'ların onun içinde hareket ettiği bir composite widget'tır. Odaklanmış bir metin alanı
+  arrow tuşlarını imleç hareketi için alır; board'un roving focus'u composer kapandığında geri
+  gelir.
 
-- **The message catalogue moves.** The dialog's keys go and the composer's placeholder and
-  `Open details` label arrive, in `apps/web/messages/en.json` and `apps/web/messages/tr.json` in
-  the same commit. `apps/web/messages/turkish-screens.test.tsx` pins the fifty longest Turkish
-  strings with a literal length assertion, so any catalogue change refreshes that list too.
+- **Mesaj kataloğu yer değiştirir.** Dialog'un anahtarları gider, composer'ın placeholder'ı ve
+  `Open details` etiketi gelir, aynı commit içinde `apps/web/messages/en.json` ve
+  `apps/web/messages/tr.json` dosyalarında. `apps/web/messages/turkish-screens.test.tsx` en uzun
+  elli Türkçe dizgeyi literal bir uzunluk iddiasıyla sabitler, dolayısıyla her katalog
+  değişikliği o listeyi de tazeler.
 
-- **Discoverability trades down slightly.** A titled modal announces itself more loudly than a
-  text row does. What carries it is that the entry point does not change: the user still clicks
-  the same `Add task` button in the same place, and the field appears where the card will.
+- **Keşfedilebilirlik biraz geriler.** Başlıklı bir modal, kendini bir metin satırından daha
+  yüksek sesle duyurur. Bunu taşıyan şey giriş noktasının değişmemesidir: kullanıcı hâlâ aynı
+  yerdeki aynı `Add task` butonuna tıklar ve alan, kartın belireceği yerde belirir.
 
-- **Dialogs keep their remaining scope.** Confirmations, board creation and destructive actions
-  still block, per design.md §5. The column and task delete dialogs and the column create and
-  settings dialogs are outside this decision and are not touched by it.
+- **Dialog'lar kalan kapsamlarını korur.** Onay, board oluşturma ve yıkıcı eylemler design.md
+  §5'e göre bloklamaya devam eder. Column ve task silme dialog'ları ile column oluşturma ve
+  ayarlar dialog'ları bu kararın dışındadır ve bu karar onlara dokunmaz.
 
-## Alternatives considered
+## Değerlendirilen Alternatifler
 
-| Alternative                                                 | Why not                                                                                                                                                                                           |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Keep `CreateTaskDialog` as it is                            | Blocks the board and hides the cards that decide what to type, to collect one string the panel can already edit; it also sits outside design.md §5's own list of what may block                   |
-| Keep both, dialog and composer                              | Two focus stories, two pending and error states and two sets of message keys for one action, free to drift; the single path is the point of the decision, not a side effect of it                 |
-| A lightweight quick-view popover on create                  | Still a layer over the board with its own dismissal and focus-return rules, and it competes with the task panel, which is where every field it could show already lives                           |
-| A composer that also collects priority, due date and labels | Rebuilds the panel's fields in a column-width row, doubling the surface that has to stay permission-checked and localised, and slows the case the composer exists for, typing six titles in a row |
-| Give the command palette its own quick-add dialog later     | Reintroduces the second path under a new name once the palette ships; deciding it now, while nothing depends on it, costs nothing and closes the door                                             |
+| Alternatif                                                     | Neden değil                                                                                                                                                                                                             |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CreateTaskDialog`'u olduğu gibi korumak                       | Panel'in zaten düzenleyebildiği tek bir dizgeyi toplamak için board'u bloklar ve ne yazılacağına karar veren kartları gizler; ayrıca design.md §5'in neyin bloklayabileceğine dair kendi listesinin dışında durur       |
+| İkisini birden tutmak, dialog ve composer                      | Tek bir aksiyon için iki focus hikâyesi, iki bekleme ve hata durumu ve iki mesaj anahtarı kümesi, çelişmekte özgür; tek yol kararın yan etkisi değil amacıdır                                                           |
+| Oluşturmada hafif bir quick-view popover                       | Yine board'un üstünde, kendi kapanma ve focus geri verme kurallarıyla bir layer'dır ve gösterebileceği her alanın zaten yaşadığı task panel ile rekabet eder                                                            |
+| Öncelik, bitiş tarihi ve etiketleri de toplayan bir composer   | Panel'in alanlarını column genişliğinde bir satırda yeniden kurar, izin kontrollü ve yerelleştirilmiş kalması gereken yüzeyi ikiye katlar ve composer'ın var olma sebebini, arka arkaya altı başlık yazmayı, yavaşlatır |
+| Command palette'e ileride kendi hızlı ekleme dialog'unu vermek | Palette indiğinde ikinci yolu yeni bir adla geri getirir; hiçbir şey ona bağlı değilken şimdi karara bağlamak bedelsizdir ve kapıyı kapatır                                                                             |

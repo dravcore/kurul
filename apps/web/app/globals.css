@@ -499,7 +499,7 @@ body {
    property rather than composing them into `transform` (its upgrade from v3's behaviour), so the
    `translate-x-[-50%] translate-y-[-50%]` utilities that centre the dialog keep doing that
    undisturbed while this keyframe animates the equally standalone `scale` property instead of
-   `transform`, per docs/design.md §5's "enter from `scale(0.96)` + `opacity: 0`", without ever
+   `transform`, per docs/design.md §5 (enter from `scale(0.96)` + `opacity: 0`), without ever
    touching, or needing to redeclare, the centring translate. */
 @keyframes surface-scale-in {
   from {

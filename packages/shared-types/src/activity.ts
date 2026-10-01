@@ -86,7 +86,7 @@ export const ActivityType = {
   // so that row would be removed by the statement it describes — the same reason there is no
   // `workspace.deleted` type.
   AccountDeleted: 'account.deleted',
-  // Personal access tokens (docs/api-conventions.md, "Authentication"). A token is a standing
+  // Personal access tokens (docs/api-conventions.md, "Kimlik doğrulama"). A token is a standing
   // credential for this workspace, so minting and revoking one are access-changing events in
   // the same sense as an invitation. The payload carries the token's id, name and display
   // prefix and never the secret, which the server does not hold after creation anyway.

@@ -126,9 +126,9 @@ function ImportTrelloDialogBody({
 
         {/*
           Both warnings are above the submit button and neither is dismissible, because both are
-          only useful before the click. The duplicate one is the whole user-facing half of "there
-          is no idempotency" (ADR 0025): told afterwards, it is an explanation of a mess rather
-          than a chance to avoid one.
+          only useful before the click. The duplicate one is the whole user-facing half of the
+          no-idempotency decision (ADR 0025, "İdempotans neden yok"): told afterwards, it is an
+          explanation of a mess rather than a chance to avoid one.
         */}
         <p className="text-small text-muted-foreground">{t('duplicateWarning')}</p>
         <p className="text-small text-muted-foreground">{t('slowWarning')}</p>

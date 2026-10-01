@@ -1,18 +1,16 @@
-# 0019. Column Completion Is a Category, Not a Name
+# 0019. Kolon Tamamlanmışlığı Bir Kategoridir, Ad Değil
 
-**Status:** Accepted
-**Date:** 2026-08-12
-**Updated:** 2026-08-21: the Consequences section's note that `dashboard.service.ts`'s move to
-`category: 'COMPLETED'` "waits until the current `perf/api-scale-debt` branch lands" is no longer
-current: `Column.category` shipped (`schema.prisma`, `dashboard.service.ts`), and the web exposes
-it in `column-settings-dialog.tsx`, as the same section already noted.
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-12
+**Güncellendi:** 2026-08-21: Sonuçlar bölümündeki, `dashboard.service.ts`'in `category: 'COMPLETED'`'a
+geçişinin "mevcut `perf/api-scale-debt` dalı merge olana kadar bekler" notu artık güncel değil:
+`Column.category` yayına girdi (`schema.prisma`, `dashboard.service.ts`) ve web bunu, aynı bölümün
+zaten belirttiği gibi `column-settings-dialog.tsx` içinde kullanıcıya açıyor.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0019-column-category.md)
+## Bağlam
 
-## Context
-
-Dashboard completion and throughput metrics currently identify the "done" column by matching
-its name. `apps/api/src/common/board-defaults.ts` exports the vocabulary that makes this work:
+Dashboard'daki tamamlanma ve throughput metrikleri "done" kolonunu şu an **adına bakarak**
+buluyor. `apps/api/src/common/board-defaults.ts` bunu mümkün kılan sözlüğü dışa aktarıyor:
 
 ```ts
 export const DONE_COLUMN_NAME = 'Done';
@@ -20,22 +18,24 @@ export const DONE_COLUMN_NAME_NORMALIZED = DONE_COLUMN_NAME.toLowerCase();
 export const doneColumnNameFilter = { equals: DONE_COLUMN_NAME, mode: 'insensitive' } as const;
 ```
 
-The docstring in that file is candid about why the matching is loose — "users rename and
-re-case their columns freely" — but loose matching does not survive a rename to a different
-word. A user who renames "Done" to "Shipped", "Complete", or "Released" silently zeroes their
-completion metrics. Nothing errors and nothing warns; the dashboard simply reports no
-completed work. This is a live defect today, not a hypothetical one.
+O dosyadaki docstring eşlemenin neden gevşek olduğunu dürüstçe anlatıyor — "kullanıcılar
+kolonlarını serbestçe yeniden adlandırır ve büyük/küçük harfini değiştirir" — ama gevşek
+eşleme, farklı bir kelimeye yapılan yeniden adlandırmadan sağ çıkmaz. "Done" kolonunu
+"Shipped", "Complete" ya da "Yayınlandı" yapan bir kullanıcı tamamlanma metriklerini sessizce
+sıfırlar. Hiçbir şey hata vermez, hiçbir şey uyarmaz; dashboard yalnızca hiç tamamlanmış iş
+yokmuş gibi rapor eder. Bu bugün var olan bir kusurdur, varsayımsal bir risk değil.
 
-[ADR 0018](0018-localization-strategy.md) turns the occasional bug into a guaranteed one: it
-decides that default column names are seeded in the creator's locale, so a board created by a
-Turkish user starts with `Bitti` and never matches `'done'` at all.
+[ADR 0018](0018-localization-strategy.md) ara sıra görülen bu hatayı garantiye çeviriyor:
+varsayılan kolon adlarının yaratıcının dilinde tohumlanmasına karar veriyor, dolayısıyla Türk
+bir kullanıcının açtığı board `Bitti` ile başlıyor ve `'done'` ile hiç eşleşmiyor.
 
-The name is the wrong carrier for this meaning. What the metrics need is a stable, structural
-signal that survives renaming, translation, and user-created columns.
+Bu anlamı taşımak için ad yanlış taşıyıcı. Metriklerin ihtiyacı olan şey; yeniden
+adlandırmadan, çeviriden ve kullanıcının kendi yarattığı kolonlardan sağ çıkan, yapısal ve
+kararlı bir işaret.
 
-## Decision
+## Karar
 
-Add a `ColumnCategory` enum to `Column`, separate from and independent of `name`:
+`Column` üzerine, `name`'den ayrı ve ondan bağımsız bir `ColumnCategory` enum'u ekleniyor:
 
 ```prisma
 enum ColumnCategory {
@@ -52,68 +52,69 @@ model Column {
 }
 ```
 
-- Metrics key off `category`, never off `name`. `DONE_COLUMN_NAME`,
-  `DONE_COLUMN_NAME_NORMALIZED` and `doneColumnNameFilter` are removed.
-- Seed columns carry an explicit category: `To Do → UNSTARTED`, `In Progress → STARTED`,
+- Metrikler `category`'ye bakar, asla `name`'e bakmaz. `DONE_COLUMN_NAME`,
+  `DONE_COLUMN_NAME_NORMALIZED` ve `doneColumnNameFilter` kaldırılır.
+- Tohum kolonlar açık bir kategori taşır: `To Do → UNSTARTED`, `In Progress → STARTED`,
   `Done → COMPLETED`.
-- The migration backfills `COMPLETED` where `lower(name) = 'done'` and leaves every other
-  column at the default.
-- `category` is user-editable through column settings. It is a property of the column, not
-  something derived from position or name.
-- Only `COMPLETED` is consumed today. The other four values are vocabulary the metrics layer
-  will grow into.
+- Migration `lower(name) = 'done'` olan yerlerde `COMPLETED` ile backfill yapar, diğer tüm
+  kolonları varsayılanda bırakır.
+- `category` kolon ayarlarından kullanıcı tarafından düzenlenebilir. Kolonun bir özelliğidir;
+  konumdan ya da addan türetilen bir şey değildir.
+- Bugün yalnızca `COMPLETED` tüketiliyor. Diğer dört değer, metrik katmanının içine büyüyeceği
+  sözlüktür.
 
-## Rationale
+## Gerekçe
 
-- Every mature tool in this category separates the displayed name from the semantic state.
-  Jira has a Status Category (To Do / In Progress / Done), Linear gives each workflow state a
-  type (`backlog`, `unstarted`, `started`, `completed`, `canceled`), and Azure DevOps has a
-  State Category. None of them kept name matching. Converging independently on the same shape
-  is a strong signal that it is the right one.
-- Linear's five-value set is adopted rather than a boolean `isDone` because **a canceled task
-  is not a completed one**. Counted as done it inflates throughput; counted as open it leaves
-  the column permanently unfinished. A boolean cannot express the difference, and adding it
-  later means a second migration and a second backfill — at exactly the cost of doing it now.
-- `CANCELED` is included today for that reason even though nothing reads it yet. The other
-  values cost one enum entry each.
-- The default is `UNSTARTED` rather than `BACKLOG` so a newly created column is treated as
-  active work in progress terms, which matches how people use a fresh column.
+- Bu kategorideki olgun her araç görünen adı anlamsal durumdan ayırıyor. Jira'da Status
+  Category (To Do / In Progress / Done), Linear'da her workflow state'in bir tipi
+  (`backlog`, `unstarted`, `started`, `completed`, `canceled`), Azure DevOps'ta State Category
+  var. Hiçbiri ad eşlemesinde kalmadı. Birbirinden bağımsız olarak aynı şekle yakınsamaları,
+  bunun doğru şekil olduğuna dair güçlü bir işarettir.
+- Boolean bir `isDone` yerine Linear'ın beş değerli kümesi benimseniyor, çünkü **iptal edilen
+  bir iş tamamlanmış bir iş değildir**. Tamamlanmış sayılırsa throughput şişer; açık sayılırsa
+  kolon sonsuza kadar bitmemiş görünür. Boolean bu farkı ifade edemez ve farkı sonradan
+  eklemek ikinci bir migration ile ikinci bir backfill demektir — tam da şimdi yapmanın
+  maliyetiyle.
+- `CANCELED` bu sebeple, henüz hiçbir yerde okunmuyor olmasına rağmen bugünden dahil ediliyor.
+  Diğer değerlerin maliyeti enum'da birer satır.
+- Varsayılan `BACKLOG` değil `UNSTARTED`, çünkü yeni yaratılan bir kolonun aktif iş akışının
+  parçası sayılması insanların taze bir kolonu nasıl kullandığıyla örtüşüyor.
 
-## Consequences
+## Sonuçlar
 
-- A schema migration with a backfill, plus `category` added to the `Column` DTO and to
-  `packages/shared-types`.
-- `dashboard.service.ts` completion queries move to `category: 'COMPLETED'`. This overlaps
-  work already in flight on that file, so implementation waits until the current
-  `perf/api-scale-debt` branch lands.
-- The name constants go away and `DEFAULT_COLUMNS` carries a category per seed column. Note
-  that `refactor/web-dedupe` moved `DEFAULT_COLUMNS` and `DONE_COLUMN_NAME` into
-  `packages/shared-types/src/board-defaults.ts`, leaving only the Prisma-shaped
-  `DONE_COLUMN_NAME_NORMALIZED` and `doneColumnNameFilter` in
-  `apps/api/src/common/board-defaults.ts`. Both halves are affected: the shared package gains
-  the per-column category, the API half is deleted outright.
-  _Since superseded:_ implementing ADR 0018 moved the seed list back to
-  `apps/api/src/common/board-defaults.ts` as `defaultColumnsFor(locale)`, once the web stopped
-  seeding columns itself. The category still travels with each seed column; only its home
-  changed.
-- **The web exposes column category in column settings** — otherwise a user's own "Shipped"
-  column can never count as done. Shipped in `column-settings-dialog.tsx`.
-- A board may legitimately have more than one `COMPLETED` column (for example "Shipped" and
-  "Won't Do" split apart later). Metrics must treat completion as a set of columns, not a
-  single row. The old name matching had the same property via `mode: 'insensitive'`, so this is
-  not new, but it now has to be deliberate.
-- Existing boards whose done column was already renamed will still report zero completions
-  until someone sets the category. The backfill cannot recover intent from an arbitrary name.
-  A one-time note in the release changelog is warranted.
-- Future work gets a stable hook: board templates, WIP limits, cycle-time measurement, and
-  automation rules can all key off category instead of re-inventing a name convention.
+- Backfill'li bir şema migration'ı, artı `Column` DTO'suna ve `packages/shared-types`'a eklenen
+  `category`.
+- `dashboard.service.ts` tamamlanma sorguları `category: 'COMPLETED'`'a geçer. Bu, o dosyada
+  hâlihazırda süren bir çalışmayla örtüştüğü için uygulama, mevcut `perf/api-scale-debt` dalı
+  merge olana kadar bekler.
+- Ad sabitleri kalkar ve `DEFAULT_COLUMNS` tohum kolon başına bir kategori taşır. Dikkat:
+  `refactor/web-dedupe` dalı `DEFAULT_COLUMNS` ve `DONE_COLUMN_NAME`'i
+  `packages/shared-types/src/board-defaults.ts` içine taşıdı;
+  `apps/api/src/common/board-defaults.ts` içinde yalnızca Prisma şeklindeki
+  `DONE_COLUMN_NAME_NORMALIZED` ve `doneColumnNameFilter` kaldı. İki yarı da etkilenir:
+  paylaşılan paket kolon başına kategoriyi kazanır, API tarafındaki yarı tamamen silinir.
+  _Sonradan aşıldı:_ ADR 0018'in uygulanması, web kolonları kendisi tohumlamayı bıraktıktan
+  sonra tohum listesini `apps/api/src/common/board-defaults.ts` içine `defaultColumnsFor(locale)`
+  olarak geri taşıdı. Kategori hâlâ her tohum kolonuyla birlikte gider; yalnızca listenin evi
+  değişti.
+- **Web kolon ayarlarında kategori düzenlenebilir** — aksi hâlde kullanıcının kendi "Shipped"
+  kolonu asla tamamlanmış sayılamaz. `column-settings-dialog.tsx` içinde yayında.
+- Bir board'un birden fazla `COMPLETED` kolonu olması meşrudur (örneğin "Shipped" ve "Won't Do"
+  ileride ayrılırsa). Metrikler tamamlanmışlığı tek bir satır değil bir kolon kümesi olarak ele
+  almalıdır. Eski ad eşlemesi `mode: 'insensitive'` üzerinden aynı özelliğe sahipti, yani bu
+  yeni bir durum değil — ama artık bilinçli olmak zorunda.
+- Done kolonu daha önce yeniden adlandırılmış mevcut board'lar, biri kategoriyi ayarlayana
+  kadar sıfır tamamlanma raporlamaya devam eder. Backfill, keyfi bir addan niyeti kurtaramaz.
+  Sürüm changelog'una bir kerelik bir not düşmek yerinde olur.
+- İleriki işler kararlı bir tutamak kazanır: board şablonları, WIP limitleri, cycle-time ölçümü
+  ve otomasyon kuralları bir ad geleneği icat etmek yerine kategoriye bakabilir.
 
-## Alternatives considered
+## Değerlendirilen alternatifler
 
-| Alternative                                      | Why not                                                                                                                                |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Boolean `isDone`                                 | Cannot distinguish canceled from completed; that distinction costs a second migration later at the same price as doing it now          |
-| Keep name matching, add per-locale synonym lists | Every new language extends the list, and a plain user rename still kills the metric — the actual defect survives untouched             |
-| Derive from position (last column is done)       | Boards legitimately end with a "Blocked", "Archive", or "Won't Do" column, and reordering would silently change what "completed" means |
-| A separate `BoardSettings.doneColumnId` pointer  | Handles one column per board, breaks when completion splits across two, and adds a referential-integrity edge case on column delete    |
-| Free-text `category` string instead of an enum   | Reintroduces exactly the matching problem this ADR removes, one layer down                                                             |
+| Alternatif                                       | Neden olmadı                                                                                                                                 |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Boolean `isDone`                                 | İptal edileni tamamlanandan ayıramaz; bu ayrım sonradan ikinci bir migration'a mal olur, bugün yapmakla aynı fiyata                          |
+| Ad eşlemesinde kalıp dile göre eşanlamlı listesi | Her yeni dil listeyi uzatır ve kullanıcının düz bir yeniden adlandırması metriği yine öldürür — asıl kusur hiç dokunulmadan hayatta kalır    |
+| Konumdan türetmek (son kolon = done)             | Board'lar meşru şekilde "Blocked", "Archive" ya da "Won't Do" ile bitebilir ve yeniden sıralama "tamamlandı"nın anlamını sessizce değiştirir |
+| Ayrı bir `BoardSettings.doneColumnId` işaretçisi | Board başına tek kolonu karşılar, tamamlanma iki kolona bölününce kırılır ve kolon silmede referans bütünlüğü kenar durumu ekler             |
+| Enum yerine serbest metin `category` alanı       | Bu ADR'nin kaldırdığı eşleme sorununu bir katman aşağıda yeniden üretir                                                                      |

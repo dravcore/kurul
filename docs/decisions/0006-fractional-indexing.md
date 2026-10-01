@@ -1,56 +1,33 @@
-# 0006. Fractional Indexing for Task and Column Position
+# 0006. Task ve Column Pozisyonu için Fractional Indexing
 
-**Status:** Accepted
-**Date:** 2026-08-08
-**Updated:** 2026-08-08 — rebalancing is on-demand, not a periodic job, matching testing.md and roadmap.md.
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-08
+**Güncellendi:** 2026-08-08 — rebalancing periyodik bir job değil, talep üzerine yapılıyor; testing.md ve roadmap.md ile eşleşecek şekilde.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0006-fractional-indexing.md)
+## Bağlam
 
-## Context
+Kanban kartları ve kolonları drag-and-drop ile sürekli yeniden sıralanıyor. Naif bir integer position kolonu, iki mevcut kart arasına bir kart eklendiğinde sonraki her satırın yeniden numaralanmasını gerektiriyor, bu da her drag-and-drop hareketini bir O(n) yazmaya ve board'lar büyüdükçe bir lock contention kaynağına dönüştürüyor.
 
-Kanban cards and columns are reordered constantly via drag-and-drop. A naive
-integer position column requires renumbering every subsequent row whenever a
-card is inserted between two existing ones, which turns every drag-and-drop
-move into an O(n) write and a source of lock contention as boards grow.
+## Karar
 
-## Decision
+`Task.position` ve `Column.position`, asla `Int` değil, **`Float`**.
 
-`Task.position` and `Column.position` are **`Float`**, never `Int`.
+## Gerekçe
 
-## Rationale
+- Bir kartı `1` ve `2` pozisyonları arasına eklemek, yeni/taşınan satıra `1.5` pozisyonunu atıyor. Yalnızca o tek satır yazılıyor — hiçbir sibling satıra dokunulmuyor.
+- Kart ve kolon yeniden sıralaması, bir kanban aracının temel etkileşim yüzeyi ve liste uzunluğundan bağımsız olarak anında hissettirmesi gerekiyor; integer yeniden numaralamanın başaramadığını, tek satırlık bir yazma başarıyor.
+- Bu bir stil tercihi değil, sert bir gereklilik — bunu sonradan tersine çevirmek, mevcut her board üzerinde bir veri migration'ı anlamına gelir.
 
-- Inserting a card between position `1` and `2` assigns the new/moved row a
-  position of `1.5`. Only that single row is written — no sibling rows are
-  touched.
-- Card and column reordering is the core interaction surface of a kanban tool
-  and needs to feel instant regardless of list length; a single-row write
-  achieves that where integer renumbering cannot.
-- This is a hard requirement, not a style preference — reversing it later means
-  a data migration across every existing board.
+## Sonuçlar
 
-## Consequences
+- Olağan yolda bir kartı taşımak, kolon boyutundan bağımsız tek-satırlık bir veritabanı yazması — O(n) yeniden numaralama yok, taşınan liste boyunca lock contention yok. İstisna, aşağıdaki rebalancing.
+- Aynı iki komşu arasına tekrarlanan eklemeler (örn. yoğun bir kolonun en üstüne her zaman yeni bir kart bırakmak), zaman içinde pozisyon değerlerini giderek daha ince ondalık hassasiyete sürükleyebilir.
+- Floating-point hassasiyeti sonludur, dolayısıyla **rebalancing talep üzerine yapılır, zamanlanmış bir job değil**: bir taşıma, hassasiyet eşiğinden daha dar bir boşluğa bir kart yerleştirecekse, o kolonun pozisyonları taşımayla aynı transaction içinde yuvarlak, iyi aralıklı sayılara yeniden akıtılır, ve ancak ondan sonra taşıma uygulanır. Zamanlanmış bir job reddedildi — bir scheduler gerektiriyor ve boşluk zaten tükenmişse çalıştırmalar _arasında_ yine de bir yazmanın başarısız olmasına izin verebiliyor, oysa reaktif kontrol bunu yapamaz. Rebalancing, modeldeki tek O(n) yazma — tek bir kolonla sınırlı ve olağan ekleme derinliklerinde yeterince nadir, dolayısıyla bir tasarım eksikliği değil kabul edilmiş bir trade-off.
+- `position` üzerindeki eşitlik/sıralama karşılaştırmaları, sorgularda ve ORM katmanında float karşılaştırma uç durumlarını hesaba katmalı.
 
-- On the common path, moving a card is a single-row database write,
-  independent of column size — no O(n) renumbering, no lock contention across
-  the moved list. The exception is rebalancing, below.
-- Repeated insertions between the same two neighbors (e.g., always dropping a
-  new card at the very top of a busy column) can drive position values to
-  increasingly fine decimal precision over time.
-- Floating-point precision is finite, so **rebalancing is on-demand, not a
-  scheduled job**: when a move would place a card in a gap narrower than the
-  precision threshold, that column's positions are reflowed to round,
-  well-spaced numbers in the same transaction as the move, and only then is
-  the move applied. A scheduled job was rejected — it needs a scheduler and
-  can still let a write fail _between_ runs if the gap is already exhausted,
-  whereas the reactive check cannot. Rebalancing is the one O(n) write in the
-  model, bounded to a single column and rare enough at ordinary insertion
-  depths that it is an accepted trade-off rather than a design gap.
-- Equality/ordering comparisons on `position` must account for float
-  comparison edge cases in queries and in the ORM layer.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative                                                | Why not                                                                                                                                                                        |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Integer position with renumbering                          | Every move updates every row after the insertion point — O(n) writes, and race conditions under concurrent multi-user drag-and-drop                                            |
-| String-based fractional indexing (e.g., base62 order keys) | Avoids float precision limits entirely, but adds key-generation complexity not justified yet; worth reconsidering if float rebalancing ever becomes a real operational problem |
+| Alternatif                                                      | Neden değil                                                                                                                                                                                               |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Yeniden numaralamalı integer pozisyon                           | Her hareket, ekleme noktasından sonraki her satırı günceller — O(n) yazma ve eşzamanlı çok-kullanıcılı drag-and-drop altında race condition'lar                                                           |
+| String tabanlı fractional indexing (örn. base62 order key'leri) | Float hassasiyet sınırlarından tamamen kaçınıyor, ama henüz gerekçelendirilmemiş key-üretim karmaşıklığı ekliyor; float rebalancing gerçek bir operasyonel soruna dönüşürse yeniden değerlendirmeye değer |

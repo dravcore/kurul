@@ -1,62 +1,61 @@
-# 0012. Comment Delete Authorship
+# 0012. Yorum Silme Yazarlığı
 
-**Status:** Accepted
-**Date:** 2026-08-09
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-09
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0012-comment-delete-authorship.md)
+## Bağlam
 
-## Context
+[ADR 0011](0011-label-task-metadata-permissions.md) Faz 5 için düz bir kural getirdi: herhangi
+bir MEMBER+ erişilebilir bir task'taki herhangi bir yorumu silebilir; yazar-only kontrolü
+"ekstra kontrol; kötüye kullanım çıkana kadar ertele" diyerek reddetmişti. MVP tamamlandıktan
+sonraki Wave tech-debt sağlamlaştırma geçişinde bu düz kural, ertelediği kötüye kullanım
+durumunun kendisi olduğu ortaya çıktı: herhangi bir workspace üyesi yazmadığı bir yorumu
+silebiliyordu, "yazar kendi notunu temizledi" ile "üye başkasının yorumunu sildi" ayrımını
+yapacak bir denetim izi olmadan. `CommentService.remove` düzeltmesi ADR güncellemesinden önce
+gitti; bu kayıt, kodun artık sahip olmadığı davranışı 0011'in tarif etmesi yerine dar kuralı
+belgelenmiş karar haline getirir.
 
-[ADR 0011](0011-label-task-metadata-permissions.md) shipped a flat rule for Phase 5: any
-MEMBER+ may delete any comment on an accessible task, explicitly rejecting an author-only
-check as "extra checks; defer until abuse appears." In the Wave tech-debt hardening pass
-that followed MVP completion, that flat rule turned out to be the abuse case it deferred —
-any workspace member could delete a comment they did not write, with no audit trail
-distinguishing "author cleaned up their own note" from "member erased someone else's." The
-`CommentService.remove` fix landed ahead of the ADR update; this record makes the narrower
-rule the documented decision instead of leaving 0011 describing behavior the code no longer
-has.
+## Karar
 
-## Decision
+Yorum silme, çıplak workspace üyeliği değil, **yazarlık veya yükseltilmiş bir rol** gerektirir:
 
-Comment deletion requires **authorship or an elevated role**, not bare workspace membership:
+| İşlem     | OWNER | ADMIN | MEMBER (yazar) | MEMBER (yazar değil) | GUEST |
+| --------- | :---: | :---: | :------------: | :------------------: | :---: |
+| Yorum sil |   ✓   |   ✓   |       ✓        |          —           |   —   |
 
-| Action           | OWNER | ADMIN | MEMBER (author) | MEMBER (not author) | GUEST |
-| ---------------- | :---: | :---: | :-------------: | :-----------------: | :---: |
-| Delete a comment |   ✓   |   ✓   |        ✓        |          —          |   —   |
+`CommentService.remove`, `comment.userId === actorId` VEYA
+`actorRole ∈ {OWNER, ADMIN}` kontrol eder; başka her durumda `ForbiddenException` fırlatır. Bu,
+[ADR 0011](0011-label-task-metadata-permissions.md)'in "Yorum oluştur; erişilebilir task'taki
+herhangi bir yorumu sil" satırının yerini alır — o ADR'deki diğer tüm satırlar (label CRUD,
+assignee, task metadata) değişmeden kalır.
 
-`CommentService.remove` checks `comment.userId === actorId` OR
-`actorRole ∈ {OWNER, ADMIN}`; anything else raises `ForbiddenException`. This supersedes the
-"Create comments; delete any comment on an accessible task" row of
-[ADR 0011](0011-label-task-metadata-permissions.md) — every other row in that ADR (label
-CRUD, assignees, task metadata) is unchanged.
+## Gerekçe
 
-## Rationale
+- Başkasının sözünü silmek, kendi sözünü silmekten farklı bir eylemdir; düz kural bunları
+  içerik işi (label, assignee, tarih) için düşünülmüş tek bir MEMBER+ kapısı altında
+  birleştiriyordu.
+- OWNER/ADMIN, kötüye kullanılan veya konu dışı yorumlar için bir moderasyon yedeği tutar —
+  0011'in düz kuralının amacı sıfır çaresi olan bir kullanıcı sınıfından kaçınmaktı, yazarlık
+  kontrolünden tamamen kaçınmak değil.
+- Kontrol, zaten yüklenmiş satırda mevcut olan (`comment.userId`) ve guard'ın çözdüğü
+  `actorRole` üzerinden yapılan tek bir ekstra karşılaştırmadır — 0011'in endişelendiği
+  "ekstra kontrol" maliyeti gerçekleşmedi.
 
-- Deleting someone else's words is a different action from deleting your own; the flat rule
-  conflated them under one MEMBER+ gate meant for content work (labels, assignees, dates).
-- OWNER/ADMIN keep a moderation backstop for abusive or off-topic comments — the point of
-  0011's flat rule was avoiding a class of user with zero recourse, not avoiding authorship
-  checks entirely.
-- The check is one extra comparison already available on the loaded row (`comment.userId`)
-  and the guard-resolved `actorRole` — the "extra checks" cost 0011 worried about did not
-  materialize.
+## Sonuçlar
 
-## Consequences
+- `CommentController`, çağıranın `MemberRole`'ünü (`@CurrentMembership()` ile) sadece
+  `@Roles`'a güvenmek yerine `CommentService.remove`'a geçirir.
+- Web hâlâ silme affordance'ını yazarlıktan bağımsız olarak her `canMutate` (MEMBER+) role
+  gösteriyor; kendi yorumu olmayan bir yorumu silen bir MEMBER artık isteğin başarılı olması
+  yerine bir `403` toast'ı alır. Butonun yazar olmayanlar için gizlenmesi bir takip işidir, bu
+  ADR'nin gerektirdiği bir şey değildir.
+- `docs/api-conventions.md` ve `docs/decisions/0011-label-task-metadata-permissions.md`,
+  yorum-silme kuralı için özel olarak bu ADR'ye çapraz referans verir.
 
-- `CommentController` passes the caller's `MemberRole` (via
-  `@CurrentMembership()`) into `CommentService.remove` instead of relying on `@Roles` alone.
-- Web still shows the delete affordance to every `canMutate` (MEMBER+) role regardless of
-  authorship; a MEMBER deleting someone else's comment now gets a `403` toast instead of the
-  request succeeding. Hiding the button for non-authors is a follow-up, not required by this
-  ADR.
-- `docs/api-conventions.md` and `docs/decisions/0011-label-task-metadata-permissions.md`
-  cross-reference this ADR for the comment-delete rule specifically.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative                                    | Why not                                                                 |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| Keep 0011's flat "any MEMBER+ may delete"      | The abuse case 0011 deferred — no author-only recourse                  |
-| OWNER/ADMIN-only delete (no author self-serve) | Members could not retract their own mistaken or duplicate comments      |
-| Soft-delete with "deleted by" audit trail      | Reasonable follow-up, but a bigger schema change than this fix warrants |
+| Alternatif                                                 | Neden değil                                                                              |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 0011'in düz "herhangi bir MEMBER+ silebilir" kuralını koru | 0011'in ertelediği kötüye kullanım durumu — yazar-only çare yok                          |
+| Sadece OWNER/ADMIN silebilir (yazar kendi işini yapamaz)   | Üyeler kendi yanlış veya yinelenen yorumlarını geri alamazdı                             |
+| "Silen kişi" denetim iziyle soft-delete                    | Makul bir takip işi, ama bu düzeltmenin gerektirdiğinden daha büyük bir şema değişikliği |

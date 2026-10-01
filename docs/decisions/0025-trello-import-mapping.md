@@ -1,379 +1,395 @@
-# 0025. Trello Import Mapping: Nothing Is Guessed, Everything Missing Is Counted
+# 0025. Trello Import Eşlemesi: Hiçbir Şey Tahmin Edilmez, Gelmeyen Her Şey Sayılır
 
-**Status:** Accepted
-**Date:** 2026-08-15
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-15
+**Güncellendi:** 2026-10-01 — (1) Bağlam ve Sonuçlar'daki "elde tek bir gerçek export yoktu" ve
+"hiçbiri gerçek bir export değil" cümleleri tarihsel: 2026-08-22'den beri iki anonimleştirilmiş
+gerçek export `apps/api/test/fixtures/trello/real/` altında, uçtan uca import ediliyor ve okunan
+alan adlarında fark çıkmadı; ROADMAP'teki gerçek-export metriği o gün kapandı
+(`apps/api/test/fixtures/trello/README.md`). (2) Gövdedeki `dosya:satır` atıfları yazıldıkları günkü
+dosyaları gösterir ve kaymıştır; ilgili öğeyi adıyla arayın: `globals.css`'te `--label-slot-1…8`
+blokları; 0019'da "Metrikler `category`'ye bakar", `lower(name) = 'done'` migration'ı,
+`column-settings-dialog.tsx` maddeleri ve "Konumdan türetmek" satırı; 0023'te Gerekçe'deki "Neden
+tek düzey yerine çoklu liste" paragrafı. (3) Değişiklik bölümündeki "hatalı bir değer bir sonraki
+import'ta bir `500`'dür" yalnız kart ve liste tavanları için doğru: bayt tavanı
+`MulterModule.registerAsync` fabrikasında modül örneklenirken okunduğundan bozuk
+`TRELLO_IMPORT_MAX_BYTES` açılışı reddeder (`apps/api/src/import/import.module.ts`). (4) Kodda bu
+kayıtta adı geçmeyen örtük kurallar da var: adı boş öğeler `malformed` sayılır, boş adlı etiket
+ayrıca bir `(label, defaulted)` satırı üretir, adsız board `Imported board` adını alır,
+ayrıştırılamayan `due` raporlanmadan `null` olur (`apps/api/src/import/trello-import-planner.ts`).
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0025-trello-import-mapping.md)
+## Bağlam
 
-## Context
+Bu kaydın hizmet ettiği ROADMAP kalemi tek yönlü bir Trello JSON import'u: board, liste, kart,
+label ve checklist; dosya ekleri URL olarak taşınıyor. Kapsam bilerek dar; dar olmayan şey,
+Trello'nun modeliyle Kurul'un modelinin örtüşmediği yerlerin sayısı — yani bir import'un ya
+tahmin etmek ya da tahmin edemeyeceğini kabul etmek zorunda kaldığı yerler.
 
-The roadmap item this record serves is a one-way Trello JSON import: board, list, card, label
-and checklist, with attachments carried as URLs. The scope is deliberately small; what is not
-small is the number of places where Trello's model and Kurul's model do not line up, and
-where an importer therefore has to either guess or admit it cannot.
+Girdinin üç özelliği aşağıdaki her kararı şekillendiriyor.
 
-Three properties of the input shape every decision below.
+**Trello'nun export şemasında sürüm alanı da yok, değişiklik kaydı da.** Bugün alınan bir export
+ile gelecek yıl alınan bir export alan adlarında, iç içe geçme yapısında ve isteğe bağlı
+dizilerin hangilerinin hiç bulunduğunda farklılaşabilir. Dolayısıyla "Trello import çalışıyor"
+bir tarih hakkında ve o tarihte elde olan dosyalar hakkında bir iddiadır; Trello hakkında değil.
 
-**Trello's export schema has no version field and no changelog.** A board exported today and a
-board exported next year can differ in field names, in nesting and in which of the optional
-arrays are present at all. "The Trello importer works" is therefore a claim about a date and
-about the files that were on hand on that date, never a claim about Trello.
+**Bu kaydın yazıldığı tarihte elde tek bir gerçek export yoktu.** `apps/api/test/fixtures/trello/`
+altındaki fikstürlerin hepsi elle yazıldı ve README'leri bunu ilk paragrafında söylüyor. Bu bir
+dipnot değil, sonucu olan bir sınırlama: import'un okuduğu her alan adı hafızadan yazıldı ve
+hiçbir şeye karşı doğrulanmadı. "Üç gerçek export'la doğrulandı" diyen ROADMAP metriği tam da bu
+yüzden **partial** kapanıyor ve ilk gerçek export elimize geçtiğinde yeniden açılıyor.
 
-**On the date this record was written, no real export was on hand.** The fixtures under
-`apps/api/test/fixtures/trello/` are hand-written, and their README says so in its first
-paragraph. That is a limitation with a consequence, not a footnote: every field name the
-importer reads was written from memory and verified against nothing. The roadmap metric that
-asks for validation against three real exports closes as **partial** for exactly this reason,
-and reopens when a real export arrives.
+**Trello'nun sözlüğü kimi yerde Kurul'unkinden geniş, kimi yerde ise karşılığı hiç yok.**
+Trello'nun on label rengi var; bu deponun sekiz tasarım-token slotu. Trello'da arşivlenmiş liste
+ve kart var; Kurul'da arşiv kavramı yok. Trello'da kartın üyeleri var; Kurul'un üyeleri
+başka bir tenant'ın kullanıcı tablosundaki satırlar. Trello'da yorum var; bu import onları
+taşımıyor.
 
-**Trello's vocabulary is larger than Kurul's in some places and absent in others.** Trello
-has ten label colours; this repository has eight design-token slots. Trello has archived lists
-and cards; Kurul has no archive. Trello has members on cards; Kurul's members are rows in
-a different tenant's user table. Trello has comments; this import does not carry them.
+Bu üç koşul altında bir eşleme iki çok farklı biçimde başarısız olabilir. **Yanlış** olabilir —
+"Bitti" adlı bir sütunun tamamlanmış sütun olduğuna karar edip, yazarı import'un dilinde
+düşünmeyen her board için yanılabilir. Ya da **eksik** olabilir — arşivlenmiş bir kartı düşürebilir
+ve bunda haklı olabilir. Birincisi olmamalı. İkincisi **sesli** olmalı.
 
-A mapping under those three conditions can fail in two very different ways. It can be wrong —
-it can decide that a column named "Bitti" is a completed column, and be wrong for every board
-whose author did not think in the importer's language. Or it can be incomplete — it can drop an
-archived card, and be right to. The first kind must not happen. The second kind must happen
-loudly.
+## Karar
 
-## Decision
+**Bir board'un anlamına dair hiçbir şey çıkarsanmaz. Gelmeyen her şey sayılır ve cevabın gövdesinde
+kullanıcıya gösterilir.**
 
-**Nothing about a board's meaning is inferred. Everything that does not come across is counted
-and shown to the user in the response body.**
+Somut olarak:
 
-Concretely:
+### Yapı
 
-### Structure
+| Trello              | Kurul                             | Not                                                      |
+| ------------------- | --------------------------------- | -------------------------------------------------------- |
+| board               | `Board`                           | `name`, `desc` → `description`                           |
+| liste               | `Column`                          | her zaman `category: UNSTARTED` — aşağıya bakın          |
+| kart                | `Task`                            | `name` → `title`, `desc` → `description`                 |
+| label               | `Label`                           | renk bir slota eşlenir, isim boşsa üretilir              |
+| kart ↔ label        | `TaskLabel`                       | `idLabels` üzerinden                                     |
+| checklist           | `Checklist`                       | Trello checklist'i başına bir satır, asla düzleştirilmez |
+| `checkItem`         | `ChecklistItem`                   | `state === 'complete'` → `isDone: true`                  |
+| kart eki            | `kind: LINK` taşıyan `Attachment` | yalnız URL; sunucu o URL'e hiç istek atmaz               |
+| kartın `due` alanı  | `Task.dueDate`                    | `estimatedMinutes` `null` kalır, ikisi aynı alan değil   |
+| üye                 | —                                 | düşürülür, sayılır                                       |
+| yorum (`actions[]`) | —                                 | düşürülür, sayılır                                       |
+| `closed: true`      | —                                 | düşürülür, sayılır                                       |
 
-| Trello                | Kurul                          | Notes                                                     |
-| --------------------- | ------------------------------ | --------------------------------------------------------- |
-| board                 | `Board`                        | `name`, `desc` → `description`                            |
-| list                  | `Column`                       | always `category: UNSTARTED` — see below                  |
-| card                  | `Task`                         | `name` → `title`, `desc` → `description`                  |
-| label                 | `Label`                        | colour mapped to a slot, name defaulted if empty          |
-| card ↔ label          | `TaskLabel`                    | via `idLabels`                                            |
-| checklist             | `Checklist`                    | one row per Trello checklist, never flattened             |
-| `checkItem`           | `ChecklistItem`                | `state === 'complete'` → `isDone: true`                   |
-| card attachment       | `Attachment` with `kind: LINK` | URL only; the server never fetches it                     |
-| card `due`            | `Task.dueDate`                 | `estimatedMinutes` stays `null`, it is not the same field |
-| member                | —                              | dropped, counted                                          |
-| comment (`actions[]`) | —                              | dropped, counted                                          |
-| `closed: true`        | —                              | dropped, counted                                          |
+### Sütun kategorisi asla tahmin edilmez
 
-### Column category is never guessed
+İçe aktarılan her sütun şema varsayılanını — `UNSTARTED` — istisnasız alır, ve rapor kaç sütunun
+bu durumda olduğunu söyleyen tek bir `(column, defaulted)` satırı taşır.
 
-Every imported column takes the schema default, `UNSTARTED`, without exception, and the report
-carries one `(column, defaulted)` row saying how many columns that was.
+### Pozisyon sıralama için okunur, sonra atılır
 
-### Position is read for order and then thrown away
+Trello'nun `pos` değeri kardeşlerin sırasını belirler; `Column.position` ve `Task.position`'a
+yazılan değerler `rebalancePositions`'tan gelir. Eşitlikler, eksik değerler ve sayısal olmayan
+değerler (Trello bazen `"bottom"` string'ini yazıyor) Trello id'sine düşer; o id'nin baştaki sekiz
+hex hanesi bir oluşturulma zaman damgasıdır — yani geri düşüş "yapıldıkları sıra"dır, yazı tura
+değil.
 
-Trello's `pos` decides the order of siblings; the values written into `Column.position` and
-`Task.position` come from `rebalancePositions`. Ties, missing values and non-numeric values
-(Trello sometimes writes the string `"bottom"`) fall back to the Trello id, whose leading eight
-hex digits are a creation timestamp — so the fallback is "the order they were made", not a coin
-flip.
+### Label renkleri sekiz slota katlanır
 
-### Label colours fold onto eight slots
+| Trello rengi | Slot     | O slotun açık tema hex'i |
+| ------------ | -------- | ------------------------ |
+| `blue`       | `slot-1` | `#2a78d6`                |
+| `orange`     | `slot-2` | `#eb6834`                |
+| `green`      | `slot-3` | `#1baf7a`                |
+| `yellow`     | `slot-4` | `#eda100`                |
+| `pink`       | `slot-5` | `#e87ba4`                |
+| `lime`       | `slot-6` | `#008300`                |
+| `purple`     | `slot-7` | `#4a3aa7`                |
+| `red`        | `slot-8` | `#e34948`                |
+| `sky`        | `slot-1` | `blue` ile paylaşır      |
+| `black`      | `slot-7` | `purple` ile paylaşır    |
 
-| Trello colour | Slot     | Light-theme hex of that slot |
-| ------------- | -------- | ---------------------------- |
-| `blue`        | `slot-1` | `#2a78d6`                    |
-| `orange`      | `slot-2` | `#eb6834`                    |
-| `green`       | `slot-3` | `#1baf7a`                    |
-| `yellow`      | `slot-4` | `#eda100`                    |
-| `pink`        | `slot-5` | `#e87ba4`                    |
-| `lime`        | `slot-6` | `#008300`                    |
-| `purple`      | `slot-7` | `#4a3aa7`                    |
-| `red`         | `slot-8` | `#e34948`                    |
-| `sky`         | `slot-1` | shares with `blue`           |
-| `black`       | `slot-7` | shares with `purple`         |
+Yeni export'ların yazdığı `_dark` / `_light` sonekleri (`purple_dark`, `sky_light`) aramadan önce
+kırpılır — bunlar tek bir rengin ton türevleridir ve bu depoda renk başına bir slot vardır, ton
+başına değil.
 
-The `_dark` / `_light` suffixes newer exports write (`purple_dark`, `sky_light`) are stripped
-before lookup — they are shade variants of one colour, and this repository has one slot per
-colour, not one slot per shade.
+Bilinmeyen bir renk adı da `null` bir renk de `slot-1`'e düşer ve ikisi de rapora bir
+`(label, defaulted)` satırı ekler. İsmi boş olan bir label'a Trello renk adı isim olarak verilir
+(`"green"`), rengi de yoksa `"Label"` — çünkü `Label.name` nullable değil ve bir şey yazmak
+zorunlu.
 
-An unknown colour name and a `null` colour both land on `slot-1` and both add a
-`(label, defaulted)` row to the report. A label with an empty name is given its Trello colour
-name as a name (`"green"`), or `"Label"` when it has no colour either, because `Label.name` is
-not nullable and something has to be written.
+Yukarıdaki hex sütunu, slot numaralarının **nereden geldiğinin** belgesidir
+(`apps/web/app/globals.css:40-47`), saklanan bir değer değil. `Label.color` slot adını saklar.
+Aynı dosyanın `:95-102`'deki koyu tema bloğu aynı sekiz slot adını farklı hex'lerle tanımlıyor —
+kolonun neden renk değil slot sakladığının kanıtı tam olarak budur.
 
-The hex column above is documentation of where the slot numbers came from
-(`apps/web/app/globals.css:40-47`), not a value anything stores. `Label.color` stores the slot
-name. The same file's dark-theme block at `:95-102` defines the same eight slot names with
-different hex values, which is the whole reason the column stores a slot and not a colour.
+### Yazma atomik, kapsam kısmi
 
-### The write is atomic; the scope is partial
+Board, sütunlar, label'lar, kartlar, checklist'ler, maddeler ve link'ler tek bir transaction'da
+yazılır. Yarım import edilmiş board yoktur. O transaction'a **neyin gireceği** öncesinde, hiç
+veritabanına dokunmayan saf kodda kararlaştırılır: transaction'a ulaşan bir satır yazılabilir
+olduğu bilinen satırdır ve içeride "bu olmadı, devam et" yoktur.
 
-Board, columns, labels, cards, checklists, items and links are written in one transaction.
-There is no half-imported board. What is _in_ that transaction is decided beforehand, in pure
-code with no database access: by the time a row reaches the transaction it is known to be
-writable, and there is no "this one failed, carry on" inside it.
+### Rapor cevabın kendisidir
 
-### The report is the response
+`201 Created` bir `TrelloImportReportDto` döndürür: yaratılan board'un id'si ve adı, yazılan satır
+türü başına bir sayı, ve bir atlama grupları listesi. Bir grup, gerçek bir sayı ve en fazla yirmi
+örnek isim taşıyan bir `(scope, reason)` çiftidir. Sayı asla kırpılmaz; kırpılan yalnız
+örneklerdir. Rapor hiçbir yerde saklanmaz.
 
-`201 Created` returns a `TrelloImportReportDto`: the created board's id and name, one count per
-written row type, and a list of skip groups. A group is a `(scope, reason)` pair with a real
-count and up to twenty sample names. The count is never capped; only the samples are. The
-report is not stored anywhere.
+Atlama sözlüğü kapalıdır: `outOfScope`, `archived`, `unmappable`, `unsupportedScheme`,
+`malformed`, `defaulted`. `defaulted` bir kayıp değil bir **ikame** tarif etmesine rağmen bu
+listede, çünkü kullanıcının import'tan sonra sorduğu soru "neyi kaybettim" değil, "board'um neden
+farklı görünüyor" — ve varsayılana düşmüş bir renk o cevabın parçası.
 
-The skip vocabulary is closed: `outOfScope`, `archived`, `unmappable`, `unsupportedScheme`,
-`malformed`, `defaulted`. `defaulted` is in that list even though it describes a substitution
-rather than a loss, because the question a user asks after an import is not "what did I lose",
-it is "why does my board look different", and a defaulted colour is part of that answer.
+### Okuyucu anlamadığı şeyi çökmek yerine raporlar
 
-### The reader reports what it does not understand instead of failing
+Bu import'taki hiçbir alan adı gerçek bir export'a karşı doğrulanmadığı için okuyucunun sözleşmesi
+"Trello şemasını biliyorum" değil, **"bilmediğimi bildiririm"**. Eksik bir alan, beklenmedik tipte
+bir alan, ya da okuyucunun temsil edemeyeceği bir kayıt aynı `(scope, reason)` raporuna düşer ve
+okuma devam eder. Yalnız iki şey hatadır: gövdenin hiç JSON olmaması, ve kök nesnenin bir board
+export'una benzememesi.
 
-Because no field name in this import was verified against a real export, the reader's contract
-is not "I know Trello's schema" — it is **"I report what I do not know"**. A missing field, a
-field of an unexpected type, or an entry the reader cannot represent is dropped into the same
-`(scope, reason)` report and reading continues. Only two things are errors: a body that is not
-JSON at all, and a root object that does not look like a board export.
+### Aynı export'u iki kez import etmek iki board üretir
 
-### Importing the same export twice produces two boards
+Tekilleştirme de yok, yerinde güncelleme de. Davranış bir testle çivileniyor ve kullanıcıya dosya
+seçmeden **önce** import diyaloğunda söyleniyor.
 
-There is no deduplication and no update-in-place. The behaviour is nailed by a test and stated
-to the user in the import dialog before they choose a file.
+### Import başına tek bir activity satırı
 
-### One activity row per import
+`board.imported`, bir kez, sayıları payload'ında taşıyarak — kart başına bir `task.created` değil.
+`board.created`'ın yanında denetim alt kümesine girer.
 
-`board.imported`, once, carrying the counts in its payload — not one `task.created` per card.
-It joins the audit subset alongside `board.created`.
+## Gerekçe
 
-## Rationale
+### Sütun kategorisi neden hiç çıkarsanmıyor
 
-### Why the column category is not inferred, at all
+[ADR 0019](0019-column-category.md) var, çünkü Kurul eskiden tamamlanmışlığı sütunun adından
+çıkarsıyordu; ve o ADR çıkarsamanın üç yolunu adıyla anıp üçünü de reddediyor:
 
-[ADR 0019](0019-column-category.md) exists because Kurul used to infer completion from a
-column's name, and it names three ways of inferring it and rejects all three:
+- **İsimle eşleme yumuşatılmadı, kaldırıldı** (`0019-column-category.md:51-52`). "Done"u
+  "Shipped" yapan bir kullanıcı tamamlanma metriklerini sessizce sıfırlar ve hiçbir şey hata
+  vermez.
+- **Konumdan türetme adıyla reddedildi** — "son sütun done" (`:113`) — çünkü board'lar meşru
+  biçimde "Blocked", "Archive" ya da "Won't Do" ile bitebilir.
+- **Yerelleştirilmiş isim zaten sinyal değil** (`:25-30`): ADR 0018 varsayılan sütun adlarını
+  yaratıcının diliyle seed ediyor, yani Türkçe bir board `Bitti` ile başlıyor ve `'done'` ile hiç
+  eşleşmiyor.
 
-- **Name matching was removed**, not softened (`0019-column-category.md:51-52`). A user who
-  renames "Done" to "Shipped" silently zeroes their completion metrics, and nothing errors.
-- **Deriving from position was rejected by name** — "last column is done" (`:113`) — because
-  boards legitimately end with "Blocked", "Archive" or "Won't Do".
-- **A localized name is not a signal in the first place** (`:25-30`): ADR 0018 seeds default
-  column names in the creator's locale, so a Turkish board starts with `Bitti` and never
-  matches `'done'` at all.
+Bir Trello export'unda kategori yok. Elde yalnız iki sinyal var — isim ve konum — ve ikisi de o
+listede. Yani çıkarsanacak bir şey kalmıyor; yine de çıkarsamak, ADR 0019'un kaldırdığı defekti
+**daha çok** ıskalayacağı bir yerde geri koymak olurdu: bir Trello board'unun sütun adları herhangi
+bir dilde herhangi bir şey olabilir, oysa ADR 0019'un kendi migration'ı yalnız Kurul'un kendi
+seed ettiği İngilizce `Done`'ı tanıyordu. O migration (`:55-56`) isimle eşlemeye emsal gibi
+görünüyor ama değil — bilinen bir yazıcının bilinen çıktısını tanıyordu.
 
-A Trello export contains no category. The only two signals available are the name and the
-position, and both are on that list. So there is nothing left to infer from, and inferring
-anyway would be re-adding the defect ADR 0019 removed, in a place where it is _more_ likely to
-misfire: a Trello board's column names can be in any language and any wording, whereas ADR
-0019's own migration only ever recognized Kurul's own seeded English `Done`. That migration
-(`:55-56`) looks like a precedent for name matching and is not one — it matched a known writer's
-known output.
+Çıkarsamamanın bedeli gerçek ve bedeli kullanıcı ödüyor: import'tan sonra her sütun `UNSTARTED`
+olduğu için, kullanıcı sütun ayarlarını açana kadar dashboard'lar hiç tamamlanmış iş göstermez. O
+yüzey zaten var — ADR 0019 onu şart koşmuştu (`:95-96`, `column-settings-dialog.tsx`) — ve rapor
+kullanıcıya orada kaç sütunun beklediğini söylüyor. Raporlanan bir kapsam daralması, raporlanmayan
+bir kapsam daralmasından başka bir şeydir.
 
-The cost of not inferring is real and is paid by the user: after an import, every column is
-`UNSTARTED`, so dashboards report no completed work until the user opens column settings. That
-surface already exists — ADR 0019 required it (`:95-96`, `column-settings-dialog.tsx`) — and the
-report tells the user how many columns are waiting there. A narrowed scope that is reported is
-a different thing from a narrowed scope that is not.
+### İdempotans neden yok
 
-### Why there is no idempotency
+Tekilleştirme saklanan bir dış tanımlayıcı ister, ve o tanımlayıcının unique kapsamı burada
+gerçekten kararlaştırılamaz. Aynı Trello board'unu iki farklı workspace'e import etmek meşru. Aynı
+workspace'e iki kez import etmek de meşru — bir kopya çıkarmanın yolu bu. Bir `Board.externalId`
+kolonu bunlardan birini yasaklamak zorunda kalırdı ve ikisi de yanlış değil.
 
-Deduplication needs a stored external identifier, and the unique scope of that identifier is
-genuinely undecidable here. Importing the same Trello board into two different workspaces is
-legitimate. Importing it twice into one workspace is also legitimate — that is how someone takes
-a copy. A `Board.externalId` column would have to pick one of those to forbid, and neither is
-wrong.
+"Var olan board'u güncelle" daha katı bir import değil, **senkronizasyondur**. Çakışma politikası,
+silme yayılımı ve bir yön ister; ROADMAP satırı ise tek yönlü import istiyor.
 
-"Update the existing board instead" is not a stricter import; it is synchronization. It needs a
-conflict policy, a deletion-propagation policy and a direction, and the roadmap line asks for
-one-way import.
+Hafif görünen alternatif — board adı zaten varsa import'u reddet — hiçbir şey yapmamaktan kötü,
+çünkü iki board'un aynı adı taşıması bugün meşru ve bu kural alakasız bir board'un import'u
+engellemesine yol açardı.
 
-The lightweight-looking alternative — reject an import whose board name already exists — is
-worse than doing nothing, because two boards sharing a name is legal today and this would make
-an unrelated existing board block an import.
+Yani davranış şu: iki import, iki board, ayrık id'ler, iki kat kart. Kazayla değişmesin diye bir
+testle çivileniyor, sürpriz olmasın diye diyalogda yazıyor.
 
-So the behaviour is: two imports, two boards, disjoint ids, twice the cards. It is nailed by a
-test so it cannot drift into an accident, and it is stated in the dialog so it cannot surprise.
+### Arşivlenmiş liste ve kart neden düşürülüyor
 
-### Why archived lists and cards are dropped rather than imported
+`closed: true` Trello'nun arşividir. Kurul'da arşiv yok, yani arşivlenmiş bir kart ancak normal
+bir kart olarak gelebilir — yani kullanıcının bilerek görüş alanından kaldırdığı şey, önüne geri
+konur. Uzun ömürlü 500 kartlık bir board'un arkasında çoğu zaman bunun birkaç katı arşivlenmiş kart
+durur, yani bu bir yuvarlama hatası da değil.
 
-`closed: true` is Trello's archive. Kurul has no archive, so an archived card can only arrive
-as a normal card — that is, as something the user deliberately removed from view, put back in
-front of them. A long-lived 500-card board commonly carries several times that many archived
-cards behind it, so this is not a rounding error either.
+### Yorumlar neden sessizce yok sayılmıyor da sayılıyor
 
-### Why comments are counted rather than silently ignored
+Yorumlar `actions[]` içinde durur ve genellikle bir export'un en büyük parçasıdır. ROADMAP
+satırının kapsamı dışındalar. Board'unu import edip hiç yorum bulamayan bir kullanıcı, aksi hâlde
+import'un başarısız mı olduğunu yoksa hiç denemediğini mi tahmin etmek zorunda kalırdı; gerçek
+sayıyı taşıyan bir `(comment, outOfScope)` satırı bunu cevabın içinde yanıtlıyor.
 
-Comments live in `actions[]` and are usually the largest part of an export. They are out of the
-roadmap line's scope. A user who imports a board and finds no comments would otherwise have to
-guess whether the importer failed or never tried; a `(comment, outOfScope)` row with a real
-count answers that in the response.
+### Üyeler neden düşürülüyor
 
-### Why members are dropped
+Bir Trello üyesi bir Kurul kullanıcısı değildir. Export güvenilir biçimde e-posta taşımıyor,
+taşıdığı durumda bile onunla eşleşmek, işi bugün o adrese sahip olan kişiye atamak demek olurdu.
+Bu import'un yazdığı her satır, import'u koşturan kişiyi `createdById` / `uploadedById` alanına
+yazar. Bu bir eşleme değil — bir sorumluluk kaydı, ve dürüst olanı bu.
 
-A Trello member is not a Kurul user. The export does not reliably carry an email, and even
-when it does, matching on it would mean assigning work to whoever holds that address in this
-workspace today. Every row this importer writes records the person who ran the import in
-`createdById` / `uploadedById`. That is not a mapping — it is an accountability record, and it
-is the honest one.
+### Ekler neden link oluyor ve sunucu neden istek atmıyor
 
-### Why attachments become links and the server never fetches them
+Trello'nun export'u bir dosya değil, çoğu zaman Trello kimlik doğrulaması gerektiren bir URL
+veriyor. Onunla dürüstçe yapılabilecek şeyin tamamı bir `AttachmentKind.LINK` satırı yazmaktır —
+[ADR 0024](0024-attachment-kinds-and-serving-policy.md) o tipi tam da bu import için ekledi.
 
-Trello's export gives a URL, often one that needs Trello authentication, not a file. Writing an
-`AttachmentKind.LINK` row is the whole of what can honestly be done with it —
-[ADR 0024](0024-attachment-kinds-and-serving-policy.md) added that kind for this import
-specifically.
+Sunucu o URL'lere istek atmıyor, ve bu bir performans kararı değil bir güvenlik kararı: "önizleme
+getir" adımı, sunucuya kullanıcının seçtiği herhangi bir adrese istek attırma **yeteneğidir** ve
+böyle bir yetenek bir kere var olduğunda tek bir import'la sınırlı kalmaz. Ek URL'leri API'nin geri
+kalanının kullandığı kurala tabidir — yalnız `http:` ve `https:` — ve başka her şey
+`(attachment, unsupportedScheme)` olarak sayılır.
 
-The server does not request those URLs, and that is a security decision rather than a
-performance one: a "fetch a preview" step is the capability to make the server issue requests to
-any address a user names, and a capability like that does not stay confined to one importer once
-it exists. Attachment URLs are held to the same rule the rest of the API uses — `http:` and
-`https:` only — and anything else is counted as `(attachment, unsupportedScheme)`.
+### Checklist'ler neden düzleştirilmiyor
 
-### Why checklists are not flattened
+[ADR 0023](0023-checklist-data-model.md) kart başına çoklu liste modelini seçti ve
+`0023-checklist-data-model.md:122-127` gerekçe olarak tam da bu import'u anıyor. Trello kartları
+rutin olarak birkaç checklist taşır; tek listeli bir model bu import'u onları birleştirmeye ve
+kullanıcının kurduğu gruplamayı kaybetmeye zorlardı. Bir Trello checklist'i bir `Checklist`
+satırıdır.
 
-[ADR 0023](0023-checklist-data-model.md) chose a multi-list model per card, and
-`0023-checklist-data-model.md:122-127` names this import as a reason. Trello cards routinely
-carry several checklists; a single-list model would have forced this importer to concatenate
-them and lose the grouping the user made. One Trello checklist is one `Checklist` row.
+## Sonuçlar
 
-## Consequences
+- **Import'tan sonra sütun kategorileri, bir insan düzeltene kadar yanlıştır.** Her sütun
+  `UNSTARTED` olduğu için tamamlanma metrikleri sıfır okur. Rapor kaç sütun olduğunu söyler,
+  sütun ayarları diyaloğu da düzeltildikleri yerdir. Bu, tahmin etmemenin bilinçli bedeli.
+- **Kullanıcı aynı dosyayı iki kez import edip iki board elde edebilir.** Toparlamanın yolu birini
+  silmek.
+- **Rapor saklanmaz.** Paneli okumadan kapatan kullanıcı neyin gelmediğinin listesini kaybeder;
+  board etkilenmez. Web bunu tıklanıp geçilebilen bir diyalog olarak değil, kapatılana kadar duran
+  bir panel olarak gösteriyor.
+- **İki Trello rengi başka iki renkle slot paylaşıyor.** Trello'da görsel olarak ayrışan iki label
+  aynı renkle gelebilir. Alternatif, tek bir import için paleti büyütmek ya da temanın
+  çözemeyeceği bir hex saklamaktı.
+- **"Trello import çalışıyor" bir tarih hakkında bir iddiadır.** Fikstürler ne zaman yazıldıklarını
+  kaydediyor, ve bu tarihte hiçbiri gerçek bir export değil. İlk gerçek export'un bu deponun
+  yanlış bildiği alan adlarını bulması muhtemel; okuyucu bunu başarısız bir import yerine rapor
+  satırı üretecek biçimde kuruldu, ama yine de eksikleri olan bir import üretecek.
 
-- **After an import, column categories are wrong until a human fixes them.** Every column is
-  `UNSTARTED`, so completion metrics read zero. The report says how many columns and the column
-  settings dialog is where they are fixed. This is the deliberate cost of not guessing.
-- **A user can import the same file twice and get two boards.** Recovering means deleting one.
-- **The report is not stored.** A user who closes the panel without reading it has lost the
-  list of what did not come across; the board itself is unaffected. The web shows it as a panel
-  that stays until dismissed rather than as a dialog that can be clicked away.
-- **Two Trello colours share a slot with two others.** Two labels that were visually distinct in
-  Trello can arrive the same colour. The alternative was growing the palette for one importer or
-  storing a hex the theme cannot resolve.
-- **"The Trello importer works" is a claim about a date.** The fixtures record when they were
-  written, and on this date none of them is a real export. The first real export is likely to
-  find field names this repository has wrong; the reader is built so that finding them produces
-  report rows rather than a failed import, but it will still produce an import that is missing
-  things.
+## Değerlendirilen alternatifler
 
-## Alternatives considered
+| Alternatif                                                 | Neden olmadı                                                                                                                                                                                     |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "done" adlı sütundan `COMPLETED` çıkarsamak                | ADR 0019'un kaldırdığı defektin ta kendisi (`:51-52`); bir Trello sütunu her dilde herhangi bir şey olabilir, yani ADR 0019'un yazıldığı durumdan daha kötü                                      |
+| Kategoriyi konumdan türetmek ("son sütun done")            | ADR 0019 bunu adıyla reddediyor (`:113`); board'lar meşru biçimde "Blocked" ya da "Won't Do" ile biter                                                                                           |
+| İdempotans için bir `Board.externalId` kolonu              | Unique kapsamı kararlaştırılamaz — aynı board'un iki workspace'e girmesi de, bir workspace'e iki kez girmesi de meşru; isimle tekilleştirme ise alakasız bir board'un import'u engellemesi demek |
+| Kuyruk + bir `ImportRun` tablosu                           | Raporu saklamak bir durum ucu, bir polling döngüsü ve bir retention kuralı demek — cevabı zaten bekleyen bir okuyucu için tek atımlık bir eyleme dört yeni yüzey                                 |
+| Trello `pos` değerlerini `position`'a olduğu gibi yazmak   | Yepyeni bir board'u eski board'un kaydığı boşluk deseniyle, `MIN_GAP`'e doğru daralmış boşluklar dahil, tohumlar; yeniden üretmek bedava                                                         |
+| Arşivlenmiş liste ve kartları normal olarak import etmek   | Kullanıcının bilerek kaldırdığını, canlı board'un birkaç katı hacimle geri koyar                                                                                                                 |
+| Trello üyelerini e-postayla kullanıcılara eşlemek          | Export güvenilir biçimde e-posta taşımıyor, ve eşleşmek işi bugün o adrese sahip olan kişiye atardı                                                                                              |
+| Ek URL'lerini getirip baytları saklamak                    | Sunucuya kullanıcının seçtiği herhangi bir adrese istek atma yeteneği verir — import'la sınırlı kalmayan bir SSRF yeteneği (ADR 0024)                                                            |
+| Bir kartın checklist'lerini tek listeye düzleştirmek       | Kullanıcının kurduğu gruplamayı atar, ve ADR 0023'ün çoklu-liste modelini seçme gerekçesiyle çelişir (`:122-127`)                                                                                |
+| Eşlenemeyen bir Trello rengi için ham hex saklamak         | `Label.color` tema tarafından çözülen bir slot saklar; bir hex'i aynı slotları farklı değerlerle tanımlayan koyu tema çözemez                                                                    |
+| Bir alan eksik ya da tuhaf tipteyken tüm dosyayı reddetmek | Buradaki hiçbir alan adı gerçek bir export'a karşı doğrulanmadı; bu, her şema kaymasını bir rapor satırı yerine tam bir başarısızlığa çevirirdi                                                  |
 
-| Alternative                                                   | Why not                                                                                                                                                                   |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Infer `COMPLETED` from a column named "done"                  | Exactly the defect ADR 0019 removed (`:51-52`); a Trello column can be named anything in any language, which is worse than the case ADR 0019 was written for              |
-| Derive the category from position ("the last column is done") | Rejected by name in ADR 0019 (`:113`); boards legitimately end with "Blocked" or "Won't Do"                                                                               |
-| A `Board.externalId` column for idempotency                   | Its unique scope is undecidable — same board into two workspaces is legitimate, and so is twice into one; and dedupe-by-name would let an unrelated board block an import |
-| A queue plus an `ImportRun` table                             | Storing the report means a status endpoint, a polling loop and a retention rule — four new surfaces for a one-shot action whose reader is already waiting on the response |
-| Write Trello's `pos` values into `position` unchanged         | Seeds a brand-new board with whatever gap pattern the old one drifted into, including gaps already narrowed toward `MIN_GAP`; re-issuing costs nothing                    |
-| Import archived lists and cards as normal ones                | Puts back what the user deliberately removed, at several times the volume of the live board                                                                               |
-| Map Trello members to users by email                          | The export does not reliably carry one, and matching would assign work to whoever holds that address today                                                                |
-| Fetch attachment URLs and store the bytes                     | Gives the server the ability to request any address a user names — an SSRF capability that does not stay confined to the importer (ADR 0024)                              |
-| Flatten a card's checklists into one list                     | Discards the grouping the user made, and contradicts the reason ADR 0023 chose a multi-list model (`:122-127`)                                                            |
-| Store a raw hex for an unmapped Trello colour                 | `Label.color` stores a theme-resolved slot; a hex cannot be resolved by the dark theme, which defines the same slots at different values                                  |
-| Reject the whole file when a field is missing or oddly typed  | No field name here was verified against a real export, so this would turn every schema drift into a total failure instead of a report row                                 |
+## Değişiklik (2026-08-26): alan uzunluğu tavanları ve satır sayısı tavanı (SEC-04)
 
-## Amendment (2026-08-26): field length ceilings and a row cap (SEC-04)
+Bir denetim bulgusu (SEC-04), bu importer'ın diğer her yazma yolunun uyguladığı uzunluk
+kontrollerini atladığını gösterdi. `Task.title`, `Task.description`, `Board.name`,
+`Board.description`, `Checklist.title`, `Column.name`, `Label.name`, `ChecklistItem.content` ve
+`Attachment.url`, diğer her rotada `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`,
+`CreateColumnDto`, `CreateLabelDto`, `CreateChecklistItemDto` ve `CreateAttachmentDto` üzerinden
+veritabanına ulaşıyor, ve bunların her biri kendi alanını `@MaxLength` ile işaretliyor. Planner
+ise `card.name`, `card.desc`, export'un kendi board adı ve açıklaması, `checklist.name`,
+`list.name`, `label.name`, bir check item'ın `name` alanı ve bir ekin `url` alanını böyle bir
+tavan olmadan doğrudan yazıyordu, yani bir Trello export'u bu dekoratörlerin korumadığı tek
+kapıydı. Export'taki hiçbir şey bu şekilde yazılmakla kötü niyetli hale gelmiyordu; risk,
+kimsenin kaydıramayacağı bir board ve ürünün bir kolonun tutmasını hiç istemediği kadar veri
+tutan bir veritabanı sütunuydu.
 
-An audit finding (SEC-04) noted that this importer skipped the length checks every other write path
-applies. `Task.title`, `Task.description`, `Board.name`, `Board.description`, `Checklist.title`,
-`Column.name`, `Label.name`, `ChecklistItem.content` and `Attachment.url` all reach the database
-through `CreateTaskDto`, `CreateBoardDto`, `CreateChecklistDto`, `CreateColumnDto`,
-`CreateLabelDto`, `CreateChecklistItemDto` and `CreateAttachmentDto` on every other route, and each
-of those decorates its field with `@MaxLength`. The planner wrote `card.name`, `card.desc`, the
-export's own board name and description, `checklist.name`, `list.name`, `label.name`, a check item's
-`name` and an attachment's `url` straight through with no such ceiling, so a Trello export was the
-one door into this database those decorators did not guard. Nothing in the export was malicious to
-write this way; the risk was a board nobody could scroll and a database column holding more than the
-product ever intended one to hold.
-
-`trello-import-planner.ts` now clamps every one of those fields to the same constant the DTO uses.
-Each pair of DTOs (create and update) imports its ceiling from one file next to it, six files in all
+`trello-import-planner.ts` artık bu alanların her birini DTO'nun kullandığı aynı sabite kısıtlıyor.
+Her DTO çifti (create ve update), tavanını yanındaki tek dosyadan import ediyor, toplam altı dosya
 (`task/dto/task-limits.ts`, `board/dto/board-limits.ts`, `board/dto/column-limits.ts`,
-`label/dto/label-limits.ts`, `task/dto/checklist-item-limits.ts` and
-`attachment/dto/attachment-limits.ts`), and the planner imports the same six, so each number exists
-once. A task title or description that was cut is reported as one `(card, defaulted)` row, the same
-reason a substitution already uses elsewhere in this report (an unknown label colour, a defaulted
-column category): the card still imports, and the question the report answers is "why does my board
-look different", which a clamp answers as well as a colour substitution does. A checklist title or a
-checklist item's content that was cut is reported the same way, under `(checklist, defaulted)` and
-`(checklistItem, defaulted)`. A label name that was cut folds into the same `(label, defaulted)` row
-an unknown colour already produces, for the reason the Decision table gives for combining them: a
-label the user does not recognise is one problem, however many of its fields changed. An attachment
-URL that was cut is reported under `(attachment, defaulted)`. A column's name shares its report row
-with the category default every imported column already gets (`(column, defaulted)`, count equal to
-the number of columns): a second, separate row for the same column would double-count it, so the
-clamp changes what that row's sample text can say rather than adding a row of its own. The board's
-own name and description are clamped silently: there is no `board` scope in the closed vocabulary
-above, a board is one row rather than a class of rows, and a `(board, defaulted)` line that could
-only ever say "1" would answer nothing a user could act on, the same reasoning `trello-export.ts`
-already applies to the board's own description when it is unusable.
+`label/dto/label-limits.ts`, `task/dto/checklist-item-limits.ts` ve
+`attachment/dto/attachment-limits.ts`), ve planner da aynı altı dosyayı import ediyor, yani her
+sayı bir kez var oluyor. Kesilen bir görev başlığı ya da açıklaması, bu raporda başka bir yerde
+zaten kullanılan aynı gerekçeyle tek bir `(card, defaulted)` satırı olarak raporlanır (bilinmeyen
+bir etiket rengi, varsayılan bir sütun kategorisi gibi): kart yine de import edilir, ve raporun
+cevapladığı soru "board'um neden farklı görünüyor" sorusudur, bunu bir kısıtlama da bir renk
+değişimi kadar iyi cevaplar. Kesilen bir checklist başlığı ya da bir checklist item'ın içeriği de
+aynı şekilde, sırasıyla `(checklist, defaulted)` ve `(checklistItem, defaulted)` altında
+raporlanır. Kesilen bir label adı, bilinmeyen bir rengin zaten ürettiği `(label, defaulted)`
+satırına katılır; Karar tablosunun bunları birleştirme gerekçesiyle aynı gerekçeyle: kullanıcının
+tanımadığı bir label tek bir sorundur, kaç alanı değişmiş olursa olsun. Kesilen bir ek URL'si
+`(attachment, defaulted)` altında raporlanır. Bir sütunun adı, her import edilen sütunun zaten
+aldığı kategori varsayımıyla aynı rapor satırını paylaşır (`(column, defaulted)`, sayı sütun
+sayısına eşit): aynı sütun için ayrı, ikinci bir satır onu iki kez saymış olurdu, bu yüzden
+kısıtlama ayrı bir satır eklemek yerine o satırın örnek metninin ne söyleyebileceğini değiştirir.
+Board'un kendi adı ve açıklaması sessizce kısıtlanır: yukarıdaki kapalı kelime dağarcığında bir
+`board` kapsamı yok, bir board bir satır sınıfı değil tek bir satır, ve yalnızca "1" diyebilecek
+bir `(board, defaulted)` satırı kullanıcının davranabileceği hiçbir şey söylemez, bu da
+`trello-export.ts`'in board'un kendi açıklaması kullanılamaz olduğunda zaten uyguladığı
+gerekçenin aynısı.
 
-Three honest limitations in the report this produces, rather than a fourth new skip reason. The
-brief for this amendment asked for a dedicated `truncated` reason; the branch reuses `Defaulted`
-instead, because the web report panel renders `t('skip.reason.' + group.reason)` from a fixed
-translation table (`apps/web/messages/{en,tr}.json`) that this worktree is not allowed to touch,
-and a new enum member with no matching key breaks that render. The consequence is that the
-existing `Defaulted` copy ("Kurul had no matching value, so the default was used") is now shown
-for five group kinds where nothing was defaulted and nothing failed to match, only cut: it
-misdescribes a clamp until a follow-up PR adds the `truncated` reason and both translations.
+Bu değişikliğin ürettiği raporda dördüncü bir yeni skip nedeni yerine üç dürüst sınırlama var.
+Bu değişikliğin brief'i özel bir `truncated` nedeni istiyordu; branch bunun yerine `Defaulted`'i
+yeniden kullanıyor, çünkü web rapor paneli `t('skip.reason.' + group.reason)`'ı sabit bir çeviri
+tablosundan (`apps/web/messages/{en,tr}.json`) render ediyor, ve bu worktree'nin dokunmasına izin
+verilmiyor; karşılığı olmayan bir enum üyesi bu render'ı kırar. Sonuç olarak, mevcut `Defaulted`
+metni ("Kurul had no matching value, so the default was used") artık hiçbir şeyin varsayılmadığı
+ve hiçbir şeyin eşleşmediği, yalnızca kesildiği beş grup türü için gösteriliyor: bir follow-up
+PR `truncated` nedenini ve her iki çeviriyi ekleyene kadar bu metin bir kısıtlamayı yanlış
+tanımlıyor.
 
-Second, a clamped column name is reported only if it happens to land among the first
-`SKIP_SAMPLE_LIMIT` samples in `(column, defaulted)`, since that row's count is `columns.length`
-whether or not any name was cut and its samples are capped the same way every group's are; past
-that cap a clamped column name leaves no trace in the report at all.
+İkincisi, kesilen bir sütun adı yalnızca ilk `SKIP_SAMPLE_LIMIT` örneği arasına düşerse
+`(column, defaulted)` içinde raporlanıyor, çünkü o satırın sayısı, herhangi bir ad kesilmiş olsun
+ya da olmasın, `columns.length`, ve örnekleri her grubunki gibi aynı şekilde sınırlanıyor; bu
+tavanı aştıktan sonra kesilen bir sütun adı raporda hiçbir iz bırakmıyor.
 
-Third, `filename: safeDisplayName(attachment.name) || url.value` falls back to the URL (already
-clamped, up to `MAX_ATTACHMENT_URL_LENGTH`, 2048 characters) when a name is empty or cleans to
-nothing, which can store a `filename` past the 255 characters `CreateAttachmentDto` caps it at on
-every other route. `AttachmentService.createLink` builds its own `filename` the identical way
-(`safeDisplayName(dto.filename ?? '') || url`), so this is not the importer diverging from its
-HTTP twin, it is a pre-existing exception in both, and "every field the importer writes is held
-to its DTO ceiling" should be read with that one exception in mind.
+Üçüncüsü, `filename: safeDisplayName(attachment.name) || url.value`, bir ad boşsa ya da
+temizlendikten sonra boş kalıyorsa (zaten kısıtlanmış, `MAX_ATTACHMENT_URL_LENGTH`'e kadar, 2048
+karakter) URL'ye düşüyor, bu da bir `filename`'i `CreateAttachmentDto`'nun her başka rotada
+kısıtladığı 255 karakteri aşacak şekilde saklayabilir. `AttachmentService.createLink` kendi
+`filename`'ini birebir aynı şekilde oluşturuyor (`safeDisplayName(dto.filename ?? '') || url`),
+yani bu, importer'ın kendi HTTP ikizinden sapması değil, ikisinde de var olan önceden var olan
+bir istisna; "importer'ın yazdığı her alan kendi DTO tavanına bağlıdır" ifadesi bu tek istisna
+akılda tutularak okunmalı.
 
-The same ceiling also bounds the _report_, not only the write. A row the planner drops rather than
-writes (an archived list or card, a card pointing at a label id the export does not contain, a
-rejected attachment, a checklist left off because its card was dropped) still quotes a name as a
-sample in the response body, and that name comes from the export, unclamped, just like the fields
-above. Every one of those sample sites clamps or cleans its text the same way the row it describes
-would have (the accepted card's own already-clamped title, in the label-id case; `safeDisplayName`
-for a rejected attachment; the column/checklist ceilings for a dropped list or checklist).
+Aynı tavan, yalnızca yazmayı değil _raporu_ da sınırlıyor. Planner'ın yazmak yerine düşürdüğü bir
+satır (arşivlenmiş bir liste ya da kart, export'ta bulunmayan bir label id'sine işaret eden bir
+kart, reddedilen bir ek, kartı düşürüldüğü için düşen bir checklist) yine de bir adı yanıt
+gövdesinde örnek olarak alıntılıyor, ve o ad export'tan geliyor, kısıtlanmamış olarak, tıpkı
+yukarıdaki alanlar gibi. Bu örnek noktalarının her biri metnini, tanımladığı satır yazılmış olsaydı
+nasıl kısıtlanacak ya da temizlenecek idiyse öyle kısıtlıyor ya da temizliyor (label-id durumunda
+kabul edilen kartın kendi zaten kısıtlanmış başlığı; reddedilen bir ek için `safeDisplayName`;
+düşen bir liste ya da checklist için sütun/checklist tavanları).
 
-One case has no row to borrow a ceiling from at all: an entry `readCard`, `readList`, `readLabel`
-or `readChecklist` rejects outright, for a missing `id` or a field of the wrong type, never
-becomes a plan row, so `trello-export.ts` reports it with whatever string sat in its `name` field,
-unclamped, and there is no accepted row's ceiling for the planner to reuse. That is the door the
-per-site clamps above do not cover, and it is closed one level lower instead: `SkipCollector`
-(`import-skip.ts`) clamps every sample to a flat `SKIP_SAMPLE_MAX_LENGTH` on the way into the
-report, whichever call site handed it the string, present or future. The per-site clamps above are
-still worth doing, since each cuts a name to the length the row it describes would actually have
-had rather than to the collector's one flat ceiling, but they are belt-and-braces now, not the
-only guard: a report about an oversized field cannot itself carry an unbounded string back to the
-caller, on any path.
+Bir durumun ödünç alacağı hiçbir tavan yok: `readCard`, `readList`, `readLabel` ya da
+`readChecklist`'in tamamen reddettiği bir girdi (eksik bir `id`, ya da yanlış tipte bir alan
+yüzünden) hiçbir zaman bir plan satırına dönüşmüyor, bu yüzden `trello-export.ts` onu, `name`
+alanında ne varsa onu, kısıtlanmamış olarak raporluyor; planner'ın ödünç alabileceği kabul edilmiş
+bir satır yok çünkü. Yukarıdaki nokta bazlı kısıtlamaların kapsamadığı kapı bu, ve bir seviye daha
+aşağıda kapatılıyor: `SkipCollector` (`import-skip.ts`) her örneği, hangi çağrı noktasından geldiği
+fark etmeksizin, şimdi ya da ileride, rapora girerken sabit bir `SKIP_SAMPLE_MAX_LENGTH`'e
+kısıtlıyor. Yukarıdaki nokta bazlı kısıtlamalar yine de değerini koruyor, çünkü her biri bir adı,
+tanımladığı satırın gerçekte sahip olacağı uzunluğa kısıtlıyor, koleksiyoncunun tek düz tavanına
+değil; ama artık tek güvence onlar değil, ek bir güvence: oversized bir alan hakkındaki bir rapor,
+hiçbir yolda kendisi sınırsız bir string taşıyamaz.
 
-A second gap the same finding named: nothing bounded how many _cards or lists_ an export could
-ask this API to plan (the two row kinds a real export is dominated by, and the two the finding
-named). `TRELLO_IMPORT_MAX_BYTES` bounds the parsed object graph's size, not the row count, and
-a small card can be a few dozen bytes, so a 20 MiB export can still be several hundred thousand
-tiny cards. `TrelloImportService` now checks the reader's `lists.length` and `cards.length`
-against `TRELLO_IMPORT_MAX_CARDS` (default 50000) and `TRELLO_IMPORT_MAX_LISTS` (default 5000)
-before the planner runs and before the transaction opens; an export over either cap answers `400`
-and writes nothing. Those are the reader's counts, not the export's raw arrays: an archived list
-or card is still in them, since the planner is what drops those, not the reader, but an entry the
-reader could not parse into a row at all (no `id`, or a field of the wrong type) is already gone,
-because that is what makes it a reader issue rather than a row in the first place. That still
-covers the cost these ceilings exist for, heap held by the parsed graph and the length of the
-writer's `createMany` sequence, since both are paid for every row the reader kept, whether or not
-the planner goes on to write it.
+Aynı bulgunun adlandırdığı ikinci bir boşluk: bir export'un bu API'den planlamasını isteyebileceği
+_kart ya da liste_ sayısını hiçbir şey sınırlamıyordu (gerçek bir export'un baskın olduğu ve
+bulgunun adlandırdığı iki satır türü). `TRELLO_IMPORT_MAX_BYTES` ayrıştırılmış nesne grafiğinin
+boyutunu sınırlar, satır sayısını değil, ve küçük bir kart birkaç düzine bayt olabilir, yani 20
+MiB'lik bir export yine de birkaç yüz bin küçük kart olabilir. `TrelloImportService` artık
+reader'ın `lists.length` ve `cards.length` değerlerini, planner çalışmadan ve transaction
+açılmadan önce `TRELLO_IMPORT_MAX_CARDS` (varsayılan 50000) ve `TRELLO_IMPORT_MAX_LISTS`
+(varsayılan 5000) değerlerine karşı denetler; bu tavanlardan birini aşan bir export `400` döner ve
+hiçbir şey yazmaz. Bunlar reader'ın sayıları, export'un ham dizileri değil: arşivlenmiş bir liste
+ya da kart hâlâ bunların içinde, çünkü onları düşüren planner, reader değil; ama reader'ın bir
+satıra hiç ayrıştıramadığı bir girdi (eksik bir `id`, ya da yanlış tipte bir alan) zaten yok,
+çünkü onu bir satır değil bir reader sorunu yapan da bu. Bu, bu tavanların var olma sebebi olan
+maliyeti (ayrıştırılmış grafiğin tuttuğu heap, ve writer'ın `createMany` dizisinin uzunluğu) yine
+de karşılıyor, çünkü ikisi de reader'ın tuttuğu her satır için ödenir, planner onu sonunda yazsın
+ya da yazmasın.
 
-Checklists, check items, labels, task-label rows and attachments have no ceiling of their own: a
-card carries as many of each as its export does, uncapped, so an export with few cards and lists
-but a very large number of checklist items would still plan and chunk that many rows inside the
-one transaction. `TRELLO_IMPORT_MAX_CARDS` and `TRELLO_IMPORT_MAX_LISTS` bound the two row kinds
-SEC-04 named and the two a real export scales with; a ceiling on the other five is left to a
-follow-up if an export turns up that needs one.
+Checklist'lerin, check item'ların, label'ların, task-label satırlarının ve eklerin kendi tavanı
+yok: bir kart, export'ununki kadar çoğunu, sınırsız, taşıyor, yani az kart ve liste ama çok
+büyük sayıda checklist item'ı olan bir export yine de o kadar satırı tek transaction içinde
+planlayıp chunk'layacaktır. `TRELLO_IMPORT_MAX_CARDS` ve `TRELLO_IMPORT_MAX_LISTS`, SEC-04'ün
+adlandırdığı ve gerçek bir export'un ölçeklendiği iki satır türünü sınırlıyor; diğer beşi için bir
+tavan, ihtiyaç duyan bir export ortaya çıkarsa bir follow-up'a bırakılıyor.
 
-`readTrelloImportMaxCards` and `readTrelloImportMaxLists` throw a plain `Error` on a
-misconfigured value, the same convention `readTrelloImportMaxBytes` already used: a bad value is
-a `500` on the next import, not a refusal to boot. That is a deliberate departure from ADR 0032's
-plan-limit ceilings, which refuse at startup instead, because those are read once by
-`readInstancePlanLimits()` at boot and never again, while every import limit here is already
-read per request for the reason given in `import-config.ts` (a test, or an operator restart, must
-see the value that is actually set). Boot-time validation was not added for these two alongside
-it, so a misconfigured `TRELLO_IMPORT_MAX_CARDS` fails the same way its byte-ceiling sibling
-already did rather than gaining a new failure mode of its own.
+`readTrelloImportMaxCards` ve `readTrelloImportMaxLists`, hatalı yapılandırılmış bir değerde düz
+bir `Error` fırlatıyor, `readTrelloImportMaxBytes`'ın zaten kullandığı aynı gelenekle: hatalı bir
+değer bir sonraki import'ta bir `500`'dür, boot'u reddetmek değil. Bu, ADR 0032'nin plan
+tavanlarından bilinçli bir sapmadır; onlar boot'ta reddediyor, çünkü onlar
+`readInstancePlanLimits()` tarafından boot'ta bir kez okunuyor ve bir daha hiç okunmuyor, oysa
+buradaki her import tavanı `import-config.ts`'de verilen gerekçeyle (bir test ya da bir operatör
+restart'ı, gerçekten ayarlanmış değeri görmeli) zaten her istekte okunuyor. Bu ikisi için boot-time
+doğrulama eklenmedi, yani hatalı yapılandırılmış bir `TRELLO_IMPORT_MAX_CARDS`, kendi yeni bir
+başarısızlık modu kazanmak yerine bayt-tavanı kardeşinin zaten yaptığı şekilde başarısız oluyor.
 
-Neither change touches the Decision section above: the skip vocabulary is unchanged, the
-structure table is unchanged, and the write is still one atomic transaction over a plan built
-with no database access.
+İki değişiklik de yukarıdaki Karar bölümüne dokunmuyor: kapalı kelime dağarcığı değişmedi, yapı
+tablosu değişmedi, ve yazma hâlâ veritabanına hiç erişmeden kurulan bir plan üzerinden tek bir
+atomik transaction.

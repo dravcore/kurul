@@ -1,468 +1,467 @@
-# 0033. Webhook Delivery and Failure Policy: Workspace-Owned Endpoints, an Outbox Row, and a Signed Envelope
+# 0033. Webhook Teslimi ve Hata Politikası: Workspace'e Ait Endpoint'ler, Bir Outbox Satırı ve İmzalı Bir Zarf
 
-**Status:** Proposed
-**Date:** 2026-08-26
+**Durum:** Önerildi
+**Tarih:** 2026-08-26
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe
+aynasıyla", "Türkçe aynasına", "Türkçe aynası" ve "Türkçe aynaları" ifadeleri kaldırılan İngilizce
+asıl + Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0033-webhook-delivery-and-failure-policy.md)
+## Bağlam
 
-## Context
+[ADR 0031](0031-api-versioning.md), webhook'ları 1.0 sıralamasının sonuna koydu, çünkü "imzalı
+teslimat ve bir başarısızlık politikası kendi ADR'lerini ve işaret edecekleri bir kontratı hak
+eder". Bu, o ADR. Henüz hiçbir şema, route ve queue yokken yazıldı; böylece aşağıdaki sorular bir
+kez, burada karara bağlanıyor, onları hayata geçiren pull request'te yeniden tartışılmıyor.
 
-[ADR 0031](0031-api-versioning.md) put webhooks last in the 1.0 sequence "because signed delivery
-and a failure policy deserve their own ADR and a contract to point at". This is that ADR. It is
-written before any schema, any route and any queue exist, so the questions below are settled once,
-here, rather than relitigated in the pull request that implements them.
+[ROADMAP.md](../../ROADMAP.md)'nin "API 1.0" bölümü bugünkü şartnamenin tamamı: tam olarak üç
+event (`task.created`, `task.moved`, `task.completed`), "workspace başına, operatörün yapılandırdığı
+bir URL'e teslim", imzalı ve en-az-bir-kere, ve "bir implementasyon değil bir ADR isteyen" bir hata
+politikası. Bu cümle, depodaki tek endpoint sahipliği ifadesi. Bir karar olarak değil, bir
+dokümantasyon pull request'inde düzyazı olarak geldi ve bu kaydın onaylaması ya da değiştirmesi
+gereken ilk şey o, çünkü aşağıdaki her şey ona bağlı: imzalama sırrının nerede yaşadığı, dışa giden
+bir URL'in saldırgan kontrolünde olup olmadığı, hiç yönetim route'u olup olmayacağı ve işin bir M mi
+yoksa L mi olduğu.
 
-[ROADMAP.md](../../ROADMAP.md)'s "API 1.0" section is the entire specification today: exactly three
-events (`task.created`, `task.moved`, `task.completed`), "delivered per workspace to an
-operator-configured URL", at-least-once with a signature, and a failure policy that "needs an ADR
-rather than an implementation". That sentence is the only statement of endpoint ownership anywhere
-in the repository. It arrived as prose in a documentation pull request rather than as a decision,
-and it is the first thing this record has to confirm or replace, because everything downstream
-branches on it: where the signing secret lives, whether an outbound URL is attacker-controlled,
-whether there are management routes at all, and whether the work is an M or an L.
+Genel tartışma [#254](https://github.com/dravcore/kurul/discussions/254)'te. Bir upvote'u ve hiç
+yorumu yok. Proje dışından kimse bir kullanım senaryosu anlatmadı, dolayısıyla aşağıdakilerin hiçbiri
+gerekçe olarak talebi gösteremez. Yapabileceği şey, ödeme yapan kitleye yapısal olarak hizmet
+edemeyen varyantı seçmemek.
 
-Discussion [#254](https://github.com/dravcore/kurul/discussions/254) is where the public
-conversation lives. It has one upvote and no comments. Nobody outside the project has described a
-use case, so nothing below can cite demand as a reason. What it can do is avoid choosing the
-variant that is structurally unable to serve the population that pays.
+**Ağacın hâlihazırda sahip olduğu ve olmadığı şeyler.**
 
-**What the tree already has, and what it does not.**
-
-- Every task mutation writes its `Activity` row inside its own transaction: `ActivityService.record(tx, …)`
-  takes the transaction client and `TaskService` calls it inside the `$transaction` that performs
-  the write. An outbox row has a place to be written from day one.
-- `task.moved` snapshots `toColumnCategory` in its payload and not `fromColumnCategory`, so a
-  `COMPLETED` to `COMPLETED` move and a `STARTED` to `COMPLETED` move cannot be told apart from the
-  row alone.
-- There is no `task.completed` and no `task.reopened` in `ActivityType`. Completion is derived, and
-  the only definition in the codebase is the dashboard's: a `task.moved` row whose target column is
-  in the `COMPLETED` category ([ADR 0019](0019-column-category.md)).
-- A column's category can be changed by `PATCH`, which flips the completion state of every task
-  sitting in it while writing one `column.updated` row and no per-task event.
-- `task.moved` is also written when a card is dragged **within** its column: a same-column reorder
-  takes the same code path as a real move.
-- Every post-commit side effect today is fire-and-forget inside the request process:
-  `realtime.emitToBoard` runs after `$transaction` resolves, and `NotificationMailer` is documented
-  as never rejecting. Both are at-most-once by design, and neither is a pattern that at-least-once
-  delivery can be copied from.
-- BullMQ is imported in exactly two files, `notification/due-soon.worker.ts` and
-  `retention/cleanup.worker.ts`, and both use it as a repeating scheduler. Nothing enqueues a job
-  from a request path, and no outbox table exists.
-- Personal access tokens set the credential precedent: `sha256` at rest, plaintext shown once, and
-  [api-conventions.md](../api-conventions.md#authentication) advertises "a database dump yields no
-  usable credential" as a stated property.
-- `TELEMETRY_ENDPOINT` is the only outbound HTTP call site in the API, and three places say so in
-  prose: the class comment in `telemetry.service.ts`, the module comment in `telemetry.module.ts`,
-  and [development.md](../development.md).
-- Nothing in `apps/api/src/common` classifies an outbound URL, and the published Compose stack puts
-  `postgres:5432`, `redis:6379` and `web:3000` on the same network as the API container.
-- `Activity` rows are already imported in bulk without per-row events: a Trello import writes one
-  `board.imported` row for an entire board rather than one `task.created` per card
+- Her task mutasyonu `Activity` satırını kendi transaction'ı içinde yazıyor:
+  `ActivityService.record(tx, …)` transaction client'ını alıyor ve `TaskService` onu, yazma işlemini
+  yapan `$transaction`'ın içinde çağırıyor. Bir outbox satırının ilk günden yazılacak bir yeri var.
+- `task.moved` payload'ında `toColumnCategory`'yi snapshot'lıyor, `fromColumnCategory`'yi değil;
+  dolayısıyla `COMPLETED`'dan `COMPLETED`'a bir taşıma ile `STARTED`'dan `COMPLETED`'a bir taşıma
+  yalnızca satıra bakarak ayırt edilemiyor.
+- `ActivityType` içinde `task.completed` ve `task.reopened` yok. Tamamlanma türetiliyor ve kod
+  tabanındaki tek tanım dashboard'unki: hedef kolonu `COMPLETED` kategorisinde olan bir `task.moved`
+  satırı ([ADR 0019](0019-column-category.md)).
+- Bir kolonun kategorisi `PATCH` ile değiştirilebiliyor; bu, içinde duran her task'ın tamamlanma
+  durumunu çeviriyor ama tek bir `column.updated` satırı yazıyor ve task başına hiçbir event
+  üretmiyor.
+- `task.moved` bir kart kendi kolonu **içinde** sürüklendiğinde de yazılıyor: aynı kolon içindeki bir
+  yeniden sıralama, gerçek bir taşımayla aynı kod yolundan geçiyor.
+- Bugün commit sonrası her yan etki, request process'i içinde ateşle-ve-unut:
+  `realtime.emitToBoard` `$transaction` çözüldükten sonra çalışıyor ve `NotificationMailer` asla
+  reject etmemesiyle belgeleniyor. İkisi de tasarım gereği en-fazla-bir-kere ve hiçbiri
+  en-az-bir-kere teslimin kopyalanabileceği bir desen değil.
+- BullMQ tam olarak iki dosyada import ediliyor, `notification/due-soon.worker.ts` ve
+  `retention/cleanup.worker.ts`, ve ikisi de onu tekrarlayan bir zamanlayıcı olarak kullanıyor. Bir
+  request yolundan hiçbir şey job kuyruğa atmıyor ve bir outbox tablosu yok.
+- Personal access token'lar kimlik bilgisi emsalini kuruyor: diskte `sha256`, düz metin bir kez
+  gösteriliyor ve [api-conventions.md](../api-conventions.md#kimlik-doğrulama) "bir veritabanı
+  dump'ı kullanılabilir bir kimlik bilgisi vermez" ifadesini bir özellik olarak ilan ediyor.
+- `TELEMETRY_ENDPOINT` API'deki tek dışa giden HTTP çağrı noktası ve üç yer bunu düzyazıyla
+  söylüyor: `telemetry.service.ts`'teki sınıf yorumu, `telemetry.module.ts`'teki modül yorumu ve
+  [development.md](../development.md).
+- `apps/api/src/common` içinde dışa giden bir URL'i sınıflandıran hiçbir şey yok ve yayımlanan
+  Compose yığını `postgres:5432`, `redis:6379` ve `web:3000`'i API container'ıyla aynı ağa koyuyor.
+- `Activity` satırları zaten satır başına event olmadan toplu yazılabiliyor: bir Trello import'u
+  kart başına bir `task.created` yerine bütün bir board için tek bir `board.imported` satırı yazıyor
   ([ADR 0025](0025-trello-import-mapping.md)).
 
-## Decision
+## Karar
 
-Eleven decisions, in the order they depend on each other, and then the non-goals they leave behind.
-The first decision decides the shape of the other ten.
+Birbirlerine bağlı oldukları sırayla on bir karar, ardından da geriye bıraktıkları kapsam dışılar.
+İlk karar diğer onunun şeklini belirliyor.
 
-### 0. A workspace owns its endpoints, not the operator
+### 0. Endpoint'lere operatör değil workspace sahip
 
-Three models were on the table.
+Masada üç model vardı.
 
-| Model                              | What it means                                                                                                                                                                                                                                               |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (a) Operator, instance-wide        | `WEBHOOK_URL` and `WEBHOOK_SECRET` read from the environment like `TELEMETRY_ENDPOINT`, forwarded in `docker-compose.yml`, one destination for the whole deployment, `workspaceId` in every payload. No table, no management routes, no tenant-supplied URL |
-| (b) Workspace                      | A `WebhookEndpoint` table, managed over workspace-administration routes, a tenant-supplied URL, a per-endpoint secret, tenant-visible failure state                                                                                                         |
-| (c) Operator first, then workspace | (a) ships first, with the payload and signature designed so (b) can be added later without changing the delivery format                                                                                                                                     |
+| Model                              | Ne anlama geliyor                                                                                                                                                                                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Operatör, instance geneli      | `TELEMETRY_ENDPOINT` gibi ortamdan okunan `WEBHOOK_URL` ve `WEBHOOK_SECRET`, `docker-compose.yml`'de forward edilir, tüm deployment için tek bir hedef, her payload'da `workspaceId`. Tablo yok, yönetim route'u yok, tenant'ın verdiği URL yok |
+| (b) Workspace                      | Bir `WebhookEndpoint` tablosu, workspace yönetim route'larıyla yönetilir, tenant'ın verdiği bir URL, endpoint başına bir sır, tenant'ın görebildiği hata durumu                                                                                 |
+| (c) Önce operatör, sonra workspace | Önce (a) gönderilir, payload ve imza (b) sonradan eklenirken teslim formatı değişmeyecek şekilde tasarlanır                                                                                                                                     |
 
-**The decision is (b): a workspace configures its own endpoints.**
+**Karar (b): endpoint'lerini workspace yapılandırır.**
 
-The reason is a consequence of [ADR 0028](0028-open-contributions-hosted-service.md) that nothing
-in the repository has written down until now. On a self-hosted instance running one team the
-operator and the team are the same people, so (a) serves them perfectly. On the hosted instance the
-operator is Dravcore, so under (a) every paying workspace shares one URL and one secret that belong
-to us, and a customer gets no usable webhook at all. The obvious escape is closed in the same ADR:
-paid differences are "operational quantities (seats, boards, storage, similar), not features", so
-webhooks cannot be sold as a tier. Under (a), therefore, webhooks are a **self-host-only feature**,
-and the hosted product is the one that has less. That inverts what the hosted service is for: the
-customer's purchase is that they do not have to run a server, not that they get a smaller product
-for doing so.
+Gerekçe, [ADR 0028](0028-open-contributions-hosted-service.md)'in şimdiye kadar depoda hiçbir yerde
+yazılmamış bir sonucu. Tek takımla çalışan kendi kendine barındırılan bir instance'ta operatör ile
+takım aynı insanlar, dolayısıyla (a) onlara kusursuz hizmet eder. Barındırılan instance'ta operatör
+Dravcore'dur; yani (a) altında ödeme yapan her workspace bize ait tek bir URL ve tek bir sırrı
+paylaşır ve müşteri kullanılabilir hiçbir webhook alamaz. Bariz kaçış yolu aynı ADR'de kapalı:
+ücretli farklar "özellik değil, operasyonel büyüklüklerdir (koltuk, board, depolama ve benzeri)",
+yani webhook'lar bir katman olarak satılamaz. O hâlde (a) altında webhook'lar **yalnızca kendi kendine
+barındıranlara ait bir özelliktir** ve daha azına sahip olan, barındırılan üründür. Bu, barındırılan
+servisin ne için var olduğunu tersine çevirir: müşterinin satın aldığı şey sunucu işletmek zorunda
+olmamaktır, bunun karşılığında daha küçük bir ürün almak değil.
 
-(c) is the tempting compromise and is rejected on cost rather than on principle. What it saves is
-the envelope and the signature, which are the cheapest part of the work and are fixed by this
-record anyway. What it does not save is any of the expensive part: the moment endpoints become
-tenant data, the egress validator, the secret at rest, the management routes, the demo refusal and
-the delivery log all have to be written from scratch. It also leaves two configuration paths alive
-at once, an environment pair and a table, which either both have to keep working forever or one has
-to be removed in a breaking change to a self-hoster's `.env`.
+(c) cazip uzlaşma ve ilkeden değil maliyetten reddediliyor. Kazandırdığı şey zarf ve imza, yani işin
+en ucuz kısmı ve zaten bu kayıtla sabitleniyor. Kazandırmadığı şey pahalı kısmın tamamı:
+endpoint'ler tenant verisi olduğu anda egress doğrulayıcısı, diskteki sır, yönetim route'ları, demo
+reddi ve teslim günlüğü sıfırdan yazılmak zorunda. Ayrıca aynı anda iki yapılandırma yolunu hayatta
+tutuyor, bir ortam değişkeni çifti ve bir tablo; ya ikisi de sonsuza kadar çalışmaya devam etmeli ya
+da biri, kendi kendine barındıran birinin `.env`'ini kıran bir değişiklikle kaldırılmalı.
 
-The honest cost of (b) is stated here rather than in a footnote: it is the larger build, it is
-being chosen for a population that has not yet asked for it in #254, and it is the model that makes
-the SSRF question real. The counterweight is sequencing. Webhooks land at 1.0, after
-[ADR 0034](0034-hosted-billing-and-plan-assignment.md)'s billing slice, by which time the hosted
-instance either exists or has been abandoned; building the instance-wide version first means
-writing the dispatcher twice with the second version needing every decision the first one avoided.
+(b)'nin dürüst maliyeti bir dipnotta değil burada yazılı: daha büyük yapım işi, #254'te henüz talep
+etmemiş bir kitle için seçiliyor ve SSRF sorusunu gerçek hâle getiren model bu. Karşı ağırlık
+sıralama. Webhook'lar 1.0'da, [ADR 0034](0034-hosted-billing-and-plan-assignment.md)'ün
+faturalandırma diliminden sonra iniyor; o noktada barındırılan instance ya vardır ya da vazgeçilmiştir
+ve instance geneli sürümü önce yapmak, dispatcher'ı iki kez yazmak demek: ikinci sürüm, ilkinin
+kaçındığı her kararı yine de vermek zorunda.
 
-### 1. What the three events mean
+### 1. Üç event ne demek
 
-`task.created` is the `task.created` activity row. One delivery per created task.
+`task.created`, `task.created` activity satırıdır. Oluşturulan task başına bir teslim.
 
-`task.moved` is the `task.moved` activity row **whose `fromColumnId` differs from its
-`toColumnId`**. A same-column reorder writes the same activity row and is **not** a delivery: an
-integrator keying on "moved" to mirror a status would otherwise receive a delivery for every drag
-inside a column, all of them no-ops with position noise. `position` still rides in the payload; it
-is data, not a trigger. The stored row is untouched by this rule, because two readers already count
-`task.moved` rows (`ActivationService` and `DashboardService.countCompletedMovesByDay`) and
-changing what the row means would change their numbers. The filter lives in the event definition.
+`task.moved`, **`fromColumnId`'si `toColumnId`'sinden farklı olan** `task.moved` activity
+satırıdır. Aynı kolon içindeki bir yeniden sıralama aynı activity satırını yazar ve bir teslim
+**değildir**: bir durumu yansıtmak için "moved"'a bağlanan bir entegratör aksi hâlde kolon
+içindeki her sürüklemede bir teslim alırdı, hepsi de position gürültüsü taşıyan no-op'lar. `position`
+yine payload'da yolculuk eder; o veridir, tetikleyici değil. Saklanan satıra bu kural dokunmaz,
+çünkü iki okuyucu zaten `task.moved` satırlarını sayıyor (`ActivationService` ve
+`DashboardService.countCompletedMovesByDay`) ve satırın anlamını değiştirmek onların sayılarını
+değiştirirdi. Filtre event tanımında yaşar.
 
-`task.completed` **has no activity row and is derived**, exactly once, from a `task.moved`
-transition where `fromColumnCategory != COMPLETED` and `toColumnCategory == COMPLETED`. Four
-corollaries, all deliberate:
+`task.completed`'ın **activity satırı yoktur, türetilir**, tam bir kez,
+`fromColumnCategory != COMPLETED` ve `toColumnCategory == COMPLETED` olan bir `task.moved`
+geçişinden. Dördü de bilinçli olan dört doğal sonuç:
 
-- **`CANCELED` is not completed.** [ADR 0019](0019-column-category.md) keeps the two categories
-  apart, and a card dropped in "Won't do" has not been finished.
-- **Done to done does not fire.** A board with two `COMPLETED` columns ("Done" and "Released")
-  emits `task.completed` on entry to the first, and `task.moved` and nothing else on the way to the
-  second.
-- **Re-categorising a column does not fan out.** `PATCH`ing a column from `STARTED` to `COMPLETED`
-  changes what completion means for every card already in it, and emits nothing for any of them.
-  The alternative is one write producing an unbounded burst of deliveries, and the dashboard already
-  documents the same asymmetry as a deliberate choice.
-- **There is no `task.reopened`.** Leaving a `COMPLETED` column emits `task.moved`, which carries
-  both categories (see the precondition below), so a consumer that wants the un-complete edge can
-  compute it from the payload it already receives.
+- **`CANCELED` tamamlanmış değildir.** [ADR 0019](0019-column-category.md) iki kategoriyi ayrı
+  tutuyor ve "Yapmayacağız"a bırakılmış bir kart bitirilmiş değildir.
+- **Bitti'den bitti'ye ateşlenmez.** İki `COMPLETED` kolonu olan bir board ("Bitti" ve "Yayında")
+  birinciye girişte `task.completed` yayar, ikinciye giderken `task.moved` yayar ve başka bir şey
+  yaymaz.
+- **Bir kolonu yeniden kategorilendirmek dağıtım yapmaz.** Bir kolonu `STARTED`'dan `COMPLETED`'a
+  `PATCH`'lemek, içindeki her kart için tamamlanmanın anlamını değiştirir ve hiçbiri için hiçbir şey
+  yaymaz. Alternatifi, tek bir yazmanın sınırsız bir teslim patlaması üretmesidir ve dashboard aynı
+  asimetriyi zaten bilinçli bir seçim olarak belgeliyor.
+- **`task.reopened` yoktur.** Bir `COMPLETED` kolonundan çıkmak `task.moved` yayar ve o da her iki
+  kategoriyi taşır (aşağıdaki ön koşula bakın), dolayısıyla tamamlanmayı geri alma kenarını isteyen
+  bir tüketici bunu zaten aldığı payload'dan hesaplayabilir.
 
-**Imports and cascades emit nothing.** A Trello import writes cards with `createMany` and one
-`board.imported` row, so a 500-card import is not 500 `task.created` deliveries; a later
-`board.imported` webhook is a separate decision, not this one. Deleting a board or a workspace
-cascades inside Postgres with no application code running, so no delivery is possible and
-`task.deleted` is out of scope. Both are non-goals rather than omissions, and both are stated so
-they are not filed as bugs.
+**Import'lar ve cascade'ler hiçbir şey yaymaz.** Bir Trello import'u kartları `createMany` ile ve tek
+bir `board.imported` satırıyla yazar, yani 500 kartlık bir import 500 `task.created` teslimi değildir;
+ileride bir `board.imported` webhook'u ayrı bir karardır, bu değil. Bir board'u veya workspace'i
+silmek Postgres içinde, hiç uygulama kodu çalışmadan cascade eder, dolayısıyla teslim mümkün değildir
+ve `task.deleted` kapsam dışıdır. İkisi de eksiklik değil, bilinçli kapsam dışıdır ve hata olarak
+raporlanmasınlar diye yazılıdır.
 
-**Precondition, additive and cheap.** `task.moved`'s activity payload gains `fromColumnCategory`
-beside the `toColumnCategory` it already snapshots. The from-column is already loaded at move time,
-the field makes the completion transition computable from the row alone, and the dashboard is
-unaffected because it only reads the `toColumn*` fields. This is the one code change this record
-asks for ahead of the implementation.
+**Ön koşul, eklemeli ve ucuz.** `task.moved`'ın activity payload'ı, zaten snapshot'ladığı
+`toColumnCategory`'nin yanına `fromColumnCategory`'yi kazanır. Kaynak kolon taşıma anında zaten
+bellekte, alan tamamlanma geçişini yalnızca satırdan hesaplanabilir kılıyor ve dashboard etkilenmiyor
+çünkü yalnızca `toColumn*` alanlarını okuyor. Bu kaydın implementasyondan önce istediği tek kod
+değişikliği budur.
 
-### 2. The envelope
+### 2. Zarf
 
 ```jsonc
 {
-  "id": "0192f4c1-…", // delivery id, UUIDv7, unique per endpoint per event
+  "id": "0192f4c1-…", // teslim id'si, UUIDv7, endpoint ve event başına tekil
   "type": "task.completed",
-  "occurredAt": "2026-08-26T09:12:44.301Z", // the commit, not the send
+  "occurredAt": "2026-08-26T09:12:44.301Z", // commit anı, gönderim anı değil
   "workspaceId": "0192e0aa-…",
-  "actorId": "0192d113-…", // null for anything the product does without a user
-  "data": {/* TaskDto, snapshotted at commit time */},
+  "actorId": "0192d113-…", // ürünün kullanıcısız yaptığı her şey için null
+  "data": {/* TaskDto, commit anında snapshot'lanmış */},
 }
 ```
 
-`data` is a `TaskDto` as `packages/shared-types` defines it, snapshotted inside the transaction, not
-re-read at send time: a delivery that lands twenty minutes late must describe the task as it was
-when the event happened, not as it is now. `workspaceId` is in every payload even though an
-endpoint belongs to exactly one workspace, so a consumer that fans several Kurul workspaces into one
-receiver never has to key on the URL it registered.
+`data`, `packages/shared-types`'ın tanımladığı hâliyle bir `TaskDto`'dur, transaction'ın içinde
+snapshot'lanır, gönderim anında yeniden okunmaz: yirmi dakika geç inen bir teslim, task'ı event
+gerçekleştiğindeki hâliyle anlatmalıdır, şimdiki hâliyle değil. Bir endpoint tam olarak bir
+workspace'e ait olsa bile `workspaceId` her payload'dadır, böylece birkaç Kurul workspace'ini tek bir
+alıcıya toplayan bir tüketici asla kaydettiği URL'e göre anahtarlamak zorunda kalmaz.
 
-The shapes are the `/v1` shapes. ADR 0031 requires it: the delivery format is a contract of its own,
-and writing it against pre-`/v1` DTOs would mean breaking it on the day the prefix lands. That is
-also why this record can be accepted now and implemented only at 1.0.
+Şekiller `/v1` şekilleridir. ADR 0031 bunu gerektiriyor: teslim formatı kendi başına bir kontrattır
+ve onu `/v1` öncesi DTO'lara göre yazmak, önek indiği gün onu kırmak demektir. Bu kaydın şimdi kabul
+edilip yalnızca 1.0'da hayata geçirilebilmesinin nedeni de budur.
 
-### 3. The signature
+### 3. İmza
 
-HMAC-SHA256 over the exact bytes `${timestamp}.${rawBody}`, hex-encoded, in three headers:
+Tam olarak `${timestamp}.${rawBody}` baytları üzerinde HMAC-SHA256, hex kodlanmış, üç header'da:
 
-| Header              | Value                                                                       |
-| ------------------- | --------------------------------------------------------------------------- |
-| `X-Kurul-Signature` | One or more `v1=<hex>` values, comma-separated; see the rotation note below |
-| `X-Kurul-Timestamp` | Unix seconds, the same value that was signed                                |
-| `X-Kurul-Delivery`  | The delivery id, also `id` in the body, for the receiver's own idempotency  |
+| Header              | Değer                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| `X-Kurul-Signature` | Virgülle ayrılmış bir ya da daha fazla `v1=<hex>` değeri; aşağıdaki rotasyon notuna bakın |
+| `X-Kurul-Timestamp` | Unix saniyesi, imzalanan değerin aynısı                                                   |
+| `X-Kurul-Delivery`  | Teslim id'si, gövdedeki `id` ile aynı, alıcının kendi idempotency'si için                 |
 
-Signing the timestamp together with the body, rather than the body alone, is what makes a captured
-request unreplayable: the receiver recomputes the MAC, then refuses a timestamp more than **five
-minutes** from its own clock. Signing the body alone would let anyone who once observed a valid
-request repeat it forever. The comparison on the receiver's side is a constant-time one, which the
-documentation says out loud because the most common way to implement this correctly and still be
-vulnerable is `==` on two strings.
+Zaman damgasını gövdeyle birlikte imzalamak, gövdeyi tek başına imzalamak yerine, yakalanmış bir
+isteği tekrar oynatılamaz kılan şeydir: alıcı MAC'i yeniden hesaplar, sonra kendi saatinden **beş
+dakikadan** fazla uzaktaki bir zaman damgasını reddeder. Yalnızca gövdeyi imzalamak, geçerli bir
+isteği bir kez gözlemleyen herkesin onu sonsuza kadar tekrarlamasına izin verirdi. Alıcı tarafındaki
+karşılaştırma sabit zamanlıdır ve dokümantasyon bunu açıkça söyler, çünkü bunu doğru yapıp yine de
+açık kalmanın en yaygın yolu iki string üzerinde `==`'dir.
 
-**The header is a list, because a sender-side rotation makes it one.** Outside a rotation it carries
-exactly one value. During the overlap window of section 6 the sender signs the same bytes with both
-the new secret and the previous one and sends `v1=<hex>,v1=<hex>`, and a receiver accepts the
-delivery if **any** listed value matches the secret it holds. This is the shape receivers already
-know from other providers, and it is the only way this rotation can be lossless: Kurul produces the
-MAC rather than verifying one, so "the previous secret stays valid" can only mean "the previous
-secret is still one of the ones we sign with". Sending a single signature during the overlap would
-fail every receiver still holding the other secret, which is the missed delivery the overlap exists
-to prevent. The `v1=` prefix carries the second extension as well, a change of algorithm, and both
-kinds of entry fit in the same list.
+**Header bir listedir, çünkü gönderen tarafındaki rotasyon onu liste yapar.** Rotasyon dışında tek
+bir değer taşır. 6. bölümdeki örtüşme penceresi boyunca gönderen aynı baytları hem yeni sırla hem de
+öncekiyle imzalar ve `v1=<hex>,v1=<hex>` gönderir; alıcı, listedeki değerlerden **herhangi biri**
+elindeki sırla eşleşiyorsa teslimi kabul eder. Bu, alıcıların başka sağlayıcılardan zaten bildiği
+biçimdir ve bu rotasyonun kayıpsız olabilmesinin tek yoludur: Kurul MAC'i doğrulamaz, **üretir**,
+dolayısıyla "önceki sır geçerli kalır" ancak "önceki sır hâlâ imzaladıklarımızdan biridir" anlamına
+gelebilir. Örtüşme sırasında tek bir imza göndermek, hâlâ diğer sırrı tutan her alıcıda başarısız
+olurdu; örtüşmenin önlemek için var olduğu kaçırılmış teslim tam olarak budur. `v1=` öneki ikinci
+genişlemeyi, yani algoritma değişikliğini de taşır ve iki tür girdi de aynı listeye sığar.
 
-### 4. Delivery is an outbox row, then a job
+### 4. Teslim önce bir outbox satırı, sonra bir job
 
-One `WebhookDelivery` row per endpoint per event, inserted **in the same transaction as the
-`Activity` row**, through the transaction client `ActivityService.record` already accepts. After
-the transaction commits, one BullMQ job per delivery is enqueued on a `webhooks` queue with
-`jobId` set to the delivery id, which makes the enqueue idempotent.
+Endpoint ve event başına bir `WebhookDelivery` satırı, **`Activity` satırıyla aynı transaction
+içinde**, `ActivityService.record`'un zaten kabul ettiği transaction client üzerinden yazılır.
+Transaction commit olduktan sonra, `webhooks` queue'suna teslim başına bir BullMQ job'ı atılır ve
+`jobId` teslim id'sine ayarlanır; bu, kuyruğa atmayı idempotent kılar.
 
-The window between commit and enqueue is real: a process that dies in it has a committed row and no
-job. A repeating sweep on the same queue re-enqueues `pending` deliveries older than the retry
-horizon, which closes the window without a distributed transaction and reuses the exact pattern
-`due-soon.worker.ts` and `cleanup.worker.ts` already run. This is the part the current codebase
-cannot supply by copying: mail and realtime are both fire-and-forget after commit, and building
-webhooks on that pattern would make the roadmap's own "at-least-once" claim false on the first pod
-restart.
+Commit ile kuyruğa atma arasındaki pencere gerçektir: o aralıkta ölen bir process'in commit olmuş bir
+satırı ve hiç job'ı olmaz. Aynı queue üzerinde tekrarlayan bir süpürme, retry ufkundan daha eski
+`pending` teslimleri yeniden kuyruğa atar; bu, pencereyi dağıtık bir transaction olmadan kapatır ve
+`due-soon.worker.ts` ile `cleanup.worker.ts`'in zaten çalıştırdığı deseni birebir kullanır. Mevcut kod
+tabanının kopyalayarak sağlayamayacağı kısım budur: posta ve realtime commit sonrasında
+ateşle-ve-unut'tur ve webhook'ları o desen üzerine kurmak, roadmap'in kendi "en-az-bir-kere" iddiasını
+ilk pod yeniden başlatmasında yanlış hâle getirirdi.
 
-**Only `2xx` is success.** `3xx` is a failure and is **not** followed: a redirect is how a validated
-public hostname becomes a request to `169.254.169.254`. `4xx` and `5xx` are both failures and are
-both retried, because the distinction between "your payload is wrong" and "I am down" is one the
-receiver is not reliably able to make during an outage.
+**Yalnızca `2xx` başarıdır.** `3xx` bir hatadır ve **takip edilmez**: bir yönlendirme, doğrulanmış
+genel bir hostname'in `169.254.169.254`'e bir isteğe dönüşme yoludur. `4xx` ve `5xx` ikisi de hatadır
+ve ikisi de yeniden denenir, çünkü "payload'ın yanlış" ile "ben ayakta değilim" ayrımı, alıcının
+bir kesinti sırasında güvenilir biçimde yapabildiği bir ayrım değildir.
 
-**No Redis, no webhooks.** `REDIS_URL` is optional for the API process and the two existing workers
-already decline to start without it. Endpoint creation is refused with a clear error when Redis is
-absent, rather than accepting an endpoint that will silently never deliver.
+**Redis yoksa webhook da yok.** `REDIS_URL` API process'i için opsiyoneldir ve mevcut iki worker
+onsuz zaten başlamayı reddediyor. Redis yokken endpoint oluşturma, sessizce hiç teslim etmeyecek bir
+endpoint'i kabul etmek yerine, net bir hatayla reddedilir.
 
-### 5. Retries, and what happens to a dead endpoint
+### 5. Yeniden denemeler ve ölü bir endpoint'e ne olur
 
-Six attempts with exponential backoff over roughly an hour, using BullMQ's own `attempts` and
-`backoff` options and reading the configured count back off the job the way `due-soon.worker.ts`
-does. Exhausting them marks the delivery `failed` and is not by itself an alarm: a receiver that is
-down for an hour is normal.
+BullMQ'nun kendi `attempts` ve `backoff` seçenekleriyle, yaklaşık bir saate yayılan üstel geri
+çekilmeli altı deneme; yapılandırılan sayı, `due-soon.worker.ts`'in yaptığı gibi job'dan geri
+okunur. Hepsinin tükenmesi teslimi `failed` işaretler ve tek başına bir alarm değildir: bir saat
+boyunca ayakta olmayan bir alıcı normaldir.
 
-**An endpoint that fails 20 consecutive deliveries, or that has not succeeded in 24 hours, is
-disabled.** `disabledAt` and `lastError` are stored on the endpoint and are readable by workspace
-admins, and re-enabling it is an explicit admin action that also sends a test delivery. Automatic
-re-enabling is deliberately absent: an endpoint that turns itself back on and fails again is a
-retry loop with extra steps, and the person who can fix the receiver is the person who registered
-it.
+**Arka arkaya 20 teslimde başarısız olan ya da 24 saattir hiç başarılı olmamış bir endpoint devre dışı
+bırakılır.** `disabledAt` ve `lastError` endpoint üzerinde saklanır ve workspace admin'leri
+tarafından okunabilir; yeniden etkinleştirmek, aynı zamanda bir test teslimi de gönderen açık bir
+admin eylemidir. Otomatik yeniden etkinleştirme bilinçli olarak yoktur: kendini geri açıp yine
+başarısız olan bir endpoint, fazladan adımları olan bir retry döngüsüdür ve alıcıyı düzeltebilecek
+kişi, onu kaydeden kişidir.
 
-This is the decision that only model (b) can make. Under an operator model there is nobody in the
-application who could re-enable anything, so the policy would have to be "log and keep trying
-forever", and the roadmap's phrase "disabling a dead endpoint" would have no referent.
+Bu, yalnızca (b) modelinin verebileceği karardır. Operatör modelinde uygulamada bir şeyi yeniden
+etkinleştirebilecek kimse yoktur, dolayısıyla politika "logla ve sonsuza kadar denemeye devam et"
+olurdu ve roadmap'in "ölü bir endpoint'i devre dışı bırakma" ifadesinin karşılığı olmazdı.
 
-### 6. The secret at rest
+### 6. Sır diskte nasıl durur
 
-**Generated by the server, shown once on creation, stored encrypted with AES-256-GCM under a key
-derived from `BETTER_AUTH_SECRET` with HKDF.** Rotation issues a new secret and keeps the previous
-one valid for 24 hours, which on the sending side means every delivery in that window is signed with
-both and carries both values in `X-Kurul-Signature` (section 3), so a receiver can be updated at any
-point in the window without a missed delivery. There is no reveal:
-a lost secret is rotated, exactly as a lost personal access token is re-minted.
+**Sunucu üretir, oluşturmada bir kez gösterilir ve `BETTER_AUTH_SECRET`'tan HKDF ile türetilen bir
+anahtarla AES-256-GCM ile şifrelenmiş saklanır.** Rotasyon yeni bir sır verir ve öncekini 24 saat
+geçerli tutar; gönderen tarafında bu, o penceredeki her teslimin ikisiyle birden imzalanması ve
+`X-Kurul-Signature`'da iki değeri birden taşıması demektir (3. bölüm), böylece bir alıcı pencerenin
+herhangi bir anında teslim kaçırmadan güncellenebilir. Yeniden gösterme yoktur:
+kaybedilen bir sır, kaybedilen bir personal access token'ın yeniden üretilmesi gibi rotasyona uğrar.
 
-The PAT precedent cannot be followed here and the divergence needs saying. A token is verified, so
-`sha256` at rest is enough and the plaintext is genuinely unrecoverable. An HMAC is **produced**, so
-the sender must hold the secret in usable form at send time. Storing it as a plaintext column would
-quietly retire a property [api-conventions.md](../api-conventions.md#authentication) advertises in
-so many words. Encryption under an instance-derived key restores most of it: a dump of the database
-alone yields nothing, and an attacker needs the environment too.
+PAT emsali burada izlenemez ve bu ayrışmanın söylenmesi gerekir. Bir token **doğrulanır**, dolayısıyla
+diskte `sha256` yeterlidir ve düz metin gerçekten geri getirilemez. Bir HMAC ise **üretilir**,
+dolayısıyla gönderen sırrı gönderim anında kullanılabilir biçimde tutmak zorundadır. Düz metin bir
+kolon olarak saklamak, [api-conventions.md](../api-conventions.md#kimlik-doğrulama)'nin tam da o
+sözcüklerle ilan ettiği bir özelliği sessizce emekliye ayırırdı. Instance'tan türetilen bir anahtarla
+şifreleme onun çoğunu geri kazandırır: tek başına bir veritabanı dump'ı hiçbir şey vermez ve
+saldırganın ortama da ihtiyacı olur.
 
-The cost is stated where an operator will read it: changing `BETTER_AUTH_SECRET` invalidates every
-webhook secret on the instance, and those endpoints must be rotated. That belongs in
-`docs/self-hosting.md` beside the variable, not only here.
+Maliyet, bir operatörün okuyacağı yerde yazılıdır: `BETTER_AUTH_SECRET`'ı değiştirmek instance'taki her
+webhook sırrını geçersiz kılar ve o endpoint'lerin rotasyona uğraması gerekir. Bu, yalnızca buraya
+değil, değişkenin yanına `docs/self-hosting.md`'ye aittir.
 
-### 7. Egress policy
+### 7. Egress politikası
 
-A tenant-supplied URL is an attacker-supplied URL, and the API container can reach `postgres`,
-`redis` and `web` by name. A new `common/outbound-url.ts` classifies a destination and is applied
-**twice**, at endpoint create/update and again immediately before each send:
+Tenant'ın verdiği bir URL, saldırganın verdiği bir URL'dir ve API container'ı `postgres`, `redis` ve
+`web`'e adlarıyla ulaşabilir. Yeni bir `common/outbound-url.ts` hedefi sınıflandırır ve **iki kez**
+uygulanır, endpoint oluşturma/güncellemede ve her gönderimden hemen önce:
 
-- `https` is required. `http` is allowed only when `WEBHOOK_ALLOW_INSECURE_URLS=true`, which exists
-  for a self-hosted LAN receiver and is off by default.
-- Loopback, private, link-local, unique-local, multicast and unspecified addresses are refused, as
-  are `.local` and `.internal` hostnames.
-- DNS is resolved and the **resolved address** is re-checked before connecting, because a hostname
-  that validated an hour ago can resolve to `127.0.0.1` now.
-- Redirects are not followed (`redirect: 'manual'`), which is already implied by "only `2xx` is
-  success".
-- The response body is read to a few kilobytes and discarded; the connection carries a timeout from
-  `WEBHOOK_TIMEOUT_MS`, mirroring `TELEMETRY_TIMEOUT_MS`.
+- `https` zorunludur. `http` yalnızca `WEBHOOK_ALLOW_INSECURE_URLS=true` iken, kendi kendine
+  barındırılan bir LAN alıcısı için, ve varsayılan olarak kapalıdır.
+- Loopback, özel, link-local, unique-local, multicast ve belirtilmemiş adresler reddedilir; `.local`
+  ve `.internal` hostname'leri de.
+- DNS çözülür ve bağlanmadan önce **çözülen adres** yeniden kontrol edilir, çünkü bir saat önce
+  doğrulanan bir hostname şimdi `127.0.0.1`'e çözülebilir.
+- Yönlendirmeler takip edilmez (`redirect: 'manual'`), ki bu zaten "yalnızca `2xx` başarıdır"ın
+  gereğidir.
+- Yanıt gövdesi birkaç kilobayta kadar okunup atılır; bağlantı `TELEMETRY_TIMEOUT_MS`'i yansıtan bir
+  `WEBHOOK_TIMEOUT_MS` zaman aşımı taşır.
 
-Under model (a) none of this would have been needed, because `TELEMETRY_ENDPOINT` is trusted for
-the sound reason that the operator wrote it. It is the price of the model that serves hosted
-customers, and it is charged in full rather than deferred.
+(a) modelinde bunların hiçbiri gerekmezdi, çünkü `TELEMETRY_ENDPOINT` sağlam bir gerekçeyle
+güvenilirdir: onu operatör yazmıştır. Bu, barındırılan müşterilere hizmet eden modelin bedelidir ve
+ertelenmek yerine tam olarak ödenir.
 
-### 8. The delivery log, its window and its indexes
+### 8. Teslim günlüğü, penceresi ve indeksleri
 
-`WebhookDelivery` keeps the response status and at most 1 KB of the response body, truncated. It is
-the highest-volume table webhooks add, one row per endpoint per event, so it gets a retention window
-at creation rather than after the first complaint: **30 days**, `WEBHOOK_DELIVERY_RETENTION_DAYS`,
-`0` meaning keep forever, added to [ADR 0020](0020-data-retention.md)'s table and to
-`cleanup.worker.ts`'s `retentionSettings()`, which reads every window by name and sweeps nothing it
-has not been told about.
+`WebhookDelivery` yanıt durumunu ve yanıt gövdesinin en fazla 1 KB'lık kırpılmış hâlini tutar.
+Webhook'ların eklediği en yüksek hacimli tablodur, endpoint ve event başına bir satır, dolayısıyla
+saklama penceresini ilk şikâyetten sonra değil oluşturulduğu anda alır: **30 gün**,
+`WEBHOOK_DELIVERY_RETENTION_DAYS`, `0` sonsuza kadar sakla demek,
+[ADR 0020](0020-data-retention.md)'nin tablosuna ve `cleanup.worker.ts`'in her pencereyi adıyla okuyan
+ve söylenmemiş hiçbir şeyi süpürmeyen `retentionSettings()`'ine eklenir.
 
-Two indexes, decided now because adding them later means a migration against the largest table in
-the schema: `(endpointId, id)` for the cursor-paged list ([api-conventions.md](../api-conventions.md#pagination)
-keys cursors on `id`, never on a sort column), and a partial index on `(status, nextAttemptAt)` for
-the pending sweep. This is a deliberate exception to [ADR 0020](0020-data-retention.md)'s
-measure-first stance on retention indexes, and issue
-[#187](https://github.com/dravcore/kurul/issues/187) is the measurement: the existing unindexed
-sweeps are a known cost on much smaller tables.
+İki indeks, şimdi kararlaştırılıyor çünkü sonradan eklemek şemadaki en büyük tabloya karşı bir
+migration demek: cursor'lu liste için `(endpointId, id)`
+([api-conventions.md](../api-conventions.md#pagination) cursor'ları her zaman `id` üzerinden
+anahtarlar, asla bir sıralama kolonu üzerinden değil) ve bekleyen süpürme için
+`(status, nextAttemptAt)` üzerinde kısmi bir indeks. Bu, [ADR 0020](0020-data-retention.md)'nin
+saklama indekslerindeki önce-ölç duruşuna bilinçli bir istisnadır ve ölçüm
+[#187](https://github.com/dravcore/kurul/issues/187)'dir: mevcut indekssiz süpürmeler çok daha küçük
+tablolarda bilinen bir maliyettir.
 
-The partial one is a `WHERE` clause, which the Prisma schema cannot express, so it is written as raw
-SQL in the migration and held in place by a test that reads `pg_indexes`. That mechanism is not a
-decision this record gets to make differently:
-[ADR 0017](0017-partial-indexes-outside-prisma-schema.md) already settled it, and this index is the
-next user of it rather than a new case.
+Kısmi olanı bir `WHERE` yan tümcesidir ve Prisma şeması bunu ifade edemez; dolayısıyla migration'da
+ham SQL olarak yazılır ve `pg_indexes`'i okuyan bir testle yerinde tutulur. Bu mekanizma, bu kaydın
+farklı verebileceği bir karar değildir: [ADR 0017](0017-partial-indexes-outside-prisma-schema.md) onu
+zaten kararlaştırdı ve bu indeks yeni bir vaka değil, o mekanizmanın bir sonraki kullanıcısıdır.
 
-### 9. A demo instance refuses endpoint creation
+### 9. Demo instance endpoint oluşturmayı reddeder
 
-`DEMO_MODE=true` refuses `POST` on the endpoint routes. A public demo where any visitor can register
-an outbound URL is an open HTTP relay with Kurul's signature attached, aimed at whatever the API
-container can reach.
+`DEMO_MODE=true`, endpoint route'larındaki `POST`'u reddeder. Herhangi bir ziyaretçinin dışa giden bir
+URL kaydedebildiği genel bir demo, üzerine Kurul'un imzası iliştirilmiş ve API container'ının
+erişebildiği her yere nişan alabilen açık bir HTTP rölesidir.
 
-The guard's existing admission rule does not stretch to cover this, and pretending it does would be
-the thing its own comment warns against. That rule is that the action "destroys something a
-_different_ visitor is using, and the hourly reset is not a recovery path for the person it happened
-to"; registering an outbound URL destroys nothing, and the reset clears it like everything else. So
-this is a **second** admission rule, stated rather than smuggled in under the first: an action is
-also refused in demo mode when it turns the instance into a tool for reaching third parties on an
-anonymous visitor's behalf. The comment asks that the list not grow "by vibes", which is a demand
-for a written reason, not a claim that the two reasons already there are the only ones there will
-ever be.
+Guard'ın mevcut kabul kuralı bunu kapsayacak kadar esnemiyor ve esnediğini varsaymak, guard'ın kendi
+yorumunun uyardığı şey olurdu. O kural, eylemin "**başka** bir ziyaretçinin kullandığı bir şeyi yok
+etmesi ve saatlik sıfırlamanın, bunun başına geldiği kişi için bir kurtarma yolu olmaması"dır; dışa
+giden bir URL kaydetmek hiçbir şeyi yok etmez ve sıfırlama onu da her şey gibi temizler. Dolayısıyla
+bu, birincisinin altına sokuşturulmuş değil açıkça yazılmış **ikinci** bir kabul kuralıdır: bir eylem,
+instance'ı anonim bir ziyaretçi adına üçüncü taraflara ulaşma aracına dönüştürdüğünde de demo modunda
+reddedilir. Yorum, listenin "vibe'larla" büyümemesini istiyor; bu, yazılı bir gerekçe talebidir, zaten
+orada olan iki gerekçenin son gerekçeler olduğu iddiası değil.
 
-### 10. Management routes, and where the capability is published
+### 10. Yönetim route'ları ve yeteneğin nerede yayımlandığı
 
 ```
-GET    /workspaces/:workspaceId/webhooks                        # endpoints, admins only
-POST   /workspaces/:workspaceId/webhooks                        # create; the only response carrying the secret
-PATCH  /workspaces/:workspaceId/webhooks/:endpointId            # url, enabled, re-enable
+GET    /workspaces/:workspaceId/webhooks                        # endpoint'ler, yalnızca admin
+POST   /workspaces/:workspaceId/webhooks                        # oluştur; sırrı taşıyan tek yanıt
+PATCH  /workspaces/:workspaceId/webhooks/:endpointId            # url, enabled, yeniden etkinleştir
 DELETE /workspaces/:workspaceId/webhooks/:endpointId
-POST   /workspaces/:workspaceId/webhooks/:endpointId/test       # one signed test delivery, named rate limit
-GET    /workspaces/:workspaceId/webhooks/:endpointId/deliveries # cursor-paged on id
+POST   /workspaces/:workspaceId/webhooks/:endpointId/test       # tek imzalı test teslimi, adlandırılmış rate limit
+GET    /workspaces/:workspaceId/webhooks/:endpointId/deliveries # id üzerinden cursor'lu sayfalama
 ```
 
-All of them are `ADMIN_ROLES` **and** `@SessionOnly`, for the same reason the token routes are: a
-standing credential must not be able to configure a second channel out of the workspace. A personal
-access token gets `403`, and the OpenAPI document says `security: [session]` on every one of these
-operations. That extends the boundary [api-conventions.md](../api-conventions.md#authentication)
-already names rather than inventing a new rule.
+Hepsi `ADMIN_ROLES` **ve** `@SessionOnly`, token route'larının olduğu gerekçenin aynısıyla: sürekli
+duran bir kimlik bilgisi, workspace'ten dışarı ikinci bir kanalı yapılandırabilmemelidir. Bir personal
+access token `403` alır ve OpenAPI belgesi bu operasyonların her birinde `security: [session]` der. Bu,
+[api-conventions.md](../api-conventions.md#kimlik-doğrulama)'nin zaten adlandırdığı sınırı yeni bir
+kural icat etmek yerine genişletir.
 
-**The capability has two halves and they are published in two different places.** The deployment
-half is whether this instance can deliver a webhook at all, which section 4 already makes
-conditional on `REDIS_URL`. That is a deployment fact in exactly the sense `mailEnabled` and
-`attachmentsEnabled` are, so `InstanceConfigDto` gains `webhooksEnabled: boolean` beside them, with
-the `/config` schema in `apps/api/openapi.json` regenerated to match. Without it the only way an
-admin can learn that this deployment has no Redis is to fill in the create form and read a `4xx`,
-which is the discovery path the other two flags exist to remove.
+**Yeteneğin iki yarısı var ve ikisi iki ayrı yerde yayımlanıyor.** Deployment yarısı, bu instance'ın
+hiç webhook teslim edip edemeyeceğidir ve 4. bölüm bunu zaten `REDIS_URL`'e bağlıyor. Bu, `mailEnabled`
+ve `attachmentsEnabled`'ın olduğu anlamda bir deployment gerçeğidir; dolayısıyla `InstanceConfigDto`
+onların yanına `webhooksEnabled: boolean` kazanır ve `apps/api/openapi.json`'daki `/config` şeması
+buna göre yeniden üretilir. Bu olmadan bir admin'in bu deployment'ta Redis olmadığını öğrenmesinin tek
+yolu, oluşturma formunu doldurup bir `4xx` okumaktır; diğer iki bayrak tam da bu keşif yolunu ortadan
+kaldırmak için var.
 
-The tenant half, whether _this workspace_ has an endpoint and which one, is not published there and
-never will be. `InstanceConfigDto`'s own comments say "never tenant state", the read surface for it
-is the endpoint list route above, and `GET /config` is readable by any signed-in caller. Model (a)
-would have needed the first half and had no second half to keep out; the boundary is the same one,
-applied twice.
+Tenant yarısı, yani **bu workspace'in** bir endpoint'i olup olmadığı ve hangisi olduğu, orada
+yayımlanmaz ve yayımlanmayacak. `InstanceConfigDto`'nun kendi yorumları "asla tenant durumu değil" der,
+bunun okuma yüzeyi yukarıdaki endpoint listesi route'udur ve `GET /config` oturum açmış her çağıran
+tarafından okunabilir. (a) modelinin ilk yarıya ihtiyacı olurdu ve dışarıda tutacak bir ikinci yarısı
+olmazdı; sınır aynı sınırdır, iki kez uygulanmıştır.
 
-### 11. Non-goals
+### 11. Kapsam dışı olanlar
 
-No ordering guarantee between deliveries, no batching, no filtering beyond the three event types,
-no general event stream (`Activity`'s vocabulary is much larger and publishing it would freeze an
-internal log as a public contract), no `board.imported`, no `task.deleted`, no OAuth app model. A
-consumer that needs to reconcile reads `GET /workspaces/{workspaceId}/tasks`.
+Teslimler arasında sıra garantisi yok, batch yok, üç event tipinin ötesinde filtreleme yok, genel bir
+event akışı yok (`Activity`'nin sözlüğü çok daha büyüktür ve onu yayımlamak dahili bir günlüğü genel bir
+kontrat olarak dondururdu), `board.imported` yok, `task.deleted` yok, OAuth uygulama modeli yok.
+Mutabakat kurması gereken bir tüketici `GET /workspaces/{workspaceId}/tasks`'ı okur.
 
-## Rationale
+## Gerekçe
 
-**Why ownership had to be decision zero.** Six of the ten decisions above have a different answer
-under model (a): there is no secret at rest, no egress validator, no management routes, no
-session-only question, no delivery log and no auto-disable, because there is nobody to disable it
-for. Writing the failure policy before the owner was chosen would have produced a document that
-answers questions the chosen model does not ask, which is the failure mode ADR 0031 wrote itself to
-prevent for versioning.
+**Sahiplik neden sıfırıncı karar olmak zorundaydı.** Yukarıdaki on kararın altısının (a) modelinde
+farklı bir cevabı var: diskte sır yok, egress doğrulayıcı yok, yönetim route'u yok, session-only
+sorusu yok, teslim günlüğü yok ve otomatik devre dışı bırakma yok, çünkü onu kimin için devre dışı
+bırakacağınız yok. Sahip seçilmeden hata politikasını yazmak, seçilen modelin sormadığı soruları
+cevaplayan bir belge üretirdi; ADR 0031'in versiyonlama için kendini yazma nedeni tam olarak bu hata
+biçimiydi.
 
-**Why an outbox and not a queue-only design.** Enqueueing a job without a durable row makes Redis
-the system of record for "this must be delivered", and Redis in this stack is a cache with a
-password, not a database with backups. A row written in the same transaction as the `Activity` row
-is durable by the same commit that made the event true, and the sweep turns "we might have missed
-the enqueue" into a bounded delay instead of a lost delivery. The cost is one extra write per
-endpoint per event and a table that has to be swept, both of which are accounted for above.
+**Neden bir outbox, sadece queue değil.** Durable bir satır olmadan job kuyruğa atmak, "bu teslim
+edilmeli" bilgisinin kayıt sistemini Redis yapar ve bu yığında Redis, yedeklenen bir veritabanı değil,
+parolası olan bir cache'tir. `Activity` satırıyla aynı transaction'da yazılan bir satır, event'i doğru
+kılan commit'in kendisiyle durable olur ve süpürme, "kuyruğa atmayı kaçırmış olabiliriz"i kayıp bir
+teslim yerine sınırlı bir gecikmeye çevirir. Bedeli endpoint ve event başına fazladan bir yazma ile
+süpürülmesi gereken bir tablodur; ikisi de yukarıda hesaba katılıyor.
 
-**Why `task.completed` is derived and not stored.** The alternative is a new `ActivityType`, which
-would be a permanent addition to a vocabulary whose names can never be renamed once a row carries
-one, in service of an event that is a pure function of a move the log already records. It would
-also force an answer to the re-categorisation question in storage rather than in the delivery
-policy: either the `PATCH` writes a row per affected task, or the feed acquires a completion event
-that is silently wrong for some tasks. Deriving it keeps the asymmetry in one place, this document,
-where it can be documented instead of materialised.
+**`task.completed` neden türetilir, saklanmaz.** Alternatifi yeni bir `ActivityType`'dır ve bu, bir
+satır bir kez taşıdıktan sonra adları asla değiştirilemeyen bir sözlüğe kalıcı bir eklemedir; üstelik
+günlüğün zaten kaydettiği bir taşımanın saf fonksiyonu olan bir event için. Ayrıca yeniden
+kategorilendirme sorusuna cevabı teslim politikasında değil depolamada vermeye zorlardı: ya `PATCH`
+etkilenen her task için bir satır yazar ya da feed, bazı task'lar için sessizce yanlış olan bir
+tamamlanma event'i kazanır. Türetmek, asimetriyi tek bir yerde, bu belgede tutar; orada
+maddileştirilmek yerine belgelenebilir.
 
-**Why the reorder filter lives in the event definition.** `task.moved` is a storage format with two
-existing readers. Narrowing it at the source would change the activation funnel's and the
-dashboard's numbers to fix a webhook that does not exist yet. Filtering at the dispatcher costs one
-predicate and leaves the log alone.
+**Yeniden sıralama filtresi neden event tanımında yaşar.** `task.moved` iki mevcut okuyucusu olan bir
+depolama formatıdır. Onu kaynakta daraltmak, henüz var olmayan bir webhook'u düzeltmek için aktivasyon
+hunisinin ve dashboard'un sayılarını değiştirirdi. Dispatcher'da filtrelemek bir predicate'e mal olur
+ve günlüğe dokunmaz.
 
-**Why encryption rather than an honest plaintext column.** A plaintext column is defensible in
-isolation: the operator can already read `DATABASE_URL`, so the extra reach an attacker gains from
-a dump-only compromise is narrow. It was rejected because the project makes a specific, published
-claim about credentials at rest, and a per-tenant secret sitting in the clear beside hashed tokens
-makes that claim require an asterisk in the very document that states it. The price is real and is
-named above: rotating `BETTER_AUTH_SECRET` becomes an event that breaks webhooks, which nothing in
-the product does today.
+**Neden şifreleme, dürüst bir düz metin kolonu yerine.** Düz metin bir kolon tek başına savunulabilir:
+operatör zaten `DATABASE_URL`'i okuyabiliyor, dolayısıyla yalnızca dump ile ele geçirmede saldırganın
+kazandığı ek erişim dardır. Reddedildi, çünkü proje diskteki kimlik bilgileri hakkında belirli,
+yayımlanmış bir iddiada bulunuyor ve hash'lenmiş token'ların yanında açıkta duran tenant başına bir
+sır, o iddiayı tam da onu ifade eden belgede yıldız işaretine muhtaç bırakır. Bedel gerçektir ve
+yukarıda adı konur: `BETTER_AUTH_SECRET`'ı rotasyona sokmak webhook'ları kıran bir olaya dönüşür, ki
+bugün üründe böyle bir şey yok.
 
-**Why 30 days and not 90.** The delivery log answers one question, "why did my receiver not get
-it", and it is asked within hours. `Activity`'s 365 days exist because the feed is a user-facing
-promise of history; nothing promises history about a delivery attempt. A shorter window on the
-highest-volume table is also what keeps the nightly sweep's cost proportional.
+**Neden 30 gün, 90 değil.** Teslim günlüğü tek bir soruyu cevaplar, "alıcım bunu neden almadı", ve o
+soru saatler içinde sorulur. `Activity`'nin 365 günü, feed'in kullanıcıya verilmiş bir geçmiş sözü
+olması nedeniyle vardır; bir teslim denemesi hakkında hiçbir şey geçmiş sözü vermiyor. En yüksek
+hacimli tabloda daha kısa bir pencere, gecelik süpürmenin maliyetini de orantılı tutan şeydir.
 
-## Consequences
+## Sonuçlar
 
-- **Three prose claims stop being true and must be rewritten in the same pull request as the
-  dispatcher.** `telemetry.service.ts`'s "the only code path in Kurul that sends anything to a third
-  party", `telemetry.module.ts`'s "nothing else in the codebase opens an outbound connection to a
-  third party", and [development.md](../development.md)'s "no outbound request is made at all" with
-  its Turkish mirror. The replacement promise is narrower and still checkable: telemetry remains the
-  only destination the **code** names, and every other outbound request goes to an address a
-  workspace admin registered and can see. [ADR 0021](0021-activation-funnel-and-opt-in-telemetry.md)'s
-  principle survives in that reduced form, and the honest part of the change is that an auditor can
-  no longer answer "where can this instance send data" from the environment alone: they have to read
-  a table.
-- **On acceptance, the [ROADMAP.md](../../ROADMAP.md) rows are rewritten to match.** The "Minimal
-  webhooks" row in the API 1.0 section loses "operator-configured URL" and gains "configured per
-  workspace by an admin", the "API 1.0 remainder" row links this record, and the deferred `PM-09`
-  row keeps launch feedback as the pacing trigger. This ADR does not make those edits; the roadmap
-  is a status document and this is the reason.
-- **The effort stays L, and now for stated reasons.** Under model (a) this would have been an M.
-  The delta is the endpoint table and its migration, the egress validator, the secret at rest, six
-  routes with their OpenAPI entries, the delivery log with its sweep and indexes, and a settings
-  screen the web owns. The existing `L` on the "API 1.0 remainder" row was already sized for this
-  model.
-- **A webhooks section is added to [api-conventions.md](../api-conventions.md) and its Turkish
-  mirror**, carrying the envelope, the headers, the verification recipe and the retry table.
-  OpenAPI 3.0 has no top-level `webhooks` object (that is 3.1) and the committed document is 3.0.0,
-  so the outbound contract is documented in prose with the payload declared as a component schema,
-  not as a generated operation. The management routes are ordinary generated operations.
-- **`packages/shared-types` gains `InstanceConfigDto.webhooksEnabled` and `apps/api/openapi.json` is
-  regenerated in the same pull request**, because CI fails when the code and the committed document
-  disagree, and the "Instance configuration" section of api-conventions and its Turkish mirror
-  document the new flag beside the two it joins.
-- **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` and the Turkish mirrors gain
-  `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_ALLOW_INSECURE_URLS` and `WEBHOOK_DELIVERY_RETENTION_DAYS`.** A
-  variable that is not forwarded in the Compose `api` environment block does not exist for anyone
-  running the published stack, and that is now checked rather than remembered:
-  `scripts/lib/compose-env.test.mjs` fails the build when `docker-compose.yml` drops a setting the
-  API reads.
-- **`fromColumnCategory` in the `task.moved` payload is additive and can land before the rest.** It
-  is the only part of this record that is worth shipping ahead of the feature, and it is safe:
-  payload readers ignore keys they do not know.
-- **`WebhookEndpoint.createdById` is nullable with `onDelete: SetNull`.** An endpoint belongs to the
-  workspace, not to the person who added it, and account deletion anonymises the user row
-  ([ADR 0026](0026-account-deletion-anonymisation.md)) rather than taking the workspace's
-  integrations down with it.
-- **Delivery is at-least-once and receivers must be idempotent.** `X-Kurul-Delivery` is the key to
-  do it with, and the documentation says so rather than implying exactly-once by omission.
+- **Üç düzyazı iddiası doğru olmaktan çıkıyor ve dispatcher ile aynı pull request'te yeniden
+  yazılmalı.** `telemetry.service.ts`'in "Kurul'da üçüncü bir tarafa bir şey gönderen tek kod yolu",
+  `telemetry.module.ts`'in "kod tabanında başka hiçbir şey üçüncü bir tarafa dışa bağlantı açmaz" ve
+  [development.md](../development.md)'nin "hiçbir dışa istek yapılmaz" ifadeleri, Türkçe aynasıyla
+  birlikte. Yerine gelen söz daha dar ve hâlâ kontrol edilebilir: telemetri, **kodun** adını verdiği
+  tek hedef olmaya devam eder ve diğer her dışa giden istek, bir workspace admin'inin kaydettiği ve
+  görebildiği bir adrese gider. [ADR 0021](0021-activation-funnel-and-opt-in-telemetry.md)'in ilkesi bu
+  indirgenmiş biçimde hayatta kalır ve değişikliğin dürüst kısmı şudur: bir denetçi artık "bu instance
+  nereye veri gönderebilir" sorusunu yalnızca ortamdan cevaplayamaz, bir tablo okumak zorundadır.
+- **Kabul edilirse [ROADMAP.md](../../ROADMAP.md) satırları buna göre yeniden yazılır.** API 1.0
+  bölümündeki "Minimal webhooks" satırı "operatörün yapılandırdığı URL"i kaybeder ve "bir admin
+  tarafından workspace başına yapılandırılır"ı kazanır, "API 1.0 remainder" satırı bu kaydı linkler ve
+  ertelenmiş `PM-09` satırı hız belirleyici olarak lansman geri bildirimini korur. Bu ADR o düzenlemeleri
+  yapmaz; roadmap bir durum belgesidir, bu ise gerekçedir.
+- **Efor L kalır, artık gerekçesi yazılı olarak.** (a) modelinde bu bir M olurdu. Fark: endpoint tablosu
+  ve migration'ı, egress doğrulayıcısı, diskteki sır, OpenAPI girdileriyle birlikte altı route, süpürmesi
+  ve indeksleriyle teslim günlüğü ve web'in sahiplendiği bir ayarlar ekranı. "API 1.0 remainder"
+  satırındaki mevcut `L` zaten bu model için boyutlandırılmıştı.
+- **[api-conventions.md](../api-conventions.md)'ye ve Türkçe aynasına bir webhook bölümü eklenir**;
+  zarf, header'lar, doğrulama tarifi ve retry tablosu orada olur. OpenAPI 3.0'da üst düzey bir `webhooks`
+  nesnesi yoktur (o 3.1'dedir) ve commit edilmiş belge 3.0.0'dır, dolayısıyla dışa giden kontrat düzyazıyla
+  belgelenir ve payload bir component şeması olarak tanımlanır, üretilmiş bir operasyon olarak değil.
+  Yönetim route'ları sıradan üretilmiş operasyonlardır.
+- **`packages/shared-types` `InstanceConfigDto.webhooksEnabled`'ı kazanır ve `apps/api/openapi.json`
+  aynı pull request'te yeniden üretilir**, çünkü kod ile commit edilmiş belge anlaşmazlığa düştüğünde
+  CI hata verir; api-conventions'ın "Instance yapılandırması" bölümü ve Türkçe aynası da yeni bayrağı
+  katıldığı ikisinin yanında belgeler.
+- **`.env.example`, `docs/self-hosting.md`, `docker-compose.yml` ve Türkçe aynaları
+  `WEBHOOK_TIMEOUT_MS`, `WEBHOOK_ALLOW_INSECURE_URLS` ve `WEBHOOK_DELIVERY_RETENTION_DAYS`'i kazanır.**
+  Compose'un `api` environment bloğunda forward edilmeyen bir değişken, yayımlanan yığını çalıştıran hiç
+  kimse için var değildir; bu artık hatırlanan değil denetlenen bir şey:
+  `scripts/lib/compose-env.test.mjs`, `docker-compose.yml` API'nin okuduğu bir ayarı düşürdüğünde
+  build'i düşürür.
+- **`task.moved` payload'ındaki `fromColumnCategory` eklemelidir ve gerisinden önce inebilir.** Bu kaydın
+  özellikten önce gönderilmeye değer tek parçasıdır ve güvenlidir: payload okuyucuları bilmedikleri
+  anahtarları yok sayar.
+- **`WebhookEndpoint.createdById` nullable ve `onDelete: SetNull`'dır.** Bir endpoint onu ekleyen kişiye
+  değil workspace'e aittir ve hesap silme, workspace'in entegrasyonlarını da beraberinde götürmek yerine
+  kullanıcı satırını anonimleştirir ([ADR 0026](0026-account-deletion-anonymisation.md)).
+- **Teslim en-az-bir-keredir ve alıcılar idempotent olmalıdır.** `X-Kurul-Delivery` bunu yapmanın
+  anahtarıdır ve dokümantasyon, atlayarak tam-bir-kere ima etmek yerine bunu açıkça söyler.
 
-## Alternatives considered
+## Değerlendirilen Alternatifler
 
-| Alternative                                                                    | Why not                                                                                                                                                                                                            |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| (a) Operator-configured `WEBHOOK_URL` for the instance                         | Cheaper by an M against an L, but every hosted workspace would share Dravcore's URL, and ADR 0028 forbids selling the fix as a feature. It makes webhooks self-host-only                                           |
-| (c) Operator first, workspace endpoints later                                  | Saves only the envelope and signature, which this record fixes anyway; leaves two configuration paths that must both live forever or break a self-hoster's `.env`                                                  |
-| Per-workspace destinations held in operator configuration                      | Needs an `InstanceSetting` table plus instance-admin write routes, which is a larger new surface than the workspace-owned table it is trying to avoid                                                              |
-| Fire-and-forget after commit, like the mailer                                  | At-most-once by design; the roadmap's "at-least-once" claim would be false on the first restart, and a crash between commit and send loses the event with no record                                                |
-| BullMQ job with no outbox row                                                  | Makes Redis the system of record for an obligation created by a Postgres commit; nothing backs it up and a flush loses deliveries silently                                                                         |
-| A stored `task.completed` activity type                                        | A permanent, unrenameable addition to the vocabulary for a pure function of a move already logged; forces the column re-categorisation question into storage                                                       |
-| Emitting `task.completed` for every task when a column is re-categorised       | One `PATCH` becomes an unbounded burst of deliveries, and the asymmetry the dashboard already documents becomes a delivery storm instead of a sentence                                                             |
-| Delivering same-column reorders as `task.moved`                                | Every drag inside a column becomes a delivery, all of them no-ops for any consumer mirroring a status                                                                                                              |
-| Narrowing the `task.moved` activity row instead                                | Two existing readers count those rows; changing the storage format to shape a webhook would move the activation funnel's and the dashboard's numbers                                                               |
-| Plaintext secret column                                                        | Retires the "a database dump yields no usable credential" property the token documentation advertises, for the first per-tenant secret the database would hold                                                     |
-| Signing the raw body only, without a timestamp                                 | A captured request stays replayable forever; the timestamp in the signed string plus a five-minute window is what bounds it                                                                                        |
-| Following redirects on delivery                                                | A validated public hostname can redirect into the Compose network or to a metadata address, which is precisely what the egress validator exists to prevent                                                         |
-| Retrying forever instead of disabling an endpoint                              | A permanently dead receiver becomes an unbounded queue and a standing outbound scan from the instance; the admin who registered it is the one who can fix it                                                       |
-| Auto-re-enabling a disabled endpoint after a cooling period                    | A retry loop with extra steps; nothing about the endpoint has changed, and the failure is on the receiver's side by definition                                                                                     |
-| Publishing the endpoint list, or whether a workspace has one, on `GET /config` | `InstanceConfigDto` is deployment capability and says so, `/config` is readable by any signed-in caller, and that is tenant state; the deployment half of the capability _is_ published there as `webhooksEnabled` |
-| Token-usable endpoint management                                               | A standing credential that can add an egress destination is a second exfiltration channel; the token routes are session-only for the same reason                                                                   |
-| No retention window on the delivery log                                        | The highest-volume table webhooks add would grow forever, and adding a window plus its indexes later is a migration against the largest table in the schema                                                        |
+| Alternatif                                                                                       | Neden değil                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Instance için operatörün yapılandırdığı `WEBHOOK_URL`                                        | L yerine M, yani daha ucuz, ama barındırılan her workspace Dravcore'un URL'ini paylaşırdı ve ADR 0028 çözümü bir özellik olarak satmayı yasaklıyor. Webhook'ları yalnızca kendi kendine barındıranlara ait kılar                |
+| (c) Önce operatör, sonra workspace endpoint'leri                                                 | Yalnızca zarf ve imzayı kurtarır, ki bu kayıt onları zaten sabitliyor; iki yapılandırma yolunu ya sonsuza kadar yaşatır ya da bir self-host `.env`'ini kırar                                                                    |
+| Operatör yapılandırmasında workspace başına hedefler                                             | Bir `InstanceSetting` tablosu ve instance-admin yazma route'ları gerektirir; kaçınmaya çalıştığı workspace tablosundan daha büyük bir yeni yüzeydir                                                                             |
+| Mailer gibi commit sonrası ateşle-ve-unut                                                        | Tasarım gereği en-fazla-bir-kere; roadmap'in "en-az-bir-kere" iddiası ilk yeniden başlatmada yanlış olurdu ve commit ile gönderim arasındaki bir çökme event'i kayıtsız kaybeder                                                |
+| Outbox satırı olmadan BullMQ job'ı                                                               | Postgres commit'inin yarattığı bir yükümlülüğün kayıt sistemini Redis yapar; onu hiçbir şey yedeklemez ve bir flush teslimleri sessizce kaybeder                                                                                |
+| Saklanan bir `task.completed` activity tipi                                                      | Günlüğün zaten kaydettiği bir taşımanın saf fonksiyonu için sözlüğe kalıcı, adı değiştirilemez bir ekleme; kolon yeniden kategorilendirme sorusunu depolamaya zorlar                                                            |
+| Bir kolon yeniden kategorilendirildiğinde her task için `task.completed` yaymak                  | Tek bir `PATCH` sınırsız bir teslim patlamasına dönüşür ve dashboard'un zaten belgelediği asimetri bir cümle yerine bir teslim fırtınası olur                                                                                   |
+| Aynı kolon içindeki yeniden sıralamaları `task.moved` olarak teslim etmek                        | Kolon içindeki her sürükleme bir teslim olur, hepsi de durum yansıtan her tüketici için no-op                                                                                                                                   |
+| Bunun yerine `task.moved` activity satırını daraltmak                                            | İki mevcut okuyucu o satırları sayıyor; bir webhook'u şekillendirmek için depolama formatını değiştirmek aktivasyon hunisinin ve dashboard'un sayılarını oynatır                                                                |
+| Düz metin sır kolonu                                                                             | Token dokümantasyonunun ilan ettiği "bir veritabanı dump'ı kullanılabilir bir kimlik bilgisi vermez" özelliğini, veritabanının tutacağı ilk tenant başına sır için emekliye ayırır                                              |
+| Zaman damgası olmadan yalnızca ham gövdeyi imzalamak                                             | Yakalanan bir istek sonsuza kadar tekrar oynatılabilir kalır; imzalanan string'deki zaman damgası ve beş dakikalık pencere onu sınırlayan şeydir                                                                                |
+| Teslimde yönlendirmeleri takip etmek                                                             | Doğrulanmış genel bir hostname Compose ağına ya da bir metadata adresine yönlendirebilir, ki egress doğrulayıcısı tam olarak bunu önlemek için var                                                                              |
+| Endpoint'i devre dışı bırakmak yerine sonsuza kadar denemek                                      | Kalıcı olarak ölü bir alıcı sınırsız bir kuyruğa ve instance'tan sürekli dışa giden bir taramaya dönüşür; onu düzeltebilecek kişi, kaydeden admin'dir                                                                           |
+| Devre dışı bir endpoint'i soğuma süresi sonrası otomatik açmak                                   | Fazladan adımları olan bir retry döngüsü; endpoint hakkında hiçbir şey değişmedi ve hata tanımı gereği alıcı tarafında                                                                                                          |
+| Endpoint listesini ya da bir workspace'in endpoint'i olup olmadığını `GET /config`'te yayımlamak | `InstanceConfigDto` deployment yeteneğidir ve bunu kendisi söyler, `/config` oturum açmış her çağıran tarafından okunabilir ve bu tenant durumudur; yeteneğin deployment yarısı orada `webhooksEnabled` olarak **yayımlanıyor** |
+| Endpoint yönetiminin token ile yapılabilmesi                                                     | Bir egress hedefi ekleyebilen sürekli bir kimlik bilgisi ikinci bir sızdırma kanalıdır; token route'ları da aynı nedenle session-only                                                                                           |
+| Teslim günlüğünde saklama penceresi olmaması                                                     | Webhook'ların eklediği en yüksek hacimli tablo sonsuza kadar büyürdü ve pencereyi indeksleriyle sonradan eklemek şemadaki en büyük tabloya karşı bir migration demek                                                            |

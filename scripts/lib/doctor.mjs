@@ -190,7 +190,7 @@ export function checkRequiredEnv({ envPath, required = REQUIRED_ENV_KEYS }) {
       name: 'required env keys',
       ok: false,
       message: `${missing.join(', ')} empty or missing in .env`,
-      fix: `set ${missing.join(', ')} in .env — see docs/development.md#environment-variables`,
+      fix: `set ${missing.join(', ')} in .env — see docs/development.md#ortam-değişkenleri`,
     };
   }
 

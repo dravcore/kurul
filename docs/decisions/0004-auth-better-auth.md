@@ -1,106 +1,82 @@
-# 0004. Auth: Better Auth with Organization Plugin
+# 0004. Auth: Organization Plugin ile Better Auth
 
-**Status:** Accepted
-**Date:** 2026-08-08
-**Updated:** 2026-08-09 — Phase 2 quality hardening: Nest-only org mutations, HTTP
-firewall on Better Auth organization writes, shared `@kurul/auth-access` roles.
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-08
+**Güncellendi:** 2026-08-09 — Faz 2 kalite sertleştirmesi: yalnızca Nest üzerinden org
+mutation'ları, Better Auth organization yazıları için HTTP firewall, paylaşılan
+`@kurul/auth-access` rolleri.
+**Güncellendi:** 2026-10-01 — Faz 2 kararındaki "Public API yanıtları "organization" kelimesini asla
+göstermez" ifadesi yalnız Nest `/workspaces/*` yanıtları için geçerlidir: kelime, firewall'un açık bıraktığı
+Better Auth okuma uçlarının yolunda (`/auth/organization/*`) ve firewall'un 403 mesajında ("Organization
+mutations must use the Nest workspace API (/workspaces).") geçer
+(`apps/api/src/auth/organization-http-firewall.ts`, `apps/api/src/auth/mount-better-auth.ts`).
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0004-auth-better-auth.md)
+## Bağlam
 
-## Context
+Çok kiracılı workspace'ler ürünün merkezinde — her kullanıcı rolleri ve davetleriyle bir veya daha fazla workspace'e ait — dolayısıyla auth seçimi, ne kadar çok kiracılılık mantığının sıfırdan elle inşa edilmesi gerekeceğini, ne kadarının yeniden kullanılabileceğini belirliyor.
 
-Multi-tenant workspaces are core to the product — every user belongs to one or
-more workspaces with roles and invites — so the auth choice determines how much
-multi-tenancy logic has to be hand-built versus reused.
+## Karar
 
-## Decision
+Auth.js/NextAuth ve Clerk yerine, **organization plugin**'ini kullanan **Better Auth**.
 
-**Better Auth**, using its **organization plugin**, over Auth.js/NextAuth and
-over Clerk.
+## Gerekçe
 
-## Rationale
+- Better Auth, 2026'nın yeni projeleri için en güçlü self-hosted seçenek: NextAuth'tan daha fazla özellik, ücretsiz, aktif bakımda.
+- **organization plugin**, çok kiracılı organizasyon yönetimini, davetleri ve üye rollerini/izinlerini kutudan çıktığı gibi kapsıyor — bunu sıfırdan inşa etmek haftalar sürer ve neredeyse her modüle dokunur.
+- Auth.js (NextAuth) bakım modunda; Better Auth onun pratik halefi olarak konumlanıyor.
+- Self-hosted olması veri egemenliğini bizde tutuyor, Clerk gibi yönetilen bir servise bağımlılık yok — bu, projenin self-hosted, AGPL konumlandırmasıyla tutarlı (bkz. [0007](0007-license-agpl.md)).
 
-- Better Auth is the strongest self-hosted option for new 2026 projects: more
-  features than NextAuth, free, actively maintained.
-- The **organization plugin** covers multi-tenant organization management,
-  invites, and member roles/permissions out of the box — building that from
-  scratch would take weeks and touch nearly every module.
-- Auth.js (NextAuth) is in maintenance mode; Better Auth is positioned as its
-  practical successor.
-- Self-hosted keeps data sovereignty with us, with no dependency on a managed
-  service like Clerk — consistent with the project's self-hosted, AGPL
-  positioning (see [0007](0007-license-agpl.md)).
+**Not:** Better Auth yalnızca backend logic sağlıyor, UI değil. Login, register ve davet-kabul ekranlarını tasarlamak ve inşa etmek bize düşüyor.
 
-**Note:** Better Auth provides backend logic only, not UI. Login, register, and
-invite-acceptance screens are ours to design and build.
+## Alan eşlemesi: organization → Workspace
 
-## Domain mapping: organization → Workspace
+Better Auth organization plugin'i _organization_, _member_ ve _invitation_ dilini
+konuşur. Kurul'un ürün dili ve REST API'si **Workspace**, **WorkspaceMember**
+ve workspace-scoped davet route'larını kullanır
+(`POST /workspaces/:workspaceId/invitations`, …). Eşleme 1:1 kabul edilir:
 
-Better Auth's organization plugin speaks _organization_, _member_, and
-_invitation_. Kurul's product language and REST API use **Workspace**,
-**WorkspaceMember**, and workspace-scoped invitation routes
-(`POST /workspaces/:workspaceId/invitations`, …). Treat the mapping as 1:1:
+| Better Auth (plugin) | Kurul (ürün / API)                           |
+| -------------------- | -------------------------------------------- |
+| Organization         | Workspace                                    |
+| Member               | WorkspaceMember                              |
+| Invitation           | Invitation (Faz 1'de ayrı Prisma modeli yok) |
 
-| Better Auth (plugin) | Kurul (product / API)                            |
-| -------------------- | ------------------------------------------------ |
-| Organization         | Workspace                                        |
-| Member               | WorkspaceMember                                  |
-| Invitation           | Invitation (no separate Prisma model in Phase 1) |
+Davet persistence'ı Better Auth'un organization tablolarında yaşar. Faz 1 bir
+Kurul `Invitation` modeli **eklemedi**.
 
-Invite persistence lives in Better Auth's organization tables. Phase 1 did
-**not** add a Kurul `Invitation` model.
+**Faz 2 kararı (2026-08-09):** tek kaynak — Prisma modelleri Kurul adlarını
+korur (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`); Better Auth
+organization plugin'i `schema.modelName` / alan eşlemeleriyle
+(`organizationId` → `workspaceId`) bu tablolara bağlanır. Sync katmanı yok.
+Roller `MemberRole` enum değerleridir (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`)
+ve Better Auth access control'de 1:1 kayıtlıdır (`creatorRole: "OWNER"`). Access-control
+rol tanımları `@kurul/auth-access` içindedir; api ve web buradan import eder. Nest,
+framework-agnostik Node handler'ı Express üzerinde `/auth/{*splat}` olarak
+monte eder (çıkış yolu — topluluk Nest wrapper'ı kullanılmaz). **Workspace/org
+mutation'ları yalnızca Nest `/workspaces/*` üzerinden gider.** Better Auth
+`/auth/organization/*` mutation HTTP yolları firewall'lanır (list/get okumaları ve
+`set-active` kalır). Public API yanıtları "organization" kelimesini asla göstermez.
 
-**Phase 2 resolution (2026-08-09):** single source of truth — Prisma models keep
-Kurul names (`Workspace`, `WorkspaceMember`, `WorkspaceInvitation`) and
-Better Auth's organization plugin maps onto them via `schema.modelName` /
-field maps (`organizationId` → `workspaceId`). No sync layer. Roles are the
-`MemberRole` enum values (`OWNER` / `ADMIN` / `MEMBER` / `GUEST`) registered
-1:1 with Better Auth access control (`creatorRole: "OWNER"`). Access-control role
-statements live in `@kurul/auth-access` and are imported by both api and web.
-Nest mounts the framework-agnostic Node handler on Express at `/auth/{*splat}`
-(escape hatch — the community Nest wrapper is not used). **Workspace/org mutations
-go only through Nest `/workspaces/*`.** Better Auth `/auth/organization/*` mutation
-HTTP paths are firewalled (list/get reads and `set-active` remain). Public API
-responses never expose the word "organization".
+## Entegrasyon riski
 
-## Integration risk
+Kütüphane seçimi iyi desteklenmiş; _eşleştirme_ Better Auth'un sunduğu en az geçilmiş yol, ve bu keşfedilmek yerine baştan bütçelenmeye değer.
 
-The library choice is well-supported; the _pairing_ is the least-travelled path
-Better Auth offers, and that is worth budgeting for rather than discovering.
+- **NestJS entegrasyonu topluluk bakımlı**, birinci taraf değil. Better Auth'un kendi birinci sınıf hedefleri Next.js, Hono ve Elysia; NestJS üçüncü taraf bir modül olan `@thallesp/nestjs-better-auth` tarafından karşılanıyor. Gereksinimleri dışa sızıyor: auth route'ları için NestJS'in **uygulama seviyesi bodyParser'ının devre dışı bırakılmasını** istiyor, bu da her controller'ın body'sini nasıl aldığını etkileyen global bir değişiklik. Bu sürtünme ısırırsa, çıkış yolu Better Auth'un framework-agnostik Node handler'ını doğrudan Express instance'ına monte edip wrapper modülü tamamen atlamak.
+- **Better Auth, 1.x içinde kırıcı değişiklikler yapıyor.** 2.0 öncesi ve minor'lar hızlı ilerliyor. Organization plugin, teams şemasını bir kez zaten yeniden yapılandırdı — `member.teamId` kaldırıldı ve yerine bir `teamMembers` tablosu geldi, mevcut kullanıcılar için bir migration gerektirdi. `workspaceId` izolasyon modelimiz ([architecture.md §7](../architecture.md#7-multi-tenant-izolasyonu)) bu tabloların üzerinde oturuyor, dolayısıyla bu çalkantı auth modülünün içinde kalmıyor.
+- **Bu yüzden: minor sürümü pinle** (`package.json`'da `^` yok), her bump öncesi release notlarını oku ve bir auth upgrade'ini rutin bağımlılık bakımı değil migration işi olarak ele al.
 
-- **The NestJS integration is community-maintained**, not first-party.
-  Better Auth's own first-class targets are Next.js, Hono, and Elysia; NestJS
-  is served by a third-party module, `@thallesp/nestjs-better-auth`. Its
-  requirements leak outward: it needs NestJS's **application-level bodyParser
-  disabled** for the auth routes, which is a global change affecting how every
-  controller receives its body. If that friction bites, the escape hatch is to
-  mount Better Auth's framework-agnostic Node handler directly on the Express
-  instance and skip the wrapper module entirely.
-- **Better Auth ships breaking changes inside 1.x.** It is pre-2.0 and minors
-  move fast. The organization plugin has already restructured its teams
-  schema once — `member.teamId` was removed in favour of a `teamMembers`
-  table, a migration for existing adopters. Our `workspaceId` isolation model
-  ([architecture.md §7](../architecture.md#7-multi-tenant-isolation)) sits on
-  top of these tables, so that churn is not contained inside the auth module.
-- **Therefore: pin the minor version** in `package.json` (no `^`), read the
-  release notes before every bump, and treat an auth upgrade as migration work
-  rather than routine dependency maintenance.
+## Sonuçlar
 
-## Consequences
+- Haftalarca sürecek özel org/davet/rol mantığından kaçınılıyor.
+- Auth verileri ve session'lar kendi altyapımızda kalıyor.
+- Aktif bakım, terk edilmiş bir bağımlılık seçme riskini azaltıyor.
+- NextAuth'tan daha yeni bir proje olması, bir şeyler ters gittiğinde dayanılacak daha küçük bir topluluk ve daha az sınanmış örnek anlamına geliyor.
+- Her auth akışı için UI/UX yüzeyinin tamamı bize ait — Better Auth başlamak için görsel bir iskelet vermiyor.
+- İleride başka bir yere geçmemiz gerekirse, hem backend entegrasyonu hem de etrafına inşa edilen özel UI birlikte taşınmalı.
 
-- Weeks of custom org/invite/role logic avoided.
-- Auth data and sessions stay on our own infrastructure.
-- Active maintenance reduces the risk of picking an abandoned dependency.
-- Being a newer project than NextAuth means a smaller community and fewer
-  battle-tested examples to lean on when something goes wrong.
-- We own the full UI/UX surface for every auth flow — Better Auth gives no
-  visual scaffolding to start from.
-- Should we ever need to migrate away, both the backend integration and the
-  custom UI built around it would need to move together.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative        | Why not                                                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Auth.js / NextAuth | In maintenance mode, reduced feature velocity                                                                                   |
-| Clerk              | Managed service — fast to integrate but cedes data sovereignty and adds recurring cost, at odds with a self-hosted AGPL product |
+| Alternatif         | Neden değil                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth.js / NextAuth | Bakım modunda, azalan özellik hızı                                                                                                                        |
+| Clerk              | Yönetilen servis — entegre etmesi hızlı ama veri egemenliğinden feragat ettiriyor ve tekrarlayan maliyet ekliyor, self-hosted bir AGPL ürünüyle çelişiyor |

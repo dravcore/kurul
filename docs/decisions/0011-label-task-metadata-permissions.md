@@ -1,50 +1,48 @@
-# 0011. Label and Task-Metadata Permissions
+# 0011. Label ve Task-Metadata İzinleri
 
-**Status:** Accepted (comment-delete row superseded by
-[ADR 0012](0012-comment-delete-authorship.md); all other rows still apply)
-**Date:** 2026-08-09
+**Durum:** Kabul edildi (yorum-silme satırının yerini
+[ADR 0012](0012-comment-delete-authorship.md) aldı; diğer tüm satırlar geçerliliğini korur)
+**Tarih:** 2026-08-09
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0011-label-task-metadata-permissions.md)
+## Bağlam
 
-## Context
+Faz 5 board label'ları, assignee'ler, priority/due/estimate alanları ve yorumları ekler.
+[ADR 0010](0010-task-permissions.md) MEMBER+'a task create/edit/move/delete verir. Label'lar
+board-scoped taksonomidir (column gibi); kart düzenlemeden ayrı bir kapı gerekir.
 
-Phase 5 adds board labels, assignees, priority/due/estimate fields, and comments.
-[ADR 0010](0010-task-permissions.md) already grants MEMBER+ task create/edit/move/delete.
-Labels are board-scoped taxonomy (like columns), so they need a distinct gate from
-“edit this card.”
+## Karar
 
-## Decision
+| İşlem                                                         | OWNER | ADMIN | MEMBER | GUEST |
+| ------------------------------------------------------------- | :---: | :---: | :----: | :---: |
+| Label, assignee, comment, task metadata okuma                 |   ✓   |   ✓   |   ✓    |   ✓   |
+| Board label oluştur / yeniden adlandır / sil                  |   ✓   |   ✓   |   —    |   —   |
+| Task'a label ata / kaldır                                     |   ✓   |   ✓   |   ✓    |   —   |
+| Assignee ekle / kaldır                                        |   ✓   |   ✓   |   ✓    |   —   |
+| `priority`, `dueDate`, `estimatedMinutes` güncelle            |   ✓   |   ✓   |   ✓    |   —   |
+| Yorum oluştur; erişilebilir task'taki herhangi bir yorumu sil |   ✓   |   ✓   |   ✓    |   —   |
 
-| Action                                                    | OWNER | ADMIN | MEMBER | GUEST |
-| --------------------------------------------------------- | :---: | :---: | :----: | :---: |
-| Read labels, assignees, comments, task metadata           |   ✓   |   ✓   |   ✓    |   ✓   |
-| Create / rename / delete board labels                     |   ✓   |   ✓   |   —    |   —   |
-| Assign / unassign labels on a task                        |   ✓   |   ✓   |   ✓    |   —   |
-| Add / remove assignees                                    |   ✓   |   ✓   |   ✓    |   —   |
-| Update `priority`, `dueDate`, `estimatedMinutes`          |   ✓   |   ✓   |   ✓    |   —   |
-| Create comments; delete any comment on an accessible task |   ✓   |   ✓   |   ✓    |   —   |
+> **Yerini aldı:** yukarıdaki satırın "herhangi bir yorumu sil" kısmı artık geçerli değil.
+> Yorum silme, yazarlık veya OWNER/ADMIN gerektirir — bkz.
+> [ADR 0012](0012-comment-delete-authorship.md).
 
-> **Superseded:** the "delete any comment" half of the row above no longer holds. Comment
-> delete requires authorship or OWNER/ADMIN — see [ADR 0012](0012-comment-delete-authorship.md).
+`Label.color` bir `LabelColorSlot` (`slot-1`…`slot-8`), asla ham hex değildir.
 
-`Label.color` is a `LabelColorSlot` (`slot-1`…`slot-8`), never a raw hex.
+## Gerekçe
 
-## Rationale
-
-- Label CRUD changes the board’s vocabulary — same Admin+ stance as column structure
+- Label CRUD board sözlüğünü değiştirir — column yapısıyla aynı Admin+ duruş
   ([ADR 0009](0009-board-column-permissions.md)).
-- Assigning labels, people, and dates is everyday card work — MEMBER+.
-- Flat comment delete avoids authorship checks for MVP; refine later if needed.
+- Label/kişi/tarih atamak günlük kart işidir — MEMBER+.
+- Düz yorum silme MVP için authorship kontrolünden kaçınır; gerekirse sonra daha ince hale getirilir.
 
-## Consequences
+## Sonuçlar
 
-- Nest `@Roles` differ for label CRUD vs label assign.
-- Web: `canMutateLabels` (Admin+) vs `canMutateTasks` (MEMBER+) for pickers vs label manager.
-- Assignees must be workspace members; labels must belong to the task’s board.
+- Nest `@Roles` label CRUD ile label assign için ayrılır.
+- Web: label yöneticisi için `canMutateLabels` (Admin+), picker'lar için `canMutateTasks` (MEMBER+).
+- Assignee'ler workspace üyesi olmalı; label'lar task'ın board'una ait olmalı.
 
-## Alternatives considered
+## Alternatifler
 
-| Alternative                | Why not                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| MEMBER may create labels   | Pollutes board taxonomy; conflicts with column Admin                                                                 |
-| Author-only comment delete | Extra checks; defer until abuse appears — **revisited and adopted in [ADR 0012](0012-comment-delete-authorship.md)** |
+| Alternatif                     | Neden değil                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| MEMBER label oluşturabilir     | Taksonomiyi kirletir; column Admin ile çelişir                                                                                              |
+| Yalnızca yazar yorum silebilir | Ekstra kontrol; kötüye kullanım çıkana kadar ertele — **[ADR 0012](0012-comment-delete-authorship.md)'de yeniden ele alındı ve benimsendi** |

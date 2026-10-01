@@ -1,82 +1,90 @@
-# 0016. Foreign-Key Violations Map to 409, Not 422
+# 0016. Yabancı Anahtar İhlalleri 422'ye Değil 409'a Eşlenir
 
-**Status:** Accepted
-**Date:** 2026-08-12
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-12
+**Güncellendi:** 2026-10-01 — Gerekçe'deki "`WorkspaceMember.user`, `Task.createdBy`, `TaskAssignee.user`,
+`Comment.user` ve `Activity.user` alanlarının hepsi `onDelete: Restrict` taşır" sayımı bugün eksik:
+`User`'a giden `Restrict` FK'ler yedi tanedir, `WorkspaceInvitation.inviter` ve `Attachment.uploadedBy` de
+dahil (`apps/api/prisma/schema.prisma`). [ADR 0026](0026-account-deletion-anonymisation.md)'dan beri hesap
+silme `User` satırını silmez, anonimleştirir (`apps/api/src/account/account-deletion.service.ts`); bu
+yüzden "engellenmiş silme" biçimi API'den erişilemez ve `P2003`'ün gerçekçi kaynağı kaybedilmiş yarıştır.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0016-foreign-key-violation-status.md)
+## Bağlam
 
-## Context
+`AllExceptionsFilter`, bir servisten dışarı sızabilen üç Prisma hata kodunu HTTP durumlarına
+çevirir: `P2002` (tekillik ihlali) → `409`, `P2025` (kayıt bulunamadı) → `404` ve `P2003`
+(yabancı anahtar kısıtı ihlali) → `409`. `P2003` satırının testi yoktu ve bir tech-debt
+denetim geçişi, var olmayan bir satırı adlandıran bir isteğin "iyi biçimlendirilmiş ama
+anlamsal olarak geçersiz" olduğu okumasıyla — ki `docs/api-conventions.md`'nin `422`'ye
+verdiği ifadenin tam olarak bu olduğu — bunun `422 Unprocessable Entity`'ye çevrilmesini
+önerdi.
 
-`AllExceptionsFilter` translates the three Prisma error codes that can escape a service into
-HTTP statuses: `P2002` (unique violation) → `409`, `P2025` (record not found) → `404`, and
-`P2003` (foreign-key constraint violation) → `409`. The `P2003` row had no test, and a
-tech-debt audit pass proposed changing it to `422 Unprocessable Entity` on the reading that a
-request naming a row that does not exist is "semantically invalid though well-formed" —
-exactly the wording `docs/api-conventions.md` gives `422`.
+Eşlemeyi bir testle kilitlemek, önce hangi kodun doğru olduğuna karar vermeyi gerektirdi:
+yanlış duruma karşı yazılmış bir test, doğru sözleşmeyi korumak yerine yanlışını
+çimentolardı.
 
-Locking the mapping with a test first required settling which code is actually correct, since
-a test written against the wrong status would cement the wrong contract rather than protect
-the right one.
+## Karar
 
-## Decision
+`P2003`, **`409 Conflict`**'e eşlenir. Denetimin `422` önerisi reddedilmiştir. Durum artık
+`all-exceptions.filter.spec.ts` içindeki iki testle kapsanıyor; bu testler ayrıca veritabanı
+kısıt adının yanıt gövdesine asla ulaşmadığını da doğrular.
 
-`P2003` maps to **`409 Conflict`**. The audit's `422` proposal is rejected. The status is now
-covered by two tests in `all-exceptions.filter.spec.ts`, which also assert that the database
-constraint name never reaches the response body.
+## Gerekçe
 
-## Rationale
+**Bu şemanın üretebileceği her `P2003`, istek gövdesindeki bir hata değil, veritabanı
+durumuyla çakışmadır.** Kod tam olarak iki biçimde gelir:
 
-**Every `P2003` this schema can produce is a conflict with database state, not a fault in the
-request body.** The code arrives in exactly two shapes:
+- **Engellenmiş bir silme.** `WorkspaceMember.user`, `Task.createdBy`, `TaskAssignee.user`,
+  `Comment.user` ve `Activity.user` alanlarının hepsi `onDelete: Restrict` taşır. Hâlâ bir
+  şeyin referans verdiği bir satırı kaldırmak `P2003` doğurur. İstek tamamen geçerlidir;
+  onu reddeden şey veritabanının o anki durumudur. Bu, ders kitabı `409` örneğidir — ve
+  zaten `409`'a eşlenen `P2002` ile aynı kategoridedir.
+- **Kaybedilmiş bir yarış.** Servisler, yazmadan önce referans verilen satırın var olduğunu
+  ve workspace içinde olduğunu doğrular. Dolayısıyla insert sırasındaki bir `P2003`, satırın
+  kontrol ile yazma arasında silindiği anlamına gelir. Yeniden denemek pekâlâ başarılı
+  olabilir; `409`'un ilettiği, `422`'nin ise reddettiği şey budur.
 
-- **A blocked delete.** `WorkspaceMember.user`, `Task.createdBy`, `TaskAssignee.user`,
-  `Comment.user` and `Activity.user` all carry `onDelete: Restrict`. Removing a row that
-  something still references raises `P2003`. The request is entirely valid; the current state
-  of the database is what refuses it. That is the textbook `409` — and it is the same
-  category as `P2002`, which already maps to `409`.
-- **A lost race.** Services validate that a referenced row exists and is in-workspace before
-  writing. A `P2003` on insert therefore means the row was deleted between the check and the
-  write. Retrying may well succeed, which is what `409` communicates and what `422` denies.
+**Bu API'de `422` alan bazlı bir yanıttır ve filtrenin verecek alanı yoktur.**
+`docs/api-conventions.md`, `details`'i "yalnızca `400`/`422` için mevcut" diye belgeler — bir
+`422`, istemcinin alan alan okuduğu biçimdir. Filtrenin elinde yalnızca Prisma'nın
+`meta.field_name` değeri vardır; bu da bir DTO yolu değil, bir veritabanı tanımlayıcısıdır
+(`Task_createdById_fkey (index)`). `details` içermeyen bir `422` üretmek ya da `details`
+içine bir şema kısıt adı koymak, hata sözleşmesini her iki yönde de bozar.
 
-**`422` in this API is a per-field answer, and the filter has no fields to give.**
-`docs/api-conventions.md` documents `details` as "present only for `400`/`422`" — a `422` is
-the shape a client reads field-by-field. All the filter has is Prisma's `meta.field_name`,
-which is a database identifier (`Task_createdById_fkey (index)`), not a DTO path. Emitting a
-`422` with no `details`, or with a `details` entry naming a schema constraint, degrades the
-error contract in both directions.
+**API'nin gerçek `422` durumu bilinçlidir ve asla filtreden gelmez.** Sözleşmenin kendi
+örneği — bir task'ı başka bir board'un kolonuna taşımak — servis içinde kontrol edilir ve
+servis durumu doğru bir mesajla kendisi fırlatır. Exception filtresine ulaşmak, uygulama
+seviyesindeki kontrolün ateşleyen şey _olmadığı_ anlamına gelir; bunu bir doğrulama hatası
+saymak, sorunun nerede olduğunu yanlış bildirir.
 
-**The API's real `422` case is deliberate and never comes from the filter.** The convention's
-own example — moving a task to a column on another board — is checked in the service, which
-raises the status itself with a proper message. Reaching the exception filter means the
-app-level check was _not_ the thing that fired; treating that as a validation failure
-misreports where the problem is.
+**Son çare eşlemesi muhafazakâr olmalıdır.** Filtre, hiçbir servisin öngörmediği hatalar için
+bir güvenlik ağıdır. `409` "durum çakıştı, bu geçici olabilir" der; `422` ise "girdin yanlış,
+yeniden deneme" der. İkisinden, gerçek bir yarış durumunda istemciye gövdesinin yanlış
+olduğunu söylemek daha yanıltıcı olan başarısızlıktır.
 
-**A last-resort mapping should be conservative.** The filter is a safety net for errors no
-service anticipated. `409` says "state conflicted, this may be transient"; `422` says "your
-input is wrong, do not retry". Of the two, telling a client its body was wrong when the truth
-was a race is the more misleading failure.
+## Sonuçlar
 
-## Consequences
+- `docs/api-conventions.md` değişikliğe ihtiyaç duymaz: "çakışan eşzamanlı bir değişiklik"
+  ifadesi `P2003`'ün her iki biçimini de kapsar ve oradaki hiçbir ifade bir yabancı anahtar
+  hatasının `422` olduğunu ima etmez.
+- Engellenmiş bir silme, `409 Conflict` ile `"Related resource conflict"` yanıtı verir —
+  bilinçli olarak genel. Hedefe hâlâ _hangi_ satırların referans verdiğini söylemez, çünkü
+  bunu bir tenant sınırı boyunca söylemek varlık sızdırır. Belirli, eyleme dönük bir mesaj
+  isteyen bir endpoint (örneğin "önce bu üyenin task'larını devret") bağımlıları kendisi
+  kontrol edip kendi exception'ını fırlatmalıdır; filtreye yaslanmamalıdır.
+- Eşleme yalnızca filtreye karşı birim testleriyle koşturulur. API'deki hiçbir HTTP rotası
+  istek üzerine `P2003` üretmeye zorlanamaz — erişilebilir her yol referanslarını önce
+  doğrular, ki amaç da budur — dolayısıyla bir entegrasyon testi de hatayı taklit etmek
+  zorunda kalırdı.
+- İleride bir endpoint, bir silmenin engelleyicilerini alan bazlı açıklamak isterse, o
+  endpoint `details` ile birlikte bilinçli olarak `422` fırlatır. Bu ADR, olası her yabancı
+  anahtar yanıtını değil, ele alınmamış son çare davranışını yönetir.
 
-- `docs/api-conventions.md` needs no change: "a conflicting concurrent change" already covers
-  both shapes of `P2003`, and no wording there implies a foreign-key error is a `422`.
-- A blocked delete answers `409 Conflict` with `"Related resource conflict"` — deliberately
-  generic. It says nothing about _which_ rows still reference the target, because saying so
-  across a tenant boundary would leak existence. An endpoint that wants a specific,
-  actionable message (for example "reassign this member's tasks first") must check for
-  dependents itself and raise its own exception; it must not lean on the filter.
-- The mapping is only exercised by unit tests against the filter. No HTTP route in the API
-  can be made to emit `P2003` on demand — every reachable path validates its references
-  first, which is the point — so an integration test would have to fake the failure anyway.
-- If a future endpoint does want a delete to explain its blockers per-field, that endpoint
-  raises `422` with `details` deliberately. This ADR governs the unhandled fallback, not
-  every possible foreign-key response.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative                                       | Why not                                                                                                                               |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `422 Unprocessable Entity` (the audit's proposal) | Misreports a state conflict and a lost race as a body-validation failure, and produces a `422` with no `details` for a client to read |
-| `404 Not Found` for the insert-side shape         | Cannot be distinguished from the delete-side shape at the filter; `P2025` already owns "the row you named is not there"               |
-| `400 Bad Request`                                 | The body is well-formed and passed validation; the failure is in the database's state, not the request                                |
-| Split `P2003` by `meta.field_name`                | Branching on Prisma constraint names couples the HTTP contract to schema naming, and both branches would still answer `409`           |
+| Alternatif                                     | Neden değil                                                                                                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `422 Unprocessable Entity` (denetimin önerisi) | Durum çakışmasını ve kaybedilmiş yarışı gövde doğrulama hatası olarak yanlış bildirir; ayrıca istemcinin okuyacağı `details` içermeyen bir `422` üretir |
+| Insert tarafındaki biçim için `404 Not Found`  | Filtrede silme tarafındaki biçimden ayırt edilemez; "adlandırdığın satır orada yok" zaten `P2025`'in alanıdır                                           |
+| `400 Bad Request`                              | Gövde iyi biçimlendirilmiştir ve doğrulamadan geçmiştir; hata istekte değil, veritabanının durumundadır                                                 |
+| `P2003`'ü `meta.field_name`'e göre ayırmak     | Prisma kısıt adlarına dallanmak HTTP sözleşmesini şema adlandırmasına bağlar ve her iki dal da yine `409` yanıtı verirdi                                |

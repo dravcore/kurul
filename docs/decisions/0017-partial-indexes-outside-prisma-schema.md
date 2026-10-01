@@ -1,20 +1,27 @@
-# 0017. Partial Indexes Live in Migrations, Guarded by Tests
+# 0017. Kısmi İndeksler Migration'larda Yaşar, Testlerle Korunur
 
-**Status:** Accepted
-**Date:** 2026-08-12
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-12
+**Güncellendi:** 2026-10-01 — Gerekçe'deki "beş testten üçünü anında kırmızıya çevirir" sayımı artık
+geçerli değil: `apps/api/test/due-soon-index.e2e-spec.ts` bir `pg_index` katalog testi kazandı ve altı test
+taşır; indeks düşerse dördü kırmızıya döner. Bağlam'daki "`prisma migrate dev`'in tam olarak drift dediği
+şey budur" ve Sonuçlar'daki "`prisma migrate dev` bu indeksi drift olarak bildirmeye devam edecek"
+anlatımı da bugünkü ölçümle örtüşmüyor: CI'daki drift kapısı (`pnpm db:drift`, altında
+`prisma migrate diff --exit-code`) bu kısmi indeks yerindeyken geçiyor, yani Prisma'nın drift denetimi onu
+fark olarak görmüyor (`.github/workflows/ci.yml`,
+`apps/api/prisma/migrations/20260818120000_attachment_kind_check/migration.sql`). Koruma testi, indeksi
+düşürecek elle yazılmış ya da yeniden üretilmiş bir migration'a karşı tek mekanik güvence olarak kalıyor.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0017-partial-indexes-outside-prisma-schema.md)
+## Bağlam
 
-## Context
+Yaklaşan son tarih bildirimleri, her tick'te son tarihi yaklaşan tüm task'ları yeniden tarayan
+zamanlanmış bir worker (`notification/due-soon.worker.ts`) tarafından yazılır. Tekilleştirme
+olmadan aynı okunmamış hatırlatma her tick'te yeniden yazılır; bu yüzden worker
+`createMany({ skipDuplicates: true })` kullanır.
 
-Due-soon reminders are written by a scheduled worker
-(`notification/due-soon.worker.ts`) that re-scans every task approaching its due date on each
-tick. Without deduplication the same unread reminder is rewritten every tick, so the worker
-uses `createMany({ skipDuplicates: true })`.
-
-That flag compiles to `INSERT … ON CONFLICT DO NOTHING`. Its entire effect depends on a
-unique index existing for the rows to conflict on — **with no index, the clause is a silent
-no-op and every insert succeeds.** The index it needs is deliberately partial:
+Bu bayrak `INSERT … ON CONFLICT DO NOTHING`'e derlenir. Tüm etkisi, satırların çakışabileceği
+bir unique indeksin var olmasına bağlıdır — **indeks yoksa bu cümlecik sessiz bir no-op'tur ve
+her insert başarılı olur.** İhtiyaç duyduğu indeks bilinçli olarak kısmidir:
 
 ```sql
 CREATE UNIQUE INDEX "Notification_due_soon_unread_uidx"
@@ -22,73 +29,74 @@ ON "Notification" ("userId", "taskId")
 WHERE "type" = 'due_soon' AND "readAt" IS NULL AND "taskId" IS NOT NULL;
 ```
 
-The predicate is load-bearing. A plain `@@unique([userId, taskId])` would forbid two mentions
-on one task, and would forbid ever re-notifying a task whose earlier reminder was already
-read. Only the filtered form says what is actually meant: _one unread due-soon reminder per
-user per task_.
+Predikat yük taşır. Düz bir `@@unique([userId, taskId])` bir task'ta iki mention'ı yasaklardı
+ve daha önceki hatırlatması okunmuş bir task'ın bir daha hiç bildirilmesine izin vermezdi.
+Yalnızca filtrelenmiş biçim gerçekte kastedileni söyler: _kullanıcı ve task başına bir tane
+okunmamış due-soon hatırlatması_.
 
-**Prisma's schema language cannot express a `WHERE` on an index.** So the index exists only
-in `migrations/20260809180000_due_soon_perf_indexes/migration.sql`. From
-`schema.prisma`'s point of view it is an object nobody declared — which is exactly what
-`prisma migrate dev` calls drift. A future schema change can therefore generate a migration
-that drops it, and the developer running the command sees a routine index removal in a diff
-full of other index churn.
+**Prisma'nın şema dili bir indeks üzerinde `WHERE` ifade edemez.** Bu yüzden indeks yalnızca
+`migrations/20260809180000_due_soon_perf_indexes/migration.sql` içinde yaşar.
+`schema.prisma`'nın bakış açısından o, kimsenin bildirmediği bir nesnedir — ki
+`prisma migrate dev`'in tam olarak drift dediği şey budur. Dolayısıyla ileriki bir şema
+değişikliği onu düşüren bir migration üretebilir ve komutu çalıştıran geliştirici, başka
+indeks hareketleriyle dolu bir diff içinde sıradan bir indeks silme görür.
 
-The failure that follows is silent and delayed: no error, no failing request, just
-`skipDuplicates` quietly doing nothing and users watching one task fill their notification
-list one scheduler tick at a time.
+Ardından gelen hata sessiz ve gecikmelidir: hata yok, başarısız istek yok; sadece
+`skipDuplicates` sessizce hiçbir şey yapmaz ve kullanıcılar tek bir task'ın bildirim
+listelerini her scheduler tick'inde bir satır daha doldurmasını izler.
 
-## Decision
+## Karar
 
-Partial indexes stay in raw SQL migrations — there is no alternative — and each one is
-**guarded by an integration test that asserts the index exists in `pg_indexes` and that the
-behaviour depending on it still holds.**
+Kısmi indeksler ham SQL migration'larda kalır — başka seçenek yok — ve her biri **indeksin
+`pg_indexes` içinde var olduğunu ve ona bağlı davranışın hâlâ geçerli olduğunu doğrulayan bir
+entegrasyon testiyle korunur.**
 
-`test/due-soon-index.e2e-spec.ts` does this for `Notification_due_soon_unread_uidx`: it
-checks the index is present and unique, that its predicate still names `due_soon`,
-`readAt IS NULL` and `taskId IS NOT NULL` over `("userId", "taskId")`, and then exercises the
-consequences — a repeated unread reminder collapses to one row, a re-notification after a
-read does not, and other notification types still repeat freely.
+`test/due-soon-index.e2e-spec.ts` bunu `Notification_due_soon_unread_uidx` için yapar:
+indeksin mevcut ve unique olduğunu, predikatının hâlâ `("userId", "taskId")` üzerinde
+`due_soon`, `readAt IS NULL` ve `taskId IS NOT NULL` adlarını taşıdığını kontrol eder ve
+sonra sonuçlarını koşturur — tekrarlanan bir okunmamış hatırlatma tek satıra iner, okunduktan
+sonraki yeniden bildirim inmez ve diğer bildirim türleri serbestçe tekrarlanmaya devam eder.
 
-Any future partial index adopts the same pattern.
+İleride eklenecek her kısmi indeks aynı deseni benimser.
 
-## Rationale
+## Gerekçe
 
-- **The test is the only mechanical guard there is.** The schema comment on the
-  `Notification` model says "do not let a generated migration drop it", but a comment does
-  not run in CI. A dropped index turns three of the five tests in that file red immediately —
-  verified by dropping it against a live test database.
-- **Asserting the predicate, not just the name, is the point.** An index that survives with a
-  widened `WHERE` is worse than a missing one: it starts rejecting legitimate rows (a second
-  mention) rather than merely failing to reject duplicates.
-- **Behavioural assertions outlast the definition string.** If Postgres ever reformats
-  `indexdef`, the three behaviour tests still fail for the right reason. The definition
-  assertions are there to name _which_ invariant broke.
-- **These tests belong in the integration tier.** They are meaningless against a mocked
-  Prisma client — the object under test is a database object. `docs/testing.md` already puts
-  "test the API against a real PostgreSQL" at the centre of the strategy, and this is the
-  purest example of it.
+- **Var olan tek mekanik koruma bu testtir.** `Notification` modelindeki şema yorumu
+  "üretilmiş bir migration'ın bunu düşürmesine izin verme" diyor, ama bir yorum CI'da
+  koşmaz. Düşürülen bir indeks o dosyadaki beş testten üçünü anında kırmızıya çevirir —
+  canlı bir test veritabanında indeks düşürülerek doğrulandı.
+- **Sadece adı değil, predikatı doğrulamak asıl mesele.** Genişletilmiş bir `WHERE` ile hayatta
+  kalan bir indeks, eksik olandan daha kötüdür: yinelenenleri reddetmeyi başaramamakla
+  kalmaz, meşru satırları (ikinci bir mention) reddetmeye başlar.
+- **Davranışsal doğrulamalar tanım metninden daha uzun ömürlüdür.** Postgres bir gün
+  `indexdef` biçimini değiştirirse, üç davranış testi hâlâ doğru sebeple başarısız olur.
+  Tanım doğrulamaları, _hangi_ değişmezin kırıldığını adlandırmak için oradadır.
+- **Bu testlerin yeri entegrasyon katmanıdır.** Mock'lanmış bir Prisma istemcisine karşı
+  anlamsızdırlar — test edilen nesne bir veritabanı nesnesidir. `docs/testing.md` zaten
+  "API'yi gerçek bir PostgreSQL'e karşı test et"i stratejinin merkezine koyar ve bu, bunun en
+  saf örneğidir.
 
-## Consequences
+## Sonuçlar
 
-- A generated migration that drops the index fails CI at the integration step rather than
-  reaching production. The fix is to edit the generated migration and keep the
-  `CREATE UNIQUE INDEX`, not to relax the test.
-- The index definition is asserted in two places — the migration and the test — so an
-  intentional change to the predicate has to be made twice. That duplication is the point;
-  it forces the change to be deliberate.
-- `prisma migrate dev` will keep reporting this index as drift. That is inherent to Prisma,
-  not something this ADR removes; the guard converts a silent loss into a loud one.
-- The same treatment is owed to any future filtered, expression, or `CONCURRENTLY`-created
-  index — anything the schema cannot round-trip. Adding one without a guard test is the
-  regression this ADR is meant to prevent.
+- İndeksi düşüren üretilmiş bir migration, production'a ulaşmak yerine CI'ın entegrasyon
+  adımında başarısız olur. Çözüm, üretilen migration'ı düzenleyip
+  `CREATE UNIQUE INDEX`'i korumaktır; testi gevşetmek değil.
+- İndeks tanımı iki yerde doğrulanır — migration ve test — bu yüzden predikatta kasıtlı bir
+  değişiklik iki kez yapılmak zorundadır. Bu yineleme kasıtlıdır; değişikliği bilinçli olmaya
+  zorlar.
+- `prisma migrate dev` bu indeksi drift olarak bildirmeye devam edecek. Bu, Prisma'ya özgü bir
+  durumdur, bu ADR'nin kaldırdığı bir şey değildir; koruma, sessiz bir kaybı gürültülü bir
+  kayba çevirir.
+- Aynı muamele, ileride eklenecek her filtreli, ifade tabanlı veya `CONCURRENTLY` oluşturulmuş
+  indekse — şemanın gidiş-dönüş yapamadığı her şeye — borçludur. Koruma testi olmadan böyle
+  bir indeks eklemek, bu ADR'nin önlemeyi amaçladığı gerilemenin ta kendisidir.
 
-## Alternatives considered
+## Değerlendirilen Alternatifler
 
-| Alternative                                                         | Why not                                                                                                                            |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| A plain `@@unique([userId, taskId])` Prisma can express             | Wrong semantics: forbids a second mention on a task, and forbids re-notifying a task after its earlier reminder was read           |
-| Deduplicate in the worker instead (read existing rows, then filter) | Turns one statement into a read-then-write race between concurrent scanners — precisely what a unique index resolves atomically    |
-| Trust the schema comment and reviewer attention                     | A comment does not run in CI, and the drop arrives inside a generated migration full of unrelated index churn                      |
-| A migration-linting step that diffs `pg_indexes` against a baseline | A larger mechanism to build and keep current; the behaviour tests catch the same loss and also explain what breaks when it happens |
-| `@@index` with `map` plus a raw `ALTER`                             | Prisma still does not model the predicate, so the drift is unchanged — only the file it lives in moves                             |
+| Alternatif                                                                    | Neden değil                                                                                                                                           |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prisma'nın ifade edebildiği düz bir `@@unique([userId, taskId])`              | Yanlış anlam: bir task'ta ikinci bir mention'ı yasaklar ve önceki hatırlatması okunmuş bir task'ın yeniden bildirilmesini engeller                    |
+| Bunun yerine worker içinde tekilleştir (mevcut satırları oku, sonra filtrele) | Tek bir ifadeyi eşzamanlı tarayıcılar arasında oku-sonra-yaz yarışına çevirir — ki unique indeksin atomik olarak çözdüğü şey tam da budur             |
+| Şema yorumuna ve gözden geçirenin dikkatine güven                             | Bir yorum CI'da koşmaz ve silme, ilgisiz indeks hareketleriyle dolu üretilmiş bir migration'ın içinde gelir                                           |
+| `pg_indexes`'i bir referansla karşılaştıran migration lint adımı              | Kurulacak ve güncel tutulacak daha büyük bir mekanizma; davranış testleri aynı kaybı yakalar ve üstelik gerçekleştiğinde neyin kırıldığını da açıklar |
+| `map` ile `@@index` artı ham bir `ALTER`                                      | Prisma predikatı yine modellemez, yani drift değişmez — sadece yaşadığı dosya değişir                                                                 |

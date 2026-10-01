@@ -1,84 +1,90 @@
-# 0032. Plan Limits: One Resolver for Every Ceiling, Unlimited Until Configured
+# 0032. Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Ayarlanana Kadar Sınırsız
 
-**Status:** Accepted
-**Date:** 2026-08-23
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-23
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe aynaları"
+ifadesi kaldırılan İngilizce asıl + Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir
+kopyası var; bkz. [ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Karar'daki "`planLimit`, hata zarfının `details`'ten sonraki ikinci
+opsiyonel üyesi" ifadesi artık geçerli değil: hata zarfına 2026-09-24'te opsiyonel `detailsOmitted`
+üyesi eklendi (`apps/api/src/common/filters/all-exceptions.filter.ts`); `planLimit`'in kodu ve şekli
+değişmedi.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0032-plan-limits.md)
+## Bağlam
 
-## Context
+[ADR 0028](0028-open-contributions-hosted-service.md) gelirin nereden geldiğini karara bağladı:
+hosted bir hizmet, yayınlanan limitler içinde ücretsiz, üzerinde ücretli, ve limitler "özellik
+değil, operasyonel büyüklüklerdir (koltuk, board, depolama ve benzeri)" diye tanımlandı. O ADR
+ayrıca bu repo için sonucu tek cümleyle adlandırdı: ürünün, açık kodda, bir self-hoster'ın
+istediği her şeye ayarlayabileceği ya da tamamen kapalı bırakabileceği bir plan-limit katmanı
+büyütmesi gerekiyor.
 
-[ADR 0028](0028-open-contributions-hosted-service.md) settled where revenue comes from: a hosted
-service, free within published limits, paid above them, where the limits are "operational
-quantities (seats, boards, storage, similar), not features". It also named the consequence for
-this repository in a sentence: the product has to grow a plan-limit layer, in the open code, that
-a self-hoster can set to whatever they want or leave off entirely.
+Bugün tam olarak bir tavan var. [ADR 0027](0027-attachment-quotas.md) workspace başına ve
+instance başına attachment baytlarını sınırlıyor, onları ortam değişkeninden okuyor ve tavanı
+aşan bir yüklemeyi kendine ait bir `error` alanı taşıyan bir `413` ile reddediyor. Hiçbir şey bir
+sayıyı sınırlamıyor: bir instance sınırsız sayıda hesap kabul ediyor, sınırsız sayıda workspace;
+bir workspace sınırsız sayıda üye ve sınırsız sayıda board kabul ediyor. Hosted bir plan hiç ifade
+edilemiyor, ve sınırlı bir instance isteyen bir self-hoster'ın başvuracağı bir ayar yok.
 
-Exactly one ceiling exists today. [ADR 0027](0027-attachment-quotas.md) caps attachment bytes per
-workspace and per instance, reads them from the environment, and refuses an over-limit upload
-with a `413` whose `error` field is its own. Nothing caps a count: an instance accepts any number
-of accounts, any number of workspaces, a workspace accepts any number of members and any number
-of boards. A hosted plan cannot be expressed at all, and a self-hoster who wants a bounded
-instance has no setting to reach for.
+Bu ADR'nin cevapladığı soru "limit olmalı mı" değil (0028 onu cevapladı), limitlerin hangi şekli
+alacağı: sayılar nerede yaşıyor, "ayarlanmamış" ne demek, nerede uygulanıyorlar, ve reddedilen bir
+yazma ne söylüyor.
 
-The question this ADR answers is not "should there be limits" (0028 answered that) but what
-shape they take: where the numbers live, what "unset" means, where they are enforced, and what a
-refused write says.
+## Karar
 
-## Decision
+**Tek bir obje her tavan sorusunu cevaplıyor, ve bayt kotaları onun üyesi.** `PlanLimitsService`
+workspace başına seat ve board'u, instance başına workspace ve hesabı, ve ADR 0027'nin attachment
+kotalarını aynı çözümleyici üzerinden çözümlüyor. Kotalar ortam değişkeni adlarını, `413`'lerini
+ve `error: "Attachment Quota Exceeded"`'larını koruyor. Değişen şey, workspace başına olanın artık
+workspace başına çözümlenebilir olması, dolayısıyla bir plan onu bir tenant için yükseltebilir ya
+da düşürebilir. Öğrenilecek ikinci bir yapılandırma deseni yok: plan katmanı kotayı sarmalıyor,
+onu değiştirmiyor ya da yeniden adlandırmıyor.
 
-**One object answers every ceiling question, and the byte quotas are members of it.**
-`PlanLimitsService` resolves seats and boards per workspace, workspaces and accounts per
-instance, and the ADR 0027 attachment quotas, through the same resolver. The quotas keep their
-environment variable names, their `413`, and their `error: "Attachment Quota Exceeded"`. What
-changes is that the per-workspace one is now resolvable per workspace, so a plan can raise or
-lower it for one tenant. There is no second configuration pattern to learn: the plan layer wraps
-the quota, it does not replace or rename it.
+**Dört yeni instance değişkeni, her biri ayarlanmadığında sınırsız.**
 
-**Four new instance variables, each unlimited when unset.**
-
-| Variable                        | Caps                                                      |
+| Değişken                        | Sınırlar                                                  |
 | ------------------------------- | --------------------------------------------------------- |
-| `PLAN_MAX_SEATS_PER_WORKSPACE`  | Members **plus pending invitations** in one workspace     |
-| `PLAN_MAX_BOARDS_PER_WORKSPACE` | Boards in one workspace                                   |
-| `PLAN_MAX_WORKSPACES`           | Workspaces on the instance                                |
-| `PLAN_MAX_USERS`                | Accounts on the instance (anonymised tombstones excluded) |
+| `PLAN_MAX_SEATS_PER_WORKSPACE`  | Bir workspace'teki üyeler **artı bekleyen davetler**      |
+| `PLAN_MAX_BOARDS_PER_WORKSPACE` | Bir workspace'teki board'lar                              |
+| `PLAN_MAX_WORKSPACES`           | Instance'taki workspace'ler                               |
+| `PLAN_MAX_USERS`                | Instance'taki hesaplar (anonimleştirilmiş kayıtlar hariç) |
 
-`0` is the explicit spelling of unlimited, as it already is for the byte quotas and the retention
-windows; a negative or non-integer value is refused at boot, where `readInstancePlanLimits()` runs
-from `PlanLimitsService.onModuleInit` and logs one `Plan ceilings: …` line whatever the values
-are.
+`0`, sınırsızın açık yazımı, tıpkı bayt kotaları ve retention pencereleri için zaten olduğu gibi;
+negatif ya da tam sayı olmayan bir değer açılışta reddedilir, `readInstancePlanLimits()`'in
+`PlanLimitsService.onModuleInit`'ten çalıştığı ve değerler ne olursa olsun tek bir
+`Plan ceilings: …` satırı logladığı yerde.
 
-**Unset is unlimited, and this deliberately diverges from ADR 0027's 2026-08-21 update.** The
-byte quotas grew default numbers because an unbounded disk takes Postgres down with it on the
-published Compose topology, where the operator who never read the quota section was the
-operator whose database died. No count has that property. A tenth board costs a row; a hundredth account
-costs a row. The failure mode a default would prevent does not exist, and the failure mode a
-default would _create_ is real: an upgrade that starts refusing the eleventh member of an
-existing team is a regression nobody configured. So the layer is inert until an operator states
-a number, and an instance that never sets one runs exactly the code paths it ran before, query
-for query: the assertions issue no count when the ceiling is `null`.
+**Ayarlanmamış sınırsızdır, ve bu ADR 0027'nin 2026-08-21 güncellemesinden kasıtlı olarak
+ayrılıyor.** Bayt kotaları varsayılan sayılar kazandı çünkü sınırsız bir disk, yayınlanan Compose
+topolojisinde Postgres'i de kendisiyle birlikte düşürüyor, kota bölümünü hiç okumayan operatör tam
+da veritabanı ölen operatör oluyordu. Hiçbir sayının bu özelliği yok. Onuncu bir board bir satıra
+mal olur; yüzüncü bir hesap bir satıra mal olur. Bir varsayılanın önleyeceği başarısızlık modu
+yok, ve bir varsayılanın _yaratacağı_ başarısızlık modu gerçek: mevcut bir takımın on birinci
+üyesini reddetmeye başlayan bir upgrade, kimsenin yapılandırmadığı bir gerilemedir. Dolayısıyla
+katman bir operatör bir sayı söyleyene kadar hareketsizdir, ve hiç birini ayarlamayan bir instance
+daha önce çalıştırdığı kod yollarını sorgu sorgusuna aynen çalıştırır: tavan `null` iken
+assertion'lar hiçbir sayım sorgusu atmaz.
 
-**A seat is a member or an invitation still pending.** Counting members alone would make the
-ceiling advisory: an admin at the limit could send twenty invitations and watch them all be
-accepted. It would also move the refusal from the person who can act on it (the admin, who can
-revoke an invitation or remove a member) to the person who cannot (the invitee, clicking a link
-they were sent days ago). Pending is the same predicate the invitation list already uses,
-`status = 'pending'` and unexpired, so a seat frees itself by the clock with no sweep, and what
-the settings screen shows as revocable is exactly what the count charges for. At **accept** time
-the count is members only: the invitation being accepted is already holding its seat, and
-counting both would refuse the last seat of a workspace that has room for exactly the person
-walking through the door.
+**Bir seat, bir üye ya da hâlâ bekleyen bir davettir.** Yalnızca üyeleri saymak, tavanı danışma
+niteliğine indirirdi: limitteki bir admin yirmi davet gönderip hepsinin kabul edilmesini
+izleyebilirdi. Bu, reddi aksiyon alabilecek kişiden (davet iptal edebilen ya da üye çıkarabilen
+admin) aksiyon alamayacak kişiye (günler önce gönderilmiş bir bağlantıya tıklayan davetli) taşırdı
+da. Bekleyen, davet listesinin zaten kullandığı aynı predicate: `status = 'pending'` ve süresi
+dolmamış, dolayısıyla bir seat süpürmeye gerek kalmadan saatle kendini boşaltır, ve ayarlar
+ekranının iptal edilebilir gösterdiği şey tam olarak sayının ücretlendirdiği şeydir. **Kabul**
+anında sayım yalnızca üyelerdir: kabul edilen davet zaten kendi seat'ini tutuyordur, ikisini
+birden saymak, tam da kapıdan giren kişi için yeri olan bir workspace'in son seat'ini reddederdi.
 
-**Per-workspace overrides live in `Workspace.planLimits`, a nullable JSON column.** Absent key =
-defer to the instance; `null` = unlimited; `0` = unlimited; a number = that ceiling. Understood
-keys are `seats`, `boards`, `storageBytes`. Resolution is override, then instance environment,
-then unlimited.
+**Workspace başına override'lar `Workspace.planLimits`'te yaşar, nullable bir JSON kolonu.** Yok
+anahtar = instance'a bırak; `null` = sınırsız; `0` = sınırsız; bir sayı = o tavan. Anlaşılan
+anahtarlar `seats`, `boards`, `storageBytes`. Çözümleme sırası: override, sonra instance ortamı,
+sonra sınırsız.
 
-**Enforcement is at the write, one refusal shape.** Board creation checks inside the transaction
-that inserts the board, and so does the Trello importer (`POST .../imports/trello`), the other
-route that adds a board: the check is the first statement of its transaction, so a refused import
-writes nothing. Workspace creation, invitation, acceptance and sign-up check immediately before
-the write they guard. Each refuses with `403` and:
+**Uygulama yazmada, tek bir ret şeklinde.** Board oluşturma, board'u ekleyen transaction'ın
+içinde denetler; board ekleyen öteki route olan Trello içe aktarıcı (`POST .../imports/trello`)
+da öyle: denetim, transaction'ının ilk ifadesidir, dolayısıyla reddedilen bir içe aktarma hiçbir
+şey yazmaz. Workspace oluşturma, davet, kabul ve sign-up, koruduğu yazmadan hemen önce denetler.
+Her biri `403` ile ve şununla reddeder:
 
 ```jsonc
 {
@@ -92,97 +98,98 @@ the write they guard. Each refuses with `403` and:
 }
 ```
 
-`planLimit` is the second optional member of the error envelope, after `details`, and it exists
-for the same reason: "you cannot do that" is not actionable, "you are using 10 of 10 seats" is.
-The codes are `PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES` and
-`PLAN_LIMIT_USERS`.
+`planLimit`, hata zarfının `details`'ten sonraki ikinci opsiyonel üyesi, ve aynı sebeple var:
+"bunu yapamazsınız" aksiyon alınabilir değildir, "10 seat'in 10'unu kullanıyorsunuz" alınabilirdir.
+Kodlar `PLAN_LIMIT_SEATS`, `PLAN_LIMIT_BOARDS`, `PLAN_LIMIT_WORKSPACES` ve `PLAN_LIMIT_USERS`.
 
-**Two read surfaces.** `GET /config` publishes the instance ceilings beside `mailEnabled` and
-`attachmentsEnabled`, as deployment capability identical for every caller. `GET
-/workspaces/{workspaceId}/plan` publishes one workspace's _resolved_ ceilings and current usage,
-readable by any member, which is what lets the members screen say "7 of 10 seats used" and the
-board list disable its create control at the ceiling with a sentence rather than a silent 403.
+**İki okuma yüzeyi.** `GET /config`, instance tavanlarını `mailEnabled` ve `attachmentsEnabled`'ın
+yanında, her çağıran için aynı deployment kapasitesi olarak yayınlar. `GET
+/workspaces/{workspaceId}/plan`, bir workspace'in _çözümlenmiş_ tavanlarını ve güncel kullanımını
+yayınlar, herhangi bir üye tarafından okunabilir; bu, üyeler ekranının "10 seat'in 7'si
+kullanılıyor" demesini ve board listesinin oluşturma kontrolünü tavanda sessiz bir 403 yerine bir
+cümleyle devre dışı bırakmasını sağlayan şey.
 
-## Rationale
+## Gerekçe
 
-**Why `403` and not a status of its own.** This is ADR 0027's move one status along. The quota
-reused `413`, already taken by the per-file size limit, and told the two apart by the envelope's
-`error`, because the status alone could not say which fix to suggest. Here `403` is already taken
-by "your role is too low", and a ceiling needs the opposite advice: no role change helps, someone
-has to free a seat or raise a number. The status stays the honest one (authenticated,
-understood, refused) and the `error` field carries the distinction, exactly as
-`docs/api-conventions.md` says clients should branch. `402 Payment Required` was rejected: this
-code ships to self-hosters who have no payment relationship with anybody, and an operator capping
-their own instance at 20 seats is not being asked for money. A hosted deployment can map this
-envelope to an upgrade prompt from `planLimit.code` without the API having to lie about what
-happened.
+**Neden `403`, kendine ait bir status değil.** Bu, ADR 0027'nin hamlesini bir adım ileri taşıyor.
+Kota `413`'ü yeniden kullandı, dosya başına boyut limiti tarafından zaten alınmıştı, ve ikisini
+zarfın `error`'ıyla ayırdı, çünkü status tek başına hangi düzeltmenin önerileceğini söyleyemiyordu.
+Burada `403` zaten "rolünüz çok düşük" tarafından alınmış, ve bir tavan tam tersi bir tavsiyeye
+ihtiyaç duyuyor: hiçbir rol değişikliği yardımcı olmaz, birinin bir seat boşaltması ya da bir
+sayıyı yükseltmesi gerekir. Status dürüst olanda kalıyor (kimlikli, anlaşılmış, reddedilmiş) ve
+`error` alanı ayrımı taşıyor, tam olarak `docs/api-conventions.md`'nin istemcilerin dallanması
+gerektiğini söylediği gibi. `402 Payment Required` reddedildi: bu kod, kimseyle ödeme ilişkisi
+olmayan self-hoster'lara gidiyor, ve kendi instance'ını 20 seat'te sınırlayan bir operatörden para
+istenmiyor. Hosted bir deployment, API'nin ne olduğu konusunda yalan söylemesine gerek kalmadan bu
+zarfı `planLimit.code`'dan bir upgrade istemine eşleyebilir.
 
-**Why a JSON column and not a `WorkspacePlan` table.** The row that will write this does not
-exist yet: hosted billing (ADR 0028) assigns a plan whose shape is still being designed, and the
-requirement stated for this layer was that billing must be able to write a workspace's ceilings
-_without a migration_. A typed table makes every new ceiling a migration, and there will be new
-ceilings: 0028's own list ends in "similar". The JSON column takes a new key the day the
-resolver learns to read it, and an older reader ignores keys it does not know instead of
-failing. What billing needs beyond ceilings (plan name, provider ids, period end) is a table
-0028 will add for its own reasons; that is orthogonal to this column, and keeping the two apart
-means a self-hosted instance with no billing at all still has a working override mechanism.
+**Neden bir `WorkspacePlan` tablosu değil bir JSON kolonu.** Bunu yazacak satır henüz yok: hosted
+billing (ADR 0028) hâlâ tasarlanmakta olan bir şekle sahip bir plan atıyor, ve bu katman için
+belirtilen gereksinim, billing'in bir workspace'in tavanlarını _migration olmadan_ yazabilmesi
+gerektiğiydi. Tipli bir tablo, her yeni tavanı bir migration yapar, ve yeni tavanlar olacak:
+0028'in kendi listesi "benzerleri" ile bitiyor. JSON kolonu, çözümleyici onu okumayı öğrendiği gün
+yeni bir anahtarı alır, ve daha eski bir okuyucu bilmediği anahtarları başarısız olmak yerine
+görmezden gelir. Billing'in tavanların ötesinde ihtiyaç duyduğu şey (plan adı, sağlayıcı id'leri,
+dönem sonu), 0028'in kendi sebepleriyle ekleyeceği bir tablo; bu, bu kolondan bağımsız, ve ikisini
+ayrı tutmak, hiç billing'i olmayan self-hosted bir instance'ın hâlâ çalışan bir override
+mekanizması olduğu anlamına geliyor.
 
-**Why a malformed override is ignored rather than refused.** Environment is configuration and a
-bad value there is refused at boot, where exactly one person sees it and nothing is running yet.
-The column is _data_, written by an integration, and refusing to serve a workspace because one
-JSON value is unparseable would turn a bad write into an outage for that tenant. Unusable keys
-are dropped, and the ceiling falls through to the instance's own number, which is the answer the
-workspace would have had before anyone wrote the row.
+**Neden bozuk bir override reddedilmek yerine görmezden geliniyor.** Ortam yapılandırmadır ve
+orada kötü bir değer açılışta reddedilir, tam olarak tek bir kişinin gördüğü ve henüz hiçbir şeyin
+çalışmadığı yerde. Kolon _veridir_, bir entegrasyon tarafından yazılır, ve bir JSON değeri
+ayrıştırılamaz diye bir workspace'e hizmet vermeyi reddetmek, kötü bir yazmayı o tenant için bir
+kesintiye çevirirdi. Kullanılamaz anahtarlar düşürülür, ve tavan instance'ın kendi sayısına düşer,
+ki bu, kimse o satırı yazmadan önce workspace'in sahip olacağı cevaptır.
 
-**Why the counts are taken at the write and not held in a counter.** ADR 0027 answered this for
-bytes and the answer is the same for rows: `Workspace → Board → Task` cascades entirely inside
-Postgres with no application code running, so a denormalized counter drifts on exactly the paths
-that free the most. Counting live rows is correct by definition after any cascade, and no index
-is added for it (the measure-first precedent of ADR 0020): every count is either by primary key
-or on a column already indexed as a foreign key, and none of them runs on an unconfigured
-instance.
+**Neden sayımlar bir sayaçta tutulmak yerine yazmada alınıyor.** ADR 0027 bunu baytlar için
+cevapladı ve satırlar için de cevap aynı: `Workspace → Board → Task` cascade'i tamamen Postgres
+içinde, hiçbir uygulama kodu çalışmadan iniyor, dolayısıyla denormalize bir sayaç tam da en çok yer
+açan yollarda sapıyor. Canlı satırları saymak, her cascade'den sonra tanım gereği doğrudur, ve
+bunun için indeks eklenmedi (ADR 0020'nin önce-ölç emsali): her sayım ya primary key üzerinden ya
+da zaten foreign key olarak indekslenmiş bir kolon üzerinden çalışır, ve hiçbiri yapılandırılmamış
+bir instance'ta çalışmaz.
 
-**Why sign-up is refused at the Better Auth mount.** `/auth/*` is served by raw Express below
-the Nest router (ADR 0004), so no exception filter is listening there. That is why the
-organization firewall in the same file already writes its own envelope by hand. The alternative,
-a `databaseHooks.user.create.before` hook, would cover every account-creating path there could
-ever be, but can only refuse by throwing Better Auth's `APIError`, whose body is not the one
-error envelope `docs/api-conventions.md` promises. `emailAndPassword` is the only sign-up path
-enabled today, so the two placements cover the same requests; the trigger to move the check into
-the hook is the first additional path (a social provider, a magic link). A ceiling refuses
-sign-**up** only: signing in, verifying an address and everything else stay open at any count, so
-lowering `PLAN_MAX_USERS` under an instance's own population never locks anybody out.
+**Neden sign-up, Better Auth mount'unda reddediliyor.** `/auth/*`, Nest router'ının altında ham
+Express tarafından servis ediliyor (ADR 0004), dolayısıyla orada dinleyen bir exception filter
+yok. Aynı dosyadaki organization firewall'unun kendi zarfını elle yazmasının sebebi bu. Alternatif,
+bir `databaseHooks.user.create.before` hook'u, olabilecek her hesap oluşturan yolu kapsardı, ama
+yalnızca Better Auth'un `APIError`'ını fırlatarak reddedebilir, ki gövdesi
+`docs/api-conventions.md`'nin vaat ettiği tek hata zarfı değildir. `emailAndPassword`, bugün etkin
+olan tek sign-up yolu, dolayısıyla iki yerleşim aynı istekleri kapsıyor; hook'a taşımanın
+tetikleyicisi ilk ek yol (bir sosyal sağlayıcı, bir magic link). Bir tavan yalnızca sign-**up**'ı
+reddeder: sign-in, bir adresi doğrulamak ve geri kalan her şey her sayıda açık kalır, dolayısıyla
+`PLAN_MAX_USERS`'ı bir instance'ın kendi nüfusunun altına ayarlamak kimseyi kilitlemez.
 
-## Consequences
+## Sonuçlar
 
-- **The ceilings are soft, and bounded.** Only the board check shares a transaction with its
-  write, and even that one is read-committed: two simultaneous creates can each count `n`. The
-  overshoot is bounded by the number of simultaneous requests, which is ADR 0027's accepted trade
-  in the same words. **Trigger:** a report of a ceiling being raced deliberately, or a measured
-  overshoot beyond one write per concurrent request. **Cost when triggered:** a
-  `pg_advisory_xact_lock` keyed on the workspace id around the count and the insert.
-- Workspace creation and invitation cannot share a transaction with their write at all: both
-  writes belong to Better Auth's API, not to a Prisma call this code makes. The window is one
-  round trip.
-- `.env.example`, `docs/self-hosting.md`, `docs/api-conventions.md` and their Turkish mirrors
-  gain the four variables, the error code table and the two read surfaces.
-- The web branches on `PLAN_LIMIT_ERROR` in the create-board and invite dialogs, and reads
-  `GET .../plan` on the boards and members screens. A failed plan read fails **open**: the
-  control stays enabled, because the API refuses the write on its own and one refused request is
-  a smaller harm than a workspace that cannot create a board and is told nothing about why.
-- Hosted billing (ADR 0028) now has its enforcement point. Assigning a plan is writing
-  `Workspace.planLimits`; nothing else in the product has to know that money was involved.
+- **Tavanlar yumuşaktır, ve sınırlıdır.** Yalnızca board denetimi kendi yazmasıyla bir transaction
+  paylaşıyor, ve o bile read-committed: iki eşzamanlı oluşturma her biri `n`'i sayabilir. Aşım,
+  eşzamanlı istek sayısıyla sınırlıdır, ki bu ADR 0027'nin kabul edilen ödünüyle aynı sözlerle.
+  **Tetikleyici:** bir tavanın kasten yarıştırıldığına dair bir rapor, ya da eşzamanlı istek
+  başına bir yazmanın ötesinde ölçülmüş bir aşım. **Tetiklendiğinde maliyeti:** sayım ile
+  insert'in etrafında, workspace id'siyle anahtarlanan bir `pg_advisory_xact_lock`.
+- Workspace oluşturma ve davet, yazmalarıyla bir transaction hiç paylaşamıyor: iki yazma da Better
+  Auth'un API'sine ait, bu kodun yaptığı bir Prisma çağrısına değil. Pencere bir round trip.
+- `.env.example`, `docs/self-hosting.md`, `docs/api-conventions.md` ve Türkçe aynaları dört
+  değişkeni, hata kod tablosunu ve iki okuma yüzeyini kazanıyor.
+- Web, create-board ve invite dialog'larında `PLAN_LIMIT_ERROR` üzerinden dallanıyor, ve board'lar
+  ile üyeler ekranlarında `GET .../plan`'ı okuyor. Başarısız bir plan okuması **açık** başarısız
+  olur: kontrol etkin kalır, çünkü API yazmayı kendi başına reddeder ve bir reddedilen istek,
+  neden hakkında hiçbir şey söylenmeyen, board oluşturamayan bir workspace'ten daha küçük bir
+  zarardır.
+- Hosted billing (ADR 0028) artık uygulama noktasına sahip. Bir plan atamak, `Workspace.planLimits`'i
+  yazmaktır; üründeki başka hiçbir şeyin paranın karıştığını bilmesi gerekmiyor.
 
-## Alternatives considered
+## Değerlendirilen alternatifler
 
-| Alternative                                               | Why not                                                                                                                                   |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Default numbers, as the byte quotas now have              | No count can take an instance down the way a full disk can; a default would only break existing deployments on upgrade                    |
-| A `WorkspacePlan` table with typed columns                | Makes every future ceiling a migration, which is exactly what the hosted-billing row must not need                                        |
-| `402 Payment Required`                                    | Self-hosters have no payment relationship; a self-imposed ceiling is not a bill                                                           |
-| A new status code, or reusing `409`                       | `403` already means "authenticated and refused"; the `error` field is the codebase's established way to say which refusal                 |
-| One guard or interceptor for every ceiling                | It would have to guess which quantity a request consumes, and would not run at all on the Better Auth routes where two of the writes live |
-| Counting members without pending invitations              | Makes the seat ceiling advisory, and moves the refusal to the invitee who cannot act on it                                                |
-| Counting pending invitations at accept time too           | Refuses the last seat of a workspace that has room for exactly that person                                                                |
-| Renaming the attachment quota variables into `PLAN_MAX_*` | Breaks every existing `.env` for a naming symmetry nobody asked for; the plan layer reads the quotas, it does not own them                |
-| Denormalized usage counters                               | Cascade deletes run entirely inside Postgres, so the counter drifts on the paths that free the most (ADR 0027's finding, unchanged)       |
+| Alternatif                                                             | Neden olmaz                                                                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Varsayılan sayılar, bayt kotalarının şimdi sahip olduğu gibi           | Hiçbir sayım, dolu bir diskin yapabileceği gibi bir instance'ı düşüremez; bir varsayılan yalnızca mevcut deployment'ları upgrade'te bozardı |
+| Tipli kolonlu bir `WorkspacePlan` tablosu                              | Her gelecekteki tavanı bir migration yapar, ki bu tam olarak hosted-billing satırının ihtiyaç duymaması gereken şey                         |
+| `402 Payment Required`                                                 | Self-hoster'ların ödeme ilişkisi yok; kendi kendine dayatılan bir tavan bir fatura değildir                                                 |
+| Yeni bir status kodu, ya da `409`'u yeniden kullanmak                  | `403` zaten "kimlikli ve reddedildi" demek; `error` alanı, hangi reddi söylemenin kod tabanının yerleşik yolu                               |
+| Her tavan için tek bir guard ya da interceptor                         | Bir isteğin hangi miktarı tükettiğini tahmin etmesi gerekirdi, ve yazmaların ikisinin yaşadığı Better Auth route'larında hiç çalışmazdı     |
+| Bekleyen davetler olmadan yalnızca üyeleri saymak                      | Seat tavanını danışma niteliğine indirir, ve reddi aksiyon alamayan davetliye taşır                                                         |
+| Kabul anında bekleyen davetleri de saymak                              | Tam da o kişi için yeri olan bir workspace'in son seat'ini reddeder                                                                         |
+| Attachment kota değişkenlerini `PLAN_MAX_*` olarak yeniden adlandırmak | Kimsenin istemediği bir adlandırma simetrisi için her mevcut `.env`'i bozar; plan katmanı kotaları okur, onlara sahip olmaz                 |
+| Denormalize kullanım sayaçları                                         | Cascade silmeler tamamen Postgres içinde çalışır, dolayısıyla sayaç en çok yer açan yollarda sapar (ADR 0027'nin bulgusu, değişmeden)       |

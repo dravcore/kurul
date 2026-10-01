@@ -30,10 +30,10 @@ export interface InstanceConfigDto {
   /**
    * Whether this deployment stores attachments at all — i.e. whether `STORAGE_PATH` is set.
    *
-   * A capability, like `mailEnabled`, never tenant state (`docs/api-conventions.md:175-177`).
-   * The web reads it to decide whether to render the upload control. The *link* control does
-   * not depend on it: a LINK needs no storage, so an instance with no `STORAGE_PATH` can still
-   * attach links.
+   * A capability, like `mailEnabled`, never tenant state (`docs/api-conventions.md`, "Instance
+   * yapılandırması"). The web reads it to decide whether to render the upload control. The *link*
+   * control does not depend on it: a LINK needs no storage, so an instance with no `STORAGE_PATH`
+   * can still attach links.
    */
   attachmentsEnabled: boolean;
   /**
@@ -124,7 +124,7 @@ export interface WorkspacePlanUsageDto {
  *
  * 403 already means "authenticated, and refused"; this string is what separates a ceiling
  * from an insufficient role, which needs an entirely different fix. Clients branch on
- * `statusCode` and `error`, never on `message` (`docs/api-conventions.md#errors`), and on
+ * `statusCode` and `error`, never on `message` (`docs/api-conventions.md#hatalar`), and on
  * `planLimit.code` when they need to know *which* ceiling.
  */
 export const PLAN_LIMIT_ERROR = 'Plan Limit Exceeded';
@@ -169,7 +169,7 @@ export interface PlanLimitDetail {
 }
 
 /**
- * The most entries the error envelope's `details` lists (`docs/api-conventions.md#errors`).
+ * The most entries the error envelope's `details` lists (`docs/api-conventions.md#hatalar`).
  *
  * A validation refusal that found more lists the first {@link VALIDATION_DETAILS_MAX}, in the
  * order validation reported them, and carries `detailsOmitted`: how many it left out, a positive
@@ -406,7 +406,7 @@ export type AttachmentKind = (typeof AttachmentKind)[keyof typeof AttachmentKind
  * (ADR 0027).
  *
  * The per-file size limit answers 413 too, so the status code alone cannot say which ceiling
- * was hit — and `docs/api-conventions.md#errors` tells clients to branch on `statusCode` and
+ * was hit — and `docs/api-conventions.md#hatalar` tells clients to branch on `statusCode` and
  * `error`, never on `message`. This string is that branch, shared so the API that writes it and
  * the web that reads it cannot drift.
  */

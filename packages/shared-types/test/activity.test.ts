@@ -61,7 +61,7 @@ describe('AUDIT_ACTIVITY_TYPES', () => {
         'account',
         // `token.created` / `token.revoked`: a personal access token is a standing credential
         // for the workspace, so minting or revoking one is access-changing in the same sense
-        // as an invitation (api-conventions.md, "Authentication").
+        // as an invitation (docs/api-conventions.md, "Kimlik doğrulama").
         'token',
       ]),
     );

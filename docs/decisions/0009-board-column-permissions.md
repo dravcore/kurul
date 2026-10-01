@@ -1,62 +1,59 @@
-# 0009. Board and Column Permissions
+# 0009. Board ve Column İzinleri
 
-**Status:** Accepted
-**Date:** 2026-08-09
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-09
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0009-board-column-permissions.md)
+## Bağlam
 
-## Context
+Faz 3, workspace tenancy altında board ve column mutasyonlarını getiriyor. Nest
+zaten ürün route'larını `WorkspaceGuard` + `@Roles` ile kapıyor; Better Auth
+organization statement'ları (`@kurul/auth-access`) yalnızca org/member/invitation
+kapsamında — board veya column yok. [design.md](../design.md) column
+değişiklikleri için Admin erişimi varsayan bir `403` metni zaten taşıyor.
+Handler'lar gelmeden önce açık bir rol matrisi gerekti; böylece API guard'ları
+ve UI enablement aynı kalır ve sonraki task-level izinler aynı kalıbı board/column
+tartışmasını yeniden açmadan genişletebilir.
 
-Phase 3 introduces board and column mutations under workspace tenancy. Nest
-already gates product routes with `WorkspaceGuard` + `@Roles`, while Better Auth
-organization statements in `@kurul/auth-access` cover org/member/invitation
-only — not boards or columns. [design.md](../design.md) already ships a `403`
-copy that assumes Admin access for column changes. We needed an explicit role
-matrix before handlers land, so API guards and UI enablement stay aligned, and
-so later task-level permissions can extend the same pattern without reopening
-the board/column debate.
+## Karar
 
-## Decision
+Board ve column yetkilendirmesi Nest'te `@Roles` ile şu matris üzerinden
+uygulanır:
 
-Board and column authorization is enforced in Nest with `@Roles`, using this
-matrix:
+| İşlem                                            | OWNER | ADMIN | MEMBER | GUEST |
+| ------------------------------------------------ | :---: | :---: | :----: | :---: |
+| Board ve column okuma                            |   ✓   |   ✓   |   ✓    |   ✓   |
+| Board oluştur; board adı / açıklama güncelle     |   ✓   |   ✓   |   ✓    |   —   |
+| Board sil                                        |   ✓   |   ✓   |   —    |   —   |
+| Column oluştur / yeniden adlandır / sırala / sil |   ✓   |   ✓   |   —    |   —   |
 
-| Action                                        | OWNER | ADMIN | MEMBER | GUEST |
-| --------------------------------------------- | :---: | :---: | :----: | :---: |
-| Read boards and columns                       |   ✓   |   ✓   |   ✓    |   ✓   |
-| Create board; update board name / description |   ✓   |   ✓   |   ✓    |   —   |
-| Delete board                                  |   ✓   |   ✓   |   —    |   —   |
-| Column create / rename / reorder / delete     |   ✓   |   ✓   |   —    |   —   |
+## Gerekçe
 
-## Rationale
+- Board açmak ve board metadata'sını düzenlemek üyeler için günlük iştir;
+  create/update'i yalnızca Admin+'a kilitlemek (Trello/Jira-benzeri olmayan)
+  küçük ekipler için sürtünme ekler, gerçek bir güvenlik kazancı vermez.
+- Column yapısını değiştirmek board şeklini değiştirmektir. Tasarım dili zaten
+  “Column'ları değiştirmek için Admin erişimine ihtiyacınız var” vaadini verir;
+  MEMBER column mutasyonu yapmamalıdır.
+- Board silmek column ve task'ları cascade eder; bu yıkıcı yüzey OWNER/ADMIN'te
+  kalır.
+- GUEST, `packages/auth-access` içinde zaten boş bir mutasyon yüzeyine sahiptir;
+  board'larda salt-okunur kalması bu duruşla uyumludur.
 
-- Opening boards and editing board metadata is everyday work for members;
-  restricting create/update to Admin+ (Trello/Jira-unlike) adds friction for
-  small teams without a real security win.
-- Changing column structure is a board-shape change. The design language already
-  promises “You need Admin access to change columns,” so MEMBER must not mutate
-  columns.
-- Deleting a board cascades columns and tasks; that destructive surface stays
-  OWNER/ADMIN.
-- GUEST already has an empty mutation surface in
-  `packages/auth-access`; keeping guests read-only on boards matches that
-  stance.
+## Sonuçlar
 
-## Consequences
+- Controller'lar board create/update, board delete ve column mutasyonları için
+  ayrı `@Roles` setleri uygulamalıdır; tek bir “member yazabilir” kapısı yanlıştır.
+- Web UI Admin-only kontrolleri gizler veya disable eder; engellenmiş bir kontrol
+  hâlâ erişilebilirse design.md `403` metnini satır içi gösterir.
+- Task create/edit/move izinleri
+  [ADR 0010](0010-task-permissions.md) ile gelir (MEMBER+ mutasyon; GUEST salt okuma).
+- Better Auth AC statement'ları `board`/`column` kaynakları için genişletilmez;
+  bu domain'lerde ürün yetkilendirmesi Nest tarafında kalır.
 
-- Controllers must apply distinct `@Roles` sets for board create/update vs
-  board delete vs column mutations; a single “member can write” gate is wrong.
-- The web UI hides or disables Admin-only controls and surfaces the design.md
-  `403` copy inline when a blocked control is still reachable.
-- Task create/edit/move permissions land in
-  [ADR 0010](0010-task-permissions.md) (MEMBER+ mutate; GUEST read-only).
-- Better Auth AC statements are not extended for `board`/`column` resources;
-  product authorization stays Nest-side for these domains.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative                                                      | Why not                                                                                                              |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Admin-only for all board and column mutations                    | Too strict for small teams; board create is content work, not structure admin                                        |
-| MEMBER may create/rename columns; only delete/reorder need Admin | Conflicts with design.md Admin copy for “change columns”; splits column UX into two mental models                    |
-| Encode board/column statements in Better Auth organization AC    | Org plugin surface is workspace membership, not product resources; Nest already owns workspace-scoped product guards |
+| Alternatif                                                            | Neden değil                                                                                                               |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Tüm board ve column mutasyonları yalnızca Admin                       | Küçük ekipler için çok katı; board oluşturma içerik işidir, yapı yönetimi değil                                           |
+| MEMBER column oluşturup yeniden adlandırabilir; silme/sıralama Admin  | design.md'nin “column değiştir” Admin metniyle çelişir; column UX'ini iki zihinsel modele böler                           |
+| Board/column statement'larını Better Auth organization AC'ye kodlamak | Org plugin yüzeyi workspace üyeliğidir, ürün kaynakları değil; Nest zaten workspace-scoped ürün guard'larını sahipleniyor |

@@ -128,7 +128,8 @@
 		# unuploadable: the file clears the API's check and the envelope pushes the body past the
 		# proxy's. The user sees a 413 on a file the documentation says is allowed, and the number
 		# they are told to look at is the one that is not the problem — the untraceable 413 of
-		# ADR 0022:170-176 in its quietest form.
+		# ADR 0022 ("Gerekçe", "Proxy sözleşmesinin neden bir gövde-boyutu satırına ihtiyacı
+		# var.") in its quietest form.
 		#
 		# The invariant is therefore not equality but ordering: **the proxy must never reject
 		# something the API would accept.** Its job is to cut absurd bodies before anything

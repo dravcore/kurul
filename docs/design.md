@@ -1,464 +1,484 @@
-# Design
+# Tasarım
 
-The visual and interaction language of the Kurul web app: principles, tokens, layout, motion, states, and copy.
+Kurul web uygulamasının görsel ve etkileşim dili: ilkeler, token'lar, yerleşim, hareket,
+durumlar ve metin.
 
-> 🌐 English (canonical) | [Türkçe](tr/design.md)
+## İçindekiler
 
-## Contents
+- [1. Tasarım ilkeleri](#1-tasarım-ilkeleri)
+- [2. Kimlik](#2-kimlik)
+- [3. Tasarım token'ları](#3-tasarım-tokenları)
+- [4. Yerleşim ve yoğunluk](#4-yerleşim-ve-yoğunluk)
+- [5. Etkileşim kalıpları](#5-etkileşim-kalıpları)
+- [6. Durumlar](#6-durumlar)
+- [7. UI metni](#7-ui-metni)
+- [8. Grafikler ve dashboard](#8-grafikler-ve-dashboard)
+- [9. Erişilebilirlik](#9-erişilebilirlik)
+- [10. Çapraz referanslar](#10-çapraz-referanslar)
 
-- [1. Design principles](#1-design-principles)
-- [2. Identity](#2-identity)
-- [3. Design tokens](#3-design-tokens)
-- [4. Layout and density](#4-layout-and-density)
-- [5. Interaction patterns](#5-interaction-patterns)
-- [6. States](#6-states)
-- [7. UI writing](#7-ui-writing)
-- [8. Charts and dashboard](#8-charts-and-dashboard)
-- [9. Accessibility](#9-accessibility)
-- [10. Cross-references](#10-cross-references)
+> **Durum.** Aşağıdaki renk ve tipografi token'ları üründe **doğrulanmıştır**
+> (`apps/web/app/globals.css`); spacing ölçeği Tailwind'in 4px tabanıdır, `globals.css`'te
+> token olarak tanımlı değildir ve hiçbir test onu denetlemez. Hâlâ aspirasyonel olan etkileşim
+> kalıpları satır içinde belirtilir; her cümleyi shipped davranış sanmayın.
 
-> **Status.** Colour, type, and spacing tokens below are **validated in product**
-> (`apps/web/app/globals.css`). Interaction patterns that are still aspirational are called
-> out inline; do not treat every sentence as shipped behaviour.
+## 1. Tasarım ilkeleri
 
-## 1. Design principles
+1. **Nefes alanıyla yoğunluk.** Bir board bir çalışma yüzeyidir. Satırlar kompakttır ve hava
+   grupların _arasına_ gider, asla içine değil — 36px satırlar, 300px column'lar, bir laptop'ta
+   dört kart. Trello kadar havadar değil, Jira kadar sıkışık değil.
+2. **Klavye öncelikli, pointer'la eşit.** Her etkileşimin bir klavye yolu vardır, drag and drop
+   dahil. Focus her zaman görünürdür ve ait olmadığı bir yerde asla hapsolmaz.
+3. **Tek bir signature, sakin bir çevre.** Kimliği (§2) tam olarak tek bir eleman taşır; geri
+   kalan her şey disiplinli nötrlerdir. Birinin işi bulmasına, taşımasına veya iş hakkında karar
+   vermesine yardımcı olmayan her şey kesilir.
+4. **Her iki tema da birinci sınıftır.** Koyu tema _seçilir_, türetilmez. Her renk bir
+   token'dan geçer; bir component'teki ham bir hex bir kusurdur
+   ([coding-standards.md](coding-standards.md#stil)).
+5. **Durumlar bir ruh hali değil, bir yöndür.** Boş ekranlar bir aksiyona davet eder, hatalar ne
+   olduğunu ve sırada ne yapılması gerektiğini söyler, yükleme ekranı yüklenmekte olan şeye
+   benzer.
+6. **String'ler bir tasarım malzemesidir.** Metin, spacing gibi tasarlanır, ekranın kullanıcıya
+   bakan tarafından yazılır ve ilk günden itibaren i18n katmanı üzerinden sunulur (§7).
 
-1. **Density with breathing room.** A board is a working surface. Rows are compact and the air
-   goes _between_ groups, never inside them — 36px rows, 300px columns, four cards on a
-   laptop. Not Trello-airy, not Jira-cramped.
-2. **Keyboard-first, pointer-equal.** Every interaction has a keyboard path, drag and drop
-   included. Focus is always visible and never trapped where it does not belong.
-3. **One signature, quiet surroundings.** Exactly one element carries the identity (§2);
-   everything else is disciplined neutrals. What does not help someone find, move, or decide
-   about work gets cut.
-4. **Both themes are first-class.** Dark is _selected_, not derived. Every color goes through
-   a token; a raw hex in a component is a defect ([coding-standards.md](coding-standards.md#styling)).
-5. **States are direction, not mood.** Empty screens invite an action, errors say what
-   happened and what to do next, loading looks like the thing that is loading.
-6. **Strings are design material.** Copy is designed like spacing, written from the user's
-   side of the screen, and ships through the i18n layer from day one (§7).
+## 2. Kimlik
 
-## 2. Identity
+Kurul, adını toplanıp karar alan ve işi bölüşen heyetten alır — ve v0.2.0'a kadar projeye ilk
+adını veren _kurultay_'dan: boyların toplandığı, sancakların dikildiği, meselelerin karara
+bağlandığı büyük meclis. Kimlik hâlâ _bu_ dünyadan gelir — sancak, damga, bozkır — jenerik
+prodüktivite-aracı dilinden değil. Ad kısaldı, görsel dil değişmedi.
 
-Kurul is named for the council that convenes, decides, and divides the work — and, until
-v0.2.0, for the _kurultay_ that gave the project its first name: the grand assembly where
-clans gather, banners are planted, matters are decided. The identity still comes from _that_
-world — banner (_sancak_), seal (_damga_), steppe — not from generic productivity-tool
-language. The name got shorter; the visual language did not change.
+**Signature eleman — sancak rail'i:** o an aktif olan neyse onun leading edge'inde 2px'lik bakır
+renginde bir çizgi (aktif sidebar öğesi, focus'taki column, seçili kart, açık panelin leading
+edge'i, bir drag sırasındaki insertion point). App chrome'da signature rengin tam yoğunlukta
+göründüğü tek yerdir ve _hareket eder_ — yanıp sönmek yerine pozisyonlar arasında kayarak geçer.
+Renkli bir header veya tonlanmış bir background yerine bu seçildi çünkü layout'a hiçbir maliyeti
+yok, 36px satır yüksekliğinde hayatta kalıyor, yoğun bir column'da anında okunuyor — ve kelimenin
+tam anlamıyla meclisin toplandığı yere dikilen sancaktır. Board'da seçili task kart bir istisna:
+rail'i kartlar arasında kayan değil, kartın kendi sol edge'ine sabit; sidebar'daki hareketli rail
+değişmedi.
 
-**Signature element — the sancak rail:** a 2px copper rule on the leading edge of whatever is
-currently in play (active sidebar item, focused column, selected card, the open panel's
-leading edge, the insertion point during a drag). It is the only place the signature color
-appears at full strength in the app chrome, and it _moves_, sliding between positions rather
-than blinking. Chosen over a colored header or tinted background because it costs no layout,
-survives at 36px row height, reads instantly in a dense column — and is literally the banner
-planted where the assembly is meeting. On the board, the selected task card is an exception: its
-rail is fixed to the card's own left edge instead of sliding between cards, and the sidebar's
-moving rail is unchanged.
+Bakır iki güç seviyesinde çalışır ve bu ikisini birbirine karıştırmak, bu dokümanın önlemek için
+var olduğu kusurdur.
 
-Copper works at two power levels, and mixing them up is the defect this document exists to prevent.
+**Tam güç** (`--primary` ile `--signature` her temada aynı hex'i paylaşır) uygulamanın en nadir
+rengidir: **ekran başına en fazla iki kullanım**, sancak rail'i, artı, varsa o view'ın tek
+primary action button'ı. Bu sayıma üçüncü bir kullanım olarak girmeyen, muaf tutulan dört şey
+vardır. **Focus ring** de tam güçtedir, ama yapısı gereği tekildir ve geçicidir: tek seferde tek
+bir elemanda, yalnızca o eleman focus'u tuttuğu sürece, bu yüzden rail'in yanında ikinci bir
+işaret olarak durmaz, o elemanın zaten taşıdığı işaretin yerine geçer. Bir **data işareti**
+(bir meter fill'i, bir progress fill'i, grafiğin tek `--signature` **emphasis** serisi, §8) tam
+güçte çizilir çünkü o, ekranın etrafındaki chrome'u değil, gösterilen değerin kendisidir; bu
+yüzden bir settings sayfası, kendi tek copper Invite button'ının yanında bir copper progress
+bar'ı, üçüncü bir chrome kullanımı harcamadan taşıyabilir. Ve **body metni içindeki bir link** ile
+**wordmark'taki ya da bir empty state'teki damga mark'ı**, birbirininkiyle aynı gerekçeyle aynı
+muafiyeti taşır: ikisi de rail veya primary button ile yarışan bir chrome değildir, bu yüzden bir
+sayfa sayım hiç kıpırdamadan ikisinden birden birkaç tane taşıyabilir: auth ekranlarının
+(rail hiç yokken kendi damga mark'ının yanında iki üç copper link) onları zaten böyle saydığı
+gibi. Sidebar wordmark'ı bugün hiçbir mark taşımıyor: `--foreground` içinde `title` adımında
+Fraunces'tir (`components/layout/sidebar-body.tsx`), yani bir settings ekranı bu sayıma karşı
+kendi rail'i ve tek button'ı dışında hiçbir şey harcamaz.
 
-**Full strength** (`--primary` and `--signature` share one hex per theme) is the app's rarest
-color: **at most two uses per screen**, the sancak rail plus, on a view that has one, its single
-primary action button. Four things are exempt from that count rather than reading as a third use
-of it. The **focus ring** is full strength too, but it is singular and transient by construction:
-on exactly one element, only for as long as that element holds focus, so it never stands beside
-the rail as a second mark, it replaces whatever mark that element already carried. A **data mark**
-(a meter fill, a progress fill, the chart's one `--signature` **emphasis** series, §8) draws full
-strength because it _is_ the value being shown, not chrome describing the screen around it, so a
-settings page can carry a copper progress bar next to its one copper Invite button without
-spending a third chrome use. And **a link inside body copy** and **the damga mark on the wordmark
-or an empty state** carry the identical exemption for the identical reason as each other: neither
-is chrome contending with the rail or the primary button, so a page can carry several of either at
-once without the count moving, the way the auth screens (two or three copper links beside their
-own damga mark, no rail in sight) already counted them. The sidebar wordmark carries no mark
-today: it is Fraunces at `title` in `--foreground` (`components/layout/sidebar-body.tsx`), so a
-settings screen spends nothing against the count but its rail and its one button.
+**Tint** (`--signature-subtle`) hiçbir zaman tam güce ulaşmaz ve bu bütçeye de girmez, ama
+bedava bir dekorasyon değildir: tam olarak tek bir role bağlıdır, **aktif veya seçili**, o anda
+o durumda olan satır, kart, drop-target column veya panel her neyse onun üzerinde. Bir ekran
+aynı anda birden fazla elemanı bu şekilde tint'leyebilir, bir multi-select'teki her seçili satır
+gibi, iki kullanımlık bütçeyi harcamadan, çünkü tint kimliği değil durumu işaretler.
 
-**Tint** (`--signature-subtle`) never reaches full strength and never joins that budget either,
-but it is not free decoration: it is bound to exactly one role, **active or selected**, on
-whatever row, card, drop-target column or panel currently holds that state. A screen may tint
-several elements this way at once, every selected row in a multi-select, without spending the
-two-use budget, because tint marks state, not identity.
+| Signature bakır nerede görünebilir                                                                                 | Nerede görünmemeli                                             |
+| ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| Sancak rail'i (aktif / seçili / drop target)                                                                       | Sayfa veya section background'ları, header'lar, hero wash'ları |
+| View'ın tek primary action button'ı                                                                                | Secondary ve tertiary button'lar                               |
+| Focus ring, yukarıdaki gibi muaf · meter, progress fill'leri ve grafiğin emphasis serisi, data işareti olarak muaf | Kart border'ları, divider'lar, tablo header'ları               |
+| Body metni içindeki link'ler                                                                                       | Label'lar, priority badge'leri, status badge'leri, avatar'lar  |
+| Wordmark ve empty-state mark'ları                                                                                  | Grafikler, tek **emphasis** serisi dışında                     |
 
-| Signature copper may appear                                                                                   | Must not appear                                   |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| The sancak rail (active / selected / drop target)                                                             | Page or section backgrounds, headers, hero washes |
-| The view's one primary action button                                                                          | Secondary and tertiary buttons                    |
-| The focus ring, exempt as above · meter, progress fills and the chart's emphasis series, exempt as data marks | Card borders, dividers, table headers             |
-| Links inside body copy                                                                                        | Labels, priority badges, status badges, avatars   |
-| Wordmark and empty-state marks                                                                                | Charts, except as the single **emphasis** series  |
+Her iki güç seviyesinde de iki kural geçerlidir. **Tonlanmış bir zemin üstünde renkli metin
+olmaz**: tint'lenmiş bir satır veya drop-target column, anlamını bir dot veya bir ikonda taşır,
+asla tint'in üstüne yatırılmış renkli bir label'da değil (§8, grafik legend'ları için aynı
+kuralı yazar: "metin text token giyer, asla series hue'sunu değil"). Ve **bakır metin
+`--accent` üzerine hiç konmaz**: açık temada orada 4.28:1 ölçülür (§3), yani 4.5:1 metin
+tabanının altında; kural bu yüzden bir taban değil bir yasak olarak yazılıdır, üstelik
+`--accent` chrome'un kendi hover adımıdır ve üstündeki bakır bir link gibi değil, kimliğin
+mobilyaya sızması gibi okunur.
 
-Two rules hold at either power level. **No colored text sits on a tinted ground**: a tinted row
-or drop-target column carries its meaning in a dot or an icon, never in a colored label laid over
-the tint (§8 states the identical rule for chart legends: "text wears text tokens, never the
-series hue"). And **copper text never sits on `--accent`**: it measures 4.28:1 there in light
-mode (§3), a number that would clear AA on its own, but the rule is written as a ban rather than
-a floor, because `--accent` is chrome's own hover step, and copper on it reads as identity
-leaking into furniture rather than as a link.
+Aynı anda iki tam güç işaret görünüyorsa ve bunlar rail ile o view'ın tek primary action'ı
+değilse, biri yanlıştır.
 
-If two full-strength marks are visible at once and they are not the rail and that view's one
-primary action, one is wrong.
+| İkonografi                                              | Kural                                                                                                                                                                                   |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wordmark, empty state'ler, auth ve marketing görselleri | **Damga esinli mark'lar** — 24px grid üzerinde geometrik, tek stroke'lu tamga formları, 1.5px stroke, surface başına bir tane, maksimum 96px. El yapımı SVG; asla bir ürün ikonu değil. |
+| Tüm ürün arayüzü                                        | **lucide** (shadcn/ui ile birlikte gelir) — dense satırlarda 16px, sidebar'da 20px, 1.5px stroke, yalnızca `currentColor`                                                               |
 
-| Iconography                                    | Rule                                                                                                                                                             |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Wordmark, empty states, auth and marketing art | **Damga-inspired marks** — geometric single-stroke tamga forms on a 24px grid, 1.5px stroke, one per surface, max 96px. Hand-authored SVG; never a product icon. |
-| All product UI                                 | **lucide** (ships with shadcn/ui) — 16px in dense rows, 20px in the sidebar, 1.5px stroke, `currentColor` only                                                   |
+**Anti-brief.** Bilinçli olarak _şu değil_: serif bir font ve kiremit rengi bir accent'le sıcak
+krem bir ground; asit bir accent'le neredeyse siyah; sıfır radius'ta broadsheet hairline'ları.
+Kurul'un nötrleri bilinçli olarak soğuk yeşil-gri akar — tam olarak sıcak bakırın karşısına
+oturacağı bir şey olsun diye; sıcak bir ground üzerinde sıcak bir accent hem şu anki varsayılan
+görünüm hem de accent'i kaybettirmenin bir yolu.
 
-**Anti-brief.** Deliberately _not_: warm-cream ground with a serif and terracotta accent;
-near-black with an acid accent; broadsheet hairlines at zero radius. Kurul's neutrals run
-cool green-gray precisely so the warm copper has something to sit against — warm accent on
-warm ground is both the current default look and a way to make the accent vanish.
+## 3. Tasarım token'ları
 
-## 3. Design tokens
+`components/ui/`'ın değiştirilmemiş generated output olarak kalması için
+shadcn/ui CSS-variable konvansiyonuna göre adlandırıldı. **Dikkat:** shadcn'in kendi
+vokabülerinde `--primary` marka action rengidir ve `--accent` ise subtle hover surface'idir; bu
+yüzden Kurul'un signature bakırı `--primary`'dir ve `--accent` sakin bir nötr tint olarak
+kalır. shadcn'in variable'larını yeniden adlandırma.
 
-Named to the shadcn/ui CSS-variable convention so `components/ui/`
-stays unmodified generated output. **Caution:** in shadcn's vocabulary `--primary` is the
-brand action color and `--accent` is the subtle hover surface, so Kurul's signature copper
-is `--primary` and `--accent` stays a quiet neutral tint. Do not rename shadcn's variables.
+### Nötrler ve accent
 
-### Neutrals and accent
+Düşük kroma bir yeşil-gri ("felt") ramp'i. Açık temanın canvas'ı bir gri adımıdır ve kartlar
+beyazdır, bu yüzden elevation shadow olmadan okunur.
 
-A low-chroma green-gray ("felt") ramp. Light mode's canvas is a step of gray and cards are
-white, so elevation reads without shadows.
+| Rol                                                                    | Token                           | Açık                   | Koyu                  |
+| ---------------------------------------------------------------------- | ------------------------------- | ---------------------- | --------------------- |
+| Canvas                                                                 | `--background`                  | `#F7F8F7`              | `#131715`             |
+| Column ground'u                                                        | `--muted`                       | `#F1F3F1`              | `#1A1E1C`             |
+| Kart surface'i                                                         | `--card`                        | `#FFFFFF`              | `#212523`             |
+| Popover surface'i                                                      | `--popover`                     | `#FFFFFF`              | `#272B29`             |
+| Hover adımı (drag preview kart surface'inde kalır, `--elevation-drag`) | `--accent`                      | `#EAEDEA`              | `#2F3331`             |
+| Border · border-strong (`--input`, `--border-strong`'u okur)           | `--border` · `--border-strong`  | `#D6DAD8` · `#7D8481`  | `#3A403D` · `#767D7A` |
+| Metin, primary                                                         | `--foreground`                  | `#212523`              | `#E8ECEA`             |
+| Metin, secondary                                                       | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
+| Metin, muted                                                           | `--muted-foreground`            | `#626965`              | `#A0A8A4`             |
+| Primary action surface'i · hover                                       | `--primary` · `--primary-hover` | `#A85A28` · `#964F23`  | `#D98A4E` · `#E0955B` |
+| Primary üzerinde metin                                                 | `--primary-foreground`          | `#FFFFFF`              | `#131715`             |
+| Rail, focus ring, link                                                 | `--signature`, `--ring`         | `#A85A28`              | `#D98A4E`             |
+| Signature tint (seçili satır, drop zone)                               | `--signature-subtle`            | `#F2E6DA`              | `#37291D`             |
+| Destructive action hover'ı                                             | `--destructive-hover`           | `#B0241C`              | `#B8524A`             |
+| Dialog ve drawer backdrop'u                                            | `--overlay-scrim`               | `rgb(25 28 27 / 0.38)` | `rgb(5 7 6 / 0.7)`    |
 
-| Role                                                                 | Token                           | Light                  | Dark                  |
-| -------------------------------------------------------------------- | ------------------------------- | ---------------------- | --------------------- |
-| Canvas                                                               | `--background`                  | `#F7F8F7`              | `#131715`             |
-| Column ground                                                        | `--muted`                       | `#F1F3F1`              | `#1A1E1C`             |
-| Card surface                                                         | `--card`                        | `#FFFFFF`              | `#212523`             |
-| Popover surface                                                      | `--popover`                     | `#FFFFFF`              | `#272B29`             |
-| Hover step (drag preview stays the card surface, `--elevation-drag`) | `--accent`                      | `#EAEDEA`              | `#2F3331`             |
-| Border · border-strong (`--input` reads `--border-strong`)           | `--border` · `--border-strong`  | `#D6DAD8` · `#7D8481`  | `#3A403D` · `#767D7A` |
-| Text, primary                                                        | `--foreground`                  | `#212523`              | `#E8ECEA`             |
-| Text, secondary                                                      | `--foreground-secondary`        | `#545A57`              | `#BCC3BF`             |
-| Text, muted                                                          | `--muted-foreground`            | `#626965`              | `#A0A8A4`             |
-| Primary action surface · hover                                       | `--primary` · `--primary-hover` | `#A85A28` · `#964F23`  | `#D98A4E` · `#E0955B` |
-| Text on primary                                                      | `--primary-foreground`          | `#FFFFFF`              | `#131715`             |
-| Rail, focus ring, link                                               | `--signature`, `--ring`         | `#A85A28`              | `#D98A4E`             |
-| Signature tint (selected row, drop zone)                             | `--signature-subtle`            | `#F2E6DA`              | `#37291D`             |
-| Destructive action hover                                             | `--destructive-hover`           | `#B0241C`              | `#B8524A`             |
-| Dialog and drawer backdrop                                           | `--overlay-scrim`               | `rgb(25 28 27 / 0.38)` | `rgb(5 7 6 / 0.7)`    |
+Metin token'larının en kötü ölçüldüğü surface (`app/globals.contrast.test.ts`): açık `--foreground`
+12.6:1, `--foreground-secondary` 5.8:1 ve `--muted-foreground` 4.6:1, hepsi `--signature-subtle`
+üzerinde en kötü; koyu `--foreground` 10.8:1, `--foreground-secondary` 7.1:1 ve
+`--muted-foreground` 5.3:1, hepsi `--accent` üzerinde en kötü. Bakır, running text olarak iki
+surface dışında hepsini geçer, ikisi de açık temada, ikisi de tabanın kaydırılması değil kayıtlı
+bir istisna: hover adımında 4.28:1, orada hiçbir call site bakır metin çizmiyor, ve signature
+tint'te 4.11:1, bu açıkça yasak (aşağıda); koyu temada altısını da geçer, `--accent` üzerinde en
+kötü 4.70:1. Bir fill olarak, `--primary` üzerindeki `--primary-foreground` açık temada beyazı
+5.05:1'de, koyu temada ink'i 6.63:1'de taşıyor; koyu temada bu sayı, canvas üzerinde okunanla
+aynı, çünkü `--primary-foreground` ile `--background` orada aynı hex'i paylaşıyor.
 
-Text worst-surface ratios, named to the surface each measures worst on
-(`app/globals.contrast.test.ts`): light `--foreground` 12.6:1, `--foreground-secondary` 5.8:1 and
-`--muted-foreground` 4.6:1, all worst on `--signature-subtle`; dark `--foreground` 10.8:1,
-`--foreground-secondary` 7.1:1 and `--muted-foreground` 5.3:1, all worst on `--accent`. Copper as
-running text clears every surface but two, both light, both a recorded exemption rather than a
-floor moved: 4.28:1 on the hover step, where no call site draws copper text, and 4.11:1 on the
-signature tint, forbidden outright (below); dark clears all six, 4.70:1 worst on `--accent`. As a
-fill, `--primary-foreground` on `--primary` carries white at 5.05:1 in light and ink at 6.63:1 in
-dark, the same number dark reads on the canvas since `--primary-foreground` and `--background`
-share one hex there.
+`--signature-subtle` hiçbir zaman bakır (`--primary`, `--signature`) metin taşımaz: yukarıdaki
+istisna bir kuraldır, bir tasarım izni değil, ve `app/globals.contrast.test.ts` bunu böyle tutmak
+için her run'da tüm call site'ları yeniden tarar. Nötr `--foreground` metni izinlidir ve diğer her
+surface gibi ona karşı ölçülür, açık temada 12.6:1, koyu temada 11.8:1.
 
-`--signature-subtle` never carries copper (`--primary`, `--signature`) text: the exemption above
-is the rule, not a design allowance, and `app/globals.contrast.test.ts` rescans every call site on
-each run to keep it that way. Neutral `--foreground` text is allowed and is measured against it
-like any other surface, 12.6:1 in light and 11.8:1 in dark.
+### Semantik skalalar — status ve priority
 
-### Semantic scales — status and priority
+Rezerve edilmiş tek bir severity ailesi ikisine de hizmet eder, her zaman bir **ikon ve bir
+kelimeyle** birlikte shiplenir, asla yalnızca renkle değil. priority, label'lardan ayrı tutulan
+sıralı bir skalerdir; sırası artan kroma ile taşınır, böylece renk körlüğünden, grayscale
+baskıdan ve sesli tarif edilmekten sağ çıkar.
 
-One reserved severity family serves both, always shipped with an **icon and a word**, never
-color alone. Priority is an ordered scalar kept separate from labels; its order is carried by
-escalating chroma, so it survives colorblindness, grayscale print, and being described aloud.
+| Anlam                            | priority | Token                                 | Açık      | Koyu      | `--card` üzerinde kontrast, A / K | İkon           |
+| -------------------------------- | -------- | ------------------------------------- | --------- | --------- | --------------------------------- | -------------- |
+| Nötr / inaktif                   | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9                         | `chevron-down` |
+| Bilgi                            | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9                         | `minus`        |
+| İyi / tamamlandı                 | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7                         | `check`        |
+| Uyarı / süresi yaklaşıyor        | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8                         | `chevron-up`   |
+| Tehlike / gecikmiş / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8                         | `chevrons-up`  |
 
-| Meaning                        | Priority | Token                                 | Light     | Dark      | Contrast on `--card`, L / D | Icon           |
-| ------------------------------ | -------- | ------------------------------------- | --------- | --------- | --------------------------- | -------------- |
-| Neutral / inactive             | `LOW`    | `--priority-low`                      | `#6B726E` | `#8A928E` | 4.9 / 4.9                   | `chevron-down` |
-| Info                           | `MEDIUM` | `--status-info`, `--priority-medium`  | `#3F6B99` | `#6BA3E8` | 5.6 / 5.9                   | `minus`        |
-| Good / done                    | -        | `--status-good`                       | `#1D7349` | `#3FBF85` | 5.8 / 6.7                   | `check`        |
-| Warning / due soon             | `HIGH`   | `--status-warning`, `--priority-high` | `#8A5A00` | `#D9A227` | 5.9 / 6.8                   | `chevron-up`   |
-| Danger / overdue / destructive | `URGENT` | `--status-danger`, `--destructive`    | `#C0281F` | `#F47A73` | 5.9 / 5.8                   | `chevrons-up`  |
+priority, full-kroma bir ikon artı metin olarak render edilir; label'lar ise renkli bir nokta ile
+tonlanmış bir chip olarak render edilir — farklı ağırlıklar, böylece kırmızı bir priority ile
+kırmızı bir label asla aynı okunmaz. `Label.color` bir hex değil, bir **slot adı** (`slot-1`…
+`slot-8`) saklar, böylece bir label'ın chip'i ile bir grafikteki bar'ı, temaya göre resolve
+edilen tek bir identity olur (§8).
 
-Priority renders as a full-chroma icon plus text; labels render as a tinted chip with a
-colored dot — different weights, so a red priority and a red label never read alike.
-`Label.color` stores a **slot name** (`slot-1`…`slot-8`), never a hex, so a label's chip and
-its bar in a chart are one identity resolved per theme (§8).
+### Tipografi
 
-### Typography
+Open-source, self-hostable, komple Latin Extended-A: Turkish (`ı İ ğ ş ç ö ü`) doğru render
+edilmelidir çünkü ilk çeviri paketi budur — bu gereksinim, moda display font'larının çoğunu
+elemiştir. Üçü de build time'da `next/font/google` ile self-hosted'dır (Next font dosyalarını
+indirir ve gömer — binary font asset'lerini repoya commit etmeden `next/font/local` ile
+eşdeğer). Üç fontun `next/font` `.variable` sınıfları `<body>`'de değil `<html>`'dedir: bu
+değişkenlere referans veren token stack'leri (`app/globals.css`'teki `--font-sans`,
+`--font-display`, `--font-mono`) `var()` çağrılarını `:root` üzerinde çözer, bir custom property
+da yalnızca kendisini tanımlayan öğeye karşı çözülür, dolayısıyla `<body>`'ye konan bir değişken
+doğrudan fallback fontlara düşer.
 
-Open-source, self-hostable, complete Latin Extended-A: Turkish (`ı İ ğ ş ç ö ü`) must render
-correctly since it is the first translation pack — a requirement that eliminated most of the
-fashionable display faces. All three are self-hosted at build time via `next/font/google`
-(Next downloads and embeds the files — equivalent to `next/font/local` without committing
-binary font assets to the repo). The three faces' `next/font` `.variable` classes live on
-`<html>`, not `<body>`: the token stacks that reference them (`--font-sans`, `--font-display`,
-`--font-mono` in `app/globals.css`) resolve their `var()` calls on `:root`, and a custom
-property resolves only against the element that defines it, so a variable placed on `<body>`
-falls straight through to the fallback fonts.
+| Rol       | Font                                                         | Nerede                                                                                                                                                                                                                                                                      | Neden bu                                                                                                                                                                                                                                          |
+| --------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Display   | **Fraunces** (variable, OFL), `WONK 0 SOFT 0`, yüksek `opsz` | Wordmark, auth, marketing, empty-state headline'ları, board'un kendi zero-column ve zero-board state'leri dahil, çünkü bir empty state nerede render edilirse edilsin bir headline'dır. Board içeriğinin kendisinde asla: kart title'ları, column header'ları, hücre metni. | Kaligrafik değil, high-contrast ve oyulmuş gibi — bir mühüre kazınmış bir şey gibi okunuyor, ki bu tam olarak _damga_ register'ı. Axis'leri quirk'i sıfıra çekip yalnızca gravürü tutmamızı sağlıyor.                                             |
+| Body / UI | **Archivo** (variable, OFL)                                  | Üründeki her şey                                                                                                                                                                                                                                                            | Bir signage grotesque: yüksek x-height, ekonomik genişlikler, 12–13px'te okunaklı. Bir board, dar column'larda yüzlerce kısa string demek — bir signage problemi. Doğru olan ama framework varsayılanı gibi okunan Inter ve Geist yerine seçildi. |
+| Mono      | **JetBrains Mono** (OFL), `0.92em`                           | Id'ler, shortcut'lar, kod                                                                                                                                                                                                                                                   | Belirsiz olmayan `0/O` ve `1/l/I` — bir stil tercihi değil, bir UUIDv7 okunabilirlik aracı                                                                                                                                                        |
 
-| Role      | Face                                                       | Where                                                                                                                                                                                                                                        | Why this one                                                                                                                                                                                                                             |
-| --------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Display   | **Fraunces** (variable, OFL), `WONK 0 SOFT 0`, high `opsz` | Wordmark, auth, marketing, empty-state headlines, the board's own zero-column and zero-board states included, since an empty state is a headline wherever it renders. Never on board content itself: card titles, column headers, cell text. | High-contrast and carved rather than calligraphic — it reads like something stamped into a seal, which is the _damga_ register. Its axes let us dial the quirk to zero and keep only the engraving.                                      |
-| Body / UI | **Archivo** (variable, OFL)                                | Everything in the product                                                                                                                                                                                                                    | A signage grotesque: tall x-height, economical widths, legible at 12–13px. A board is hundreds of short strings in narrow columns — a signage problem. Chosen over Inter and Geist, which are correct but read as the framework default. |
-| Mono      | **JetBrains Mono** (OFL), `0.92em`                         | Ids, shortcuts, code                                                                                                                                                                                                                         | Unambiguous `0/O` and `1/l/I` — a UUIDv7 legibility tool, not a style choice                                                                                                                                                             |
-
-| Step                   | Size / line       | Weight    | Use                                                                                |
+| Adım                   | Boyut / satır     | Weight    | Kullanım                                                                           |
 | ---------------------- | ----------------- | --------- | ---------------------------------------------------------------------------------- |
-| `display`              | 40 / 44           | 600       | One per auth or marketing screen                                                   |
-| `stat`                 | 28 / 32           | 600       | The stat tile's value, and nothing else (§8); proportional figures, never Fraunces |
-| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Page and panel titles · section and dialog titles                                  |
-| `read`                 | 14 / 21           | 400       | Long-form prose: task description, comment body, import report sentences           |
-| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline**: fields and rows · card titles, active nav                         |
-| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamps · chips, counts, axis ticks                                   |
+| `display`              | 40 / 44           | 600       | Auth veya marketing ekranı başına bir tane                                         |
+| `stat`                 | 28 / 32           | 600       | Stat tile'ın value'su, başka hiçbir yer (§8); proportional rakamlar, asla Fraunces |
+| `title-lg` · `title`   | 20 / 28 · 16 / 24 | 600       | Sayfa ve panel başlıkları · section ve dialog başlıkları                           |
+| `read`                 | 14 / 21           | 400       | Uzun prose: task description, comment body, import report cümleleri                |
+| `body` · `body-strong` | 13 / 18           | 400 · 550 | **UI baseline**: field'lar ve satırlar · kart başlıkları, aktif nav                |
+| `small` · `micro`      | 12 / 16 · 11 / 14 | 400       | Metadata, timestamp'ler · chip'ler, count'lar, axis tick'leri                      |
 
-This is the whole scale, with no gap left for a Tailwind default to fill unnoticed: `text-sm`,
-`text-lg`, `text-xs` and `font-medium` are gone from the component tree, and
-`app/theme-classes.test.ts` holds two separate gates on that claim. One compiles every `text-`,
-`bg-`, `border-`, `font-` and `shadow-` class through Tailwind and fails the build on one that
-resolves to nothing: a typo, never a live Tailwind default, since a default compiles clean and
-would pass that gate quietly. The other denies Tailwind's own size and weight scale by name
-(`text-xs` through `text-9xl`, `font-thin` through `font-black`) against a short, reasoned
-exception list, so a reintroduced default is caught even though it compiles. That list is three
-rows and they are all the same row: `text-base` on the three mobile form fields below.
-`font-semibold` had fourteen call sites, every one a heading restating the 600 its own
-`--text-*--font-weight` already carried, and all fourteen are gone, so the ban on it carries no
-exception at all. `text-lg` becomes `title` (16/24) at every call site, `DialogTitle`
-included: a dialog's title is a section title, not a size of its own, and there is no `18px`
-step for it to have kept. `text-xs` becomes `small` (12/16), never `micro` (11/14): its two call
-sites were a button label and a keyboard-shortcut hint, neither one metadata small enough for the
-smallest step. `font-medium` becomes `font-strong` (550) throughout. Only the four heading steps
-(`display`, `stat`, `title-lg`, `title`) declare a `--text-*--font-weight`; `read`, `body`,
-`small` and `micro` declare a size and a line box and nothing else, so they render at the
-inherited 400. That is what `body-strong` names: `text-body` paired with `font-strong` at the
-call site, not a step of its own. `micro` is paired the same way in the two places it needs to
-be heavier, the board's filter count and the notification bell, and left alone in the eleven
-where it is metadata. The label and the dialog
-title both carry their own step's line-height now, 18px and 24px, with no `leading-none` layered
-on top: that was a shadcn default riding along uninvited, not a choice this scale ever asked for.
-(Tailwind's own `text-base`, 16px, stays as a deliberate exception on three form fields below
-768px, §4, not a gap in this scale.)
+Bu ölçeğin tamamı budur, bir Tailwind varsayılanının fark edilmeden dolduracağı bir boşluk
+bırakmaz: `text-sm`, `text-lg`, `text-xs` ve `font-medium` component ağacından tamamen kalktı, ve
+`app/theme-classes.test.ts` bu iddia üzerinde iki ayrı kapı taşıyor. Biri ağaçtaki her `text-`,
+`bg-`, `border-`, `font-`, `shadow-` ve `rounded-` class'ını (test olmayan `.tsx` dosyalarında)
+Tailwind üzerinden derleyip hiçbir şey üretmeyen birini build'i kırarak yakalıyor: bu bir typo'dur, asla canlı bir Tailwind varsayılanı değil,
+çünkü bir varsayılan temiz derlenir ve bu kapıyı sessizce geçerdi. Diğeri, Tailwind'in kendi
+size ve weight skalasını (`text-xs`'ten `text-9xl`'e, `font-thin`'den `font-black`'e) kısa,
+gerekçeli bir istisna listesine karşı isim bazında yasaklıyor, böylece geri dönen bir varsayılan
+derlense bile yakalanıyor. O liste üç satır ve üçü de aynı satır: aşağıdaki üç mobil form
+field'inde `text-base`. `font-semibold`'ün on dört çağrı yeri vardı, hepsi kendi
+`--text-*--font-weight`'inin zaten taşıdığı 600'ü tekrar eden bir heading'di ve on dördü de
+kalktı, dolayısıyla ona konan yasağın hiç istisnası yok. `text-lg`, her çağrı
+yerinde `title` (16/24) oluyor, `DialogTitle` dahil: bir dialog'un başlığı bir section
+başlığıdır, kendine ait bir boyut değil, ve zaten `18px`'lik bir adım hiç olmadı. `text-xs`,
+`small` (12/16) oluyor, asla `micro` (11/14) değil: iki çağrı yeri de bir button label'ı ve bir
+keyboard-shortcut ipucuydu, ikisi de en küçük adıma sığacak kadar metadata değil. `font-medium`
+her yerde `font-strong` (550) oluyor. Yalnızca dört heading adımı (`display`, `stat`,
+`title-lg`, `title`) kendi `--text-*--font-weight`'ini bildiriyor; `read`, `body`, `small` ve
+`micro` bir boyut ve bir satır kutusu bildiriyor, başka bir şey değil, dolayısıyla miras alınan
+400'de render ediliyorlar. `body-strong`'un adlandırdığı şey de bu: kendine ait bir adım değil,
+çağrı yerinde `font-strong` ile eşlenmiş `text-body`. `micro` da daha kalın olması gereken iki
+yerde, board'un filter count'unda ve notification bell'inde aynı şekilde eşleniyor, metadata
+olduğu on bir yerde ise kendi haline bırakılıyor. Label ve dialog başlığı artık kendi adımlarının
+line-height'ını taşıyor, 18px ve 24px, üstüne binmiş bir `leading-none` olmadan: o, davetsiz
+misafir bir shadcn varsayılanıydı, bu ölçeğin hiç istediği bir seçim değildi. (Tailwind'in kendi
+`text-base`'i, 16px, 768px altındaki üç form field'inde bilinçli bir istisna olarak kalıyor,
+§4, bu ölçekte bir boşluk değil.)
 
-`read` (14/21, weight 400) is a closed list on purpose, not a general prose size: task
-description, comment body, and import report sentences carry it, nowhere else. Board cards stay
-`body` (13/18) even where they show a description snippet. `text-read-utilities.test.ts` scans
-`app/`, `components/` and `lib/` for the literal utility class and fails the build the moment a
-fourth _file_ adds itself; it compares file paths, which is why `import-report-panel.tsx` can
-carry two of today's four occurrences without moving the gate, the same technique
-`border-utilities.test.ts` already uses for its own closed lists.
+`read` (14/21, weight 400) bilinçli olarak kapalı bir listedir, genel bir prose boyutu değil:
+task description, comment body ve import report cümleleri onu taşır, başka hiçbir yerde. Kart'lar,
+bir description snippet'i gösterseler bile `body` (13/18) kalır. `text-read-utilities.test.ts`,
+`app/`, `components/` ve `lib/`'i literal utility class için tarar ve dördüncü bir _dosya_
+eklendiği an build'i kırar; karşılaştırdığı şey dosya yolları olduğu için
+`import-report-panel.tsx` bugünkü dört occurrence'ın ikisini gate'i kıpırdatmadan taşıyabiliyor.
+`border-utilities.test.ts`'in kendi kapalı listeleri için zaten kullandığı aynı teknik.
 
-`tabular-nums` on columns of numbers, axis ticks, and table cells — never on a hero figure or
-a stat-tile value.
+`tabular-nums`, sayı column'larında, axis tick'lerinde ve tablo hücrelerinde — asla bir hero
+figure veya bir stat-tile değeri üzerinde değil.
 
 ### Spacing, radius, elevation
 
-| System    | Values                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spacing   | `2 · 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 48`: a 4px base with a 2px half-step; the half-step is what makes a dense row survive                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Radius    | `sm 4` chips · `md 6` buttons, inputs, cards · `lg 10` panels, dialogs · `full` avatars. Tighter than the shadcn default; large radii read soft and cost usable width.                                                                                                                                                                                                                                                                                                                                                                      |
-| Border    | 1px hairline `--border`; 2px only for the sancak rail, focus rings, and the task card's own left edge (`--border` at rest, `--signature` when the card is selected)                                                                                                                                                                                                                                                                                                                                                                         |
-| Elevation | **Borders first, shadows last.** The card is always one step above the column ground (`--muted`); the column ground itself steps away from the canvas toward that theme's floor, down in light and up in dark. Real shadows exist in four places, dialogs, popovers, the drag preview and the hairline `shadow-xs` on `Input`, `Select`, `Textarea` and the outline `Button`; in dark the first three also carry a 1px `--border-strong` ring inside the shadow, since a shadow alone does not read once the surface under it is this dark. |
+| Sistem    | Değerler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spacing   | `2 · 4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 48`: 2px'lik bir half-step'e sahip 4px'lik bir base; dense bir satırı hayatta tutan şey bu half-step                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Radius    | `sm 4` chip'ler · `md 6` button'lar, input'lar, kart'lar · `lg 10` panel'ler, dialog'lar · `full` avatar'lar. shadcn varsayılanından daha sıkı; büyük radius'lar yumuşak okunur ve kullanılabilir genişlikten çalar.                                                                                                                                                                                                                                                                                                                                    |
+| Border    | 1px hairline `--border`; 2px yalnızca sancak rail'i, focus ring'ler ve task kartın kendi sol kenarı için (durağanken `--border`, kart seçiliyken `--signature`)                                                                                                                                                                                                                                                                                                                                                                                         |
+| Elevation | **Önce border'lar, en son shadow'lar.** Kart her zaman column ground'unun (`--muted`) bir adım üstündedir; column ground'un kendisi canvas'tan, o temanın tabanına doğru bir adım uzaklaşır: açık temada aşağı, koyu temada yukarı. Gerçek shadow'lar dört yerde var: dialog'lar, popover'lar, drag preview ve `Input`, `Select`, `Textarea` ile outline `Button` üzerindeki hairline `shadow-xs`; koyu temada ilk üçü ayrıca shadow'un içinde 1px'lik bir `--border-strong` ring'i taşır, çünkü surface bu kadar koyuyken shadow tek başına okunmuyor. |
 
-## 4. Layout and density
+## 4. Yerleşim ve yoğunluk
 
-App shell per the `(app)` route group in [architecture.md §4](architecture.md#4-appsweb--structure).
+App shell, [architecture.md §4](architecture.md#4-appsweb--yapı)'teki `(app)` route group'una
+göre.
 
-| Region             | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell height       | Exactly `100dvh`, `overflow: hidden` — never `min-height`. Every page owns its own scroller.                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Sidebar            | 240px, workspace switcher pinned at top; collapses to a 56px icon rail below 1280px and on demand; off-canvas below 768px                                                                                                                                                                                                                                                                                                                                                                          |
-| Topbar             | 48px sticky — board name, filter entry, overflow (presence avatars are not shipped yet); **56px below 768px**, where it also carries the navigation trigger                                                                                                                                                                                                                                                                                                                                        |
-| Board canvas       | Full-bleed, horizontal scroll; column headers stick on vertical scroll                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Column             | 300px fixed (280 min / 320 max on wide screens), 12px gap, 40px sticky header with name + count + `⋯` (48px below 768px); below 48rem a column is 85vw and the strip snaps to it (mandatory scroll snap), with 24px edge masks (`--background` fading to transparent) drawn on whichever side still has a column to scroll to                                                                                                                                                                      |
-| Card               | 8px 12px padding plus a 32px right gutter for the drag grip (48px below 768px); 6px between the title block and the meta row, 8px between the signals inside it; **36px** title only, **56px** typical (one meta line), **76px** at the clamp: the title clamps at 2 lines, so no card is taller than that. The first three are measured on the seeded board; the clamp figure is measured on a card built for it, a title long enough to wrap onto the second line with a full meta row under it. |
-| Card content order | Priority icon + title · meta row (label dots, due date + estimate combined, assignees), one line, never two                                                                                                                                                                                                                                                                                                                                                                                        |
-| List / table row   | 36px; 44px below 768px                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Settings and forms | 720px max width — prose is read, not scanned                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Touch target       | **44px minimum below 768px** on every control, with one exception, WCAG 2.5.5's own: a link inside a sentence, sized by the line-height of the text around it (the mail-setup link on `/settings/members`, measured 12/16); and a native checkbox, which is measured by its label rather than by its own 14px box, since the label toggles the same input and is what a thumb aims at (`e2e/tests/mobile-navigation.spec.ts`). A checkbox with no label falls through to its own box and fails.    |
+| Bölge                | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell yüksekliği     | Tam olarak `100dvh`, `overflow: hidden` — asla `min-height` değil. Her sayfa kendi scroller'ına sahiptir.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Sidebar              | 240px, üstte pinlenmiş workspace switcher; 1280px altında ve talep üzerine 56px'lik bir icon rail'ine collapse olur; 768px altında off-canvas                                                                                                                                                                                                                                                                                                                                                                        |
+| Topbar               | 48px sticky — geri oku, board adı, overflow (presence avatar'ları henüz gelmedi); board filtreleri topbar'ın altında ayrı bir araç satırında durur; **768px altında 56px**, ve orada gezinme trigger'ını da taşır                                                                                                                                                                                                                                                                                                    |
+| Board canvas         | Full-bleed, horizontal scroll; column header'ları vertical scroll'da sticky kalır                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Column               | 300px fixed (geniş ekranlarda 280 min / 320 max), 12px gap, isim + count + `⋯` içeren 40px sticky header (768px altında 48px); 48rem altında bir column 85vw'dir ve strip ona snap eder (mandatory scroll snap), scroll edilecek column'un kaldığı kenara 24px'lik edge mask (`--background`'dan transparent'a) çizilir                                                                                                                                                                                              |
+| Card                 | 8px 12px padding, artı drag grip'i için 32px sağ kanal (768px altında 48px); title bloğu ile meta satırı arasında 6px, meta satırının içindeki sinyaller arasında 8px; yalnızca title **36px**, tipik **56px** (tek meta satırı), clamp'te **76px**: title 2 satırda clamp'lenir, yani hiçbir kart bundan uzun olmaz. İlk üçü seed'deki board üzerinde ölçüldü; clamp değeri ise bunun için kurulan bir kartta ölçüldü: ikinci satıra taşacak kadar uzun bir title ve altında dolu bir meta satırı.                  |
+| Card içerik sırası   | priority ikonu + title · meta satırı (label dot'ları, birleşik due date + estimate, assignee'ler), tek satır, asla iki değil                                                                                                                                                                                                                                                                                                                                                                                         |
+| List / table satırı  | 36px; 768px altında 44px                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Settings ve form'lar | 720px max width — prose okunur, taranmaz                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Touch target         | **768px altında 44px minimum**, her kontrolde, tek istisnası WCAG 2.5.5'in kendi istisnası: bir cümlenin içindeki, boyutunu çevresindeki metnin line-height'ından alan link (`/settings/members` üzerindeki e-posta kurulum linki, ölçülen 12/16); bir de native checkbox, ki kendi 14px'lik kutusuyla değil, label'ıyla ölçülür, çünkü label aynı input'u toggle eder ve başparmağın nişan aldığı yer odur (`e2e/tests/mobile-navigation.spec.ts`). Label'ı olmayan bir checkbox kendi kutusuna düşer ve fail eder. |
 
-**The shell is exactly one viewport tall, and this is load-bearing.** `min-height: 100dvh`
-would say "at least" and bound nothing below it — which is what it did, and why a column's
-`overflow-y-auto` never clipped: the document grew instead, reaching 27 425px on a 1 000-task
-board. Per-column scrolling, the sticky column header and drag autoscroll all depend on the
-column having a bounded box, so all three were inert. `100dvh` and not `100vh`: on a phone
-`100vh` is the viewport with the browser chrome retracted, so a `vh`-sized shell is taller than
-the screen and pushes the topbar under the address bar on first paint. The consequence to
-respect when adding a page: **the document does not scroll anywhere in the app**, so a new
-route under `(app)` must declare its own `flex-1 overflow-y-auto`, exactly as the dashboard,
-settings and notifications pages do.
+**Shell tam olarak bir viewport yüksekliğindedir ve bu taşıyıcı bir karardır.**
+`min-height: 100dvh` "en az" der ve altındaki hiçbir şeyi sınırlamaz — yaptığı da buydu, ve
+bir column'un `overflow-y-auto`'sunun neden hiç kırpmadığının sebebi budur: belge büyüyordu,
+1 000 task'lık bir board'da 27 425px'e ulaşıyordu. Column başına scroll, sticky column header'ı
+ve drag autoscroll'un üçü de column'un sınırlı bir kutuya sahip olmasına bağlı; dolayısıyla
+üçü de işlevsizdi. `100vh` değil `100dvh`: telefonda `100vh`, browser chrome'u geri çekilmiş
+haldeki viewport'tur, yani `vh` ile boyutlanmış bir shell ekrandan yüksektir ve ilk paint'te
+topbar'ı adres çubuğunun altına iter. Yeni sayfa eklerken uyulacak sonuç: **uygulamanın hiçbir
+yerinde belge scroll etmez**, bu yüzden `(app)` altındaki yeni bir route kendi
+`flex-1 overflow-y-auto`'sunu bildirmek zorundadır — dashboard, settings ve notifications
+sayfalarının yaptığı gibi.
 
-**Below 768px the sidebar is off-canvas** — a hamburger in the topbar opening the same
-`SidebarBody` in a drawer, not a second navigation with its own list of links. The drawer is
-the app's `Dialog` primitive docked to the left edge (`DialogDrawerContent`), which is a
-deliberate refusal to hand-roll one: the focus trap, `Escape`, returning focus to the trigger,
-inerting the page behind and the scroll lock are the whole substance of an off-canvas panel,
-and a parallel implementation is a second place for one of them to be missing. It slides at
-220ms on `--ease-drawer`, and cross-fades instead under `prefers-reduced-motion`.
+**768px altında sidebar off-canvas'tır** — topbar'daki bir hamburger, aynı `SidebarBody`'yi
+bir drawer'da açar; kendi link listesi olan ikinci bir gezinme değil. Drawer, uygulamanın
+`Dialog` primitive'inin sol kenara sabitlenmiş hali (`DialogDrawerContent`), ve bu bilinçli
+bir "elle yazmayı reddetme"dir: focus trap, `Escape`, focus'u trigger'a geri verme, arkadaki
+sayfayı inert kılma ve scroll lock, bir off-canvas panelin bütün özüdür — paralel bir
+implementasyon, bunlardan birinin eksik kalabileceği ikinci bir yerdir. 220ms'de
+`--ease-drawer` ile kayar, `prefers-reduced-motion` altında ise kaymak yerine cross-fade eder.
 
-**44px, not 40, and keyed on width rather than on pointer type.** 44px is WCAG 2.5.5 (AAA) and
-the figure the roadmap holds this layout to. It is keyed on `max-md` — the same breakpoint the
-drawer uses — rather than on `pointer: coarse`, so one condition governs the whole mobile
-layout instead of two that can disagree; a 360px window on a desktop getting 44px targets costs
-nothing. The floor lives in the `Button` and `Input` variants and in the dropdown item classes,
-not at the call sites, so there is one list to read. Sizes above the breakpoint are untouched.
-It is **measured, not asserted**: `e2e/tests/mobile-navigation.spec.ts` sweeps every button,
-link, input and menu item on the board, in the drawer and on `/settings/members` and
-`/settings/account/delete` at 360px and fails on any box under 44px in either axis. jsdom lays
-nothing out, so a unit test cannot make this claim.
+**40 değil 44, ve pointer tipine değil genişliğe bağlı.** 44px, WCAG 2.5.5 (AAA) ve roadmap'in
+bu yerleşimi tuttuğu rakam. `pointer: coarse` yerine drawer'ın kullandığı breakpoint'e —
+`max-md` — bağlıdır: birbiriyle çelişebilecek iki koşul yerine tüm mobil yerleşimi tek bir
+koşul yönetsin diye. Masaüstünde 360px genişliğinde bir pencerenin 44px hedef alması bir şeye
+mal olmaz. Zemin, çağrı yerlerinde değil `Button` ile `Input` variant'larında ve dropdown item
+sınıflarında yaşar; böylece okunacak tek bir liste vardır. Bugün beş yer zemini kendi başına
+veriyor: kart (`task-card.tsx`), drag grip'i (`sortable-task-card.tsx`), filtre chip'i
+(`board-filter-chips.tsx`), sidebar satırı (`sidebar-body.tsx`, `touchTargets` prop'uyla) ve
+checkbox label'ları (`notification-settings.tsx`, `notifications-list.tsx`,
+`task-assignees-section.tsx`, `task-labels-section.tsx`, `searchable-picker.tsx`,
+`checklist-item-row.tsx`); kural onlar için de geçerlidir. Breakpoint üstündeki ölçüler
+değişmez. Ve bu **iddia edilmez, ölçülür**: `e2e/tests/mobile-navigation.spec.ts`, 360px'te
+board'daki, drawer'daki ve `/settings/members` ile `/settings/account/delete` üzerindeki her
+button, link, input ve menu item'ını tarar ve iki eksenden
+birinde 44px'in altındaki her kutuda fail eder. jsdom hiçbir şeyi layout etmediği için bir
+unit test bu iddiayı kuramaz.
 
-**16px below 768px, `body` above it, on every text field.** The same iOS Safari behavior that
-justifies the 44px touch floor also zooms the whole page on focus if the field it lands in
-computes under 16px, and Tailwind's own `text-base` is exactly that threshold: `Input`,
-`Textarea` and `Select` all carry `text-base md:text-body`, so the rule is keyed to the same
-`max-md` breakpoint as everything else in this section rather than judged one primitive at a
-time. It is enforced the same two ways the 44px floor is: measured, and structurally hard to
-regress past. `e2e/tests/mobile-navigation.spec.ts` reads every field's computed `font-size` on
-the board, in the navigation drawer, in the task panel and on the two settings sub-routes at
-360px and fails on anything short of `16px`, and `lib/utils.ts`'s `cn()` extends `tailwind-merge` with this type scale so a consumer's
-own `text-*` override still deduplicates against a primitive's default instead of both classes
-reaching the DOM and stylesheet order deciding which one paints.
+**768px altında her metin field'ında 16px, üstünde `body`.** 44px dokunma tabanını
+gerekçelendiren aynı iOS Safari davranışı, bir field 16px'in altında hesaplanırsa focus'ta
+sayfanın tamamını da zoom'lar; Tailwind'in kendi `text-base`'i tam olarak bu eşik değerdir:
+`Input`, `Textarea` ve `Select` üçü de `text-base md:text-body` taşır, bu yüzden kural, bir
+primitif başına değil, bu bölümdeki her şeyle aynı `max-md` breakpoint'ine bağlıdır. Tıpkı 44px
+tabanı gibi iki şekilde uygulanır: ölçülür, ve yapısal olarak geriye kaymayı zorlaştırır.
+`e2e/tests/mobile-navigation.spec.ts`, 360px'te board'da, navigation drawer'da, task panel'de
+ve iki settings alt rotasında her field'ın hesaplanmış `font-size`'ını okur ve `16px`'in
+altındaki her şeyde fail eder; `lib/utils.ts`'in `cn()`'i, `tailwind-merge`'ü bu tip ölçeğiyle genişletir, böylece bir
+tüketicinin kendi `text-*` override'ı, ikisi birden DOM'a ulaşıp stylesheet sırasının hangisinin
+boyanacağına karar vermesi yerine, bir primitifin varsayılanıyla yine tekilleşir.
 
-**Touch drag is by the grip.** The card body belongs to the column's scroller — the wrapper
-carrying dnd-kit's listeners has no `touch-action`, so the browser claims a vertical gesture
-there — and the grip declares `touch-action: none`, which is what hands that one 44px region to
-dnd-kit instead. This is a division, not a limitation: a column that cannot be scrolled with a
-thumb is worse than a card that cannot be dragged from its middle. Both halves are asserted.
-A touch drag also starts from a **250ms press** on the grip (5px of travel cancels it), so a
-swipe that begins on the grip still scrolls; a mouse drag starts from **6px of movement** with no
-delay, because a mouse has no gesture to give up.
+**Touch'ta drag grip'ten yapılır.** Kart gövdesi column'un scroller'ına aittir — dnd-kit
+listener'larını taşıyan wrapper'ın kendi `touch-action`'ı yoktur, dolayısıyla dikey bir
+hareketi browser üstlenir — grip ise `touch-action: none` bildirir, ve o 44px'lik tek bölgeyi
+dnd-kit'e veren şey budur. Bu bir kısıt değil, bir iş bölümüdür: başparmakla scroll edilemeyen
+bir column, ortasından sürüklenemeyen bir karttan daha kötüdür. İki yarı da test edilir.
+Dokunmatik drag ayrıca grip üzerinde **250ms'lik bir basışla** başlar (5px'lik hareket onu iptal
+eder), böylece grip'ten başlayan bir kaydırma yine scroll eder; mouse drag'i ise gecikmesiz,
+**6px'lik hareketle** başlar, çünkü mouse'un vazgeçecek bir hareketi yoktur.
 
-**Task detail: a right-side panel, not a modal.** ~480px wide (`min` 420px / `max` 640px via
-CSS), **non-modal** — the board stays visible and clickable behind it on desktop. Below the
-Tailwind `md` breakpoint (768px) it becomes a fullscreen sheet (`fixed inset-0`). Drag-resize
-of the panel width is not implemented; the CSS bounds are fixed. Confirmations, board
-creation, and destructive actions stay **dialogs**; those genuinely need to block.
+**Task detayı: bir modal değil, sağ tarafta bir panel.** ~480px genişlik (CSS ile `min` 420px /
+`max` 640px), **non-modal**: masaüstünde board arkasında görünür ve tıklanabilir kalır. Tailwind
+`md` breakpoint'inin (768px) altında full-screen bir sheet'e dönüşür (`fixed inset-0`). Panel
+genişliğinin drag ile yeniden boyutlandırılması uygulanmadı; CSS sınırları sabittir.
+Confirmation'lar, board oluşturma ve destructive aksiyonlar **dialog** olarak kalır; onların
+gerçekten block etmesi gerekir.
 
-| Why a panel |                                                                                                                                                                            |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Context     | The point of a board is the surrounding cards; a modal deletes them                                                                                                        |
-| Flow        | Triage is open → edit → next. A panel keeps the next card one click away instead of a dismiss plus a click.                                                                |
-| Realtime    | A card moving under a modal is invisible; behind a panel it is visible                                                                                                     |
-| Routing     | Deep-linkable at `board/[boardId]/task/[taskId]` — both soft navigation and a hard load render `BoardView` with the task selected (no Next.js intercepting/`@modal` route) |
+| Neden bir panel |                                                                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context         | Bir board'un amacı çevresindeki kartlardır; bir modal onları siler                                                                                                            |
+| Flow            | Triage open → edit → next'tir. Bir panel, bir dismiss artı bir click yerine, bir sonraki kartı tek bir click uzakta tutar.                                                    |
+| Realtime        | Bir modal'ın altında hareket eden bir kart görünmezdir; bir panelin arkasında görünürdür                                                                                      |
+| Routing         | `board/[boardId]/task/[taskId]`'te deep-linkable: hem soft navigation hem de hard load, task seçili halde `BoardView`'i render eder (Next.js intercepting/`@modal` route yok) |
 
-**Which surface a situation gets.** Every layer in the app answers to one of these:
+**Bir durumun hangi surface'i aldığı.** Uygulamadaki her katman bunlardan birine cevap verir:
 
-| Situation                                                                                                                                              | Surface                                   | Rule                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One or two fields that save where they are, opened from the exact spot they describe                                                                   | Inline composer / inline edit             | No layer, no focus trap; `Enter` saves, `Escape` cancels and restores the old value (`components/common/inline-rename.tsx`, `components/board/task-composer.tsx`, [ADR 0035](decisions/0035-inline-task-composer.md)) |
-| A focused multi-field form, or a destructive or hard-to-reverse confirmation that genuinely has to block the screen behind it                          | Dialog                                    | Traps focus, closes on `Esc`, restores focus on close (§5, §9 Focus management); board and column creation, invites, an owner role change, every delete                                                               |
-| One entity's full detail, read or edited alongside the list it came from                                                                               | Panel                                     | Non-modal, ~480px, a fullscreen sheet below `md` ("Task detail" above)                                                                                                                                                |
-| Several independent settings-style sections on one screen, 2 to 7 of them                                                                              | One page, one `SettingsSection` per topic | `/settings` holds six today: members, language, notifications, tokens, workspace, account                                                                                                                             |
-| One of those sections reaches its own data-table scale (a roster with a control per row), or a confirmation flow too tall for a paragraph and a button | Sub-route                                 | `/settings/members`, `/settings/account/delete` (Settings IA below)                                                                                                                                                   |
-| A distinct top-level destination                                                                                                                       | Full page                                 | Owns its own `flex-1 overflow-y-auto` ("The shell is exactly one viewport tall" above)                                                                                                                                |
-| A list of options that outgrows a flat scan                                                                                                            | Progressive disclosure                    | 7 or fewer renders flat; 8 or more folds behind a searchable popover (below)                                                                                                                                          |
-| The result of an action the screen cannot already show for itself                                                                                      | Toast                                     | Per §7's third-beat rule: the effect is off-screen, has no on-screen representation, or reaches further than the view admits                                                                                          |
-| A field-level `400` or `422` failure                                                                                                                   | Inline error                              | Under the field, focus moves to the first (§6 Errors)                                                                                                                                                                 |
+| Durum                                                                                                                                                                                       | Surface                                      | Kural                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kendi yerinde kaydedilen bir veya iki field, tam olarak tanımladığı noktadan açılır                                                                                                         | Inline composer / inline edit                | Layer yok, focus trap yok; `Enter` kaydeder, `Escape` iptal eder ve eski değeri geri yükler (`components/common/inline-rename.tsx`, `components/board/task-composer.tsx`, [ADR 0035](decisions/0035-inline-task-composer.md)) |
+| Odaklı çok field'lı bir form, ya da arkasındaki ekranı gerçekten block etmesi gereken destructive veya geri alınması zor bir confirmation                                                   | Dialog                                       | Focus'u trap eder, `Esc`'te kapanır, kapanışta focus'u restore eder (§5, §9 Focus yönetimi); board ve column oluşturma, invite'lar, bir owner role değişimi, her delete                                                       |
+| Bir entity'nin tam detayı, geldiği list'in yanında okunur veya edit edilir                                                                                                                  | Panel                                        | Non-modal, ~480px, `md` altında full-screen bir sheet (yukarıdaki "Task detayı")                                                                                                                                              |
+| Bir ekranda birden fazla bağımsız settings-tipi section, 2 ile 7 arası                                                                                                                      | Tek sayfa, konu başına bir `SettingsSection` | `/settings` bugün altı tane taşıyor: members, language, notifications, tokens, workspace, account                                                                                                                             |
+| Bu section'lardan biri kendi veri tablosu ölçeğine ulaşıyor (satır başına bir control taşıyan bir roster), ya da bir confirmation flow bir paragraf artı bir button'a sığmayacak kadar uzun | Sub-route                                    | `/settings/members`, `/settings/account/delete` (aşağıdaki Settings IA)                                                                                                                                                       |
+| Ayrı bir üst düzey destination                                                                                                                                                              | Tam sayfa                                    | Kendi `flex-1 overflow-y-auto`'sunu taşır (yukarıdaki "Shell tam olarak bir viewport yüksekliğindedir")                                                                                                                       |
+| Düz bir taramayı aşan bir seçenekler listesi                                                                                                                                                | Aşamalı açılım (progressive disclosure)      | 7 veya daha az düz render edilir; 8 veya daha fazlası aşağıdaki searchable bir popover'ın arkasına katlanır                                                                                                                   |
+| Ekranın kendisinin zaten gösteremediği bir aksiyonun sonucu                                                                                                                                 | Toast                                        | §7'nin üçüncü vuruş kuralına göre: etki ekran dışında, ekranda bir karşılığı yok, ya da view'ın kabul ettiğinden daha uzağa uzanıyor                                                                                          |
+| Field-level bir `400` veya `422` failure'ı                                                                                                                                                  | Inline hata                                  | Field'ın altında, focus ilkine gider (§6 Error'lar)                                                                                                                                                                           |
 
-**How many dialogs there are, and how that is counted.**
-`find apps/web/components -iname '*dialog*.tsx' ! -iname '*.test.tsx'` is the whole list; four of
-its files are not a dialog anyone meets, and come off the count: the `ui/dialog.tsx` primitive,
-the `common/form-dialog.tsx` and `common/confirm-dialog.tsx` wrappers, and
-`board/board-dialogs.tsx`, which only mounts the board's own. That leaves **15 concrete dialogs**,
-down from 19: renaming a board and renaming a workspace became inline
-edits, and changing a role and deleting an account became the two sub-routes above. Every removal
-was a surface moving down the rubric, never a dialog deleted for the count's sake.
+**Kaç dialog var ve bu nasıl sayılıyor.**
+`find apps/web/components -iname '*dialog*.tsx' ! -iname '*.test.tsx'` bütün listeyi verir;
+dosyalarından dördü kimsenin karşılaşmadığı bir dialog değildir ve sayıdan düşer: `ui/dialog.tsx`
+primitifi, `common/form-dialog.tsx` ile `common/confirm-dialog.tsx` sarmalayıcıları, ve yalnızca
+board'un kendi dialog'larını mount eden `board/board-dialogs.tsx`. Geriye **15 somut dialog**
+kalıyor, 19'dan düşerek: bir board'u ve bir workspace'i yeniden adlandırmak satır içi
+düzenlemeye, rol değiştirmek ile hesap silmek de yukarıdaki iki alt rotaya taşındı. Her düşüş bir
+yüzeyin rubrikte aşağı inmesiydi, sayı için silinen bir dialog değil.
 
-**Panel order.** `TaskPanel` composes, top to bottom: `TaskPanelFields` (title at `title-lg` and
-description at `read` from `md` up, both 16px below it; the title is borderless at rest and
-bordered only on focus via `border-transparent focus:border-input`), `TaskPropertiesPanel`
-(priority, due date, estimate, assignees, labels), `TaskChecklists`, `TaskAttachments`,
-`TaskDiscussionPanel` (comments, activity), then, for whoever can mutate, a delete footer. It is
-the same order the card itself reads in: what the
-task is, then what is in it, then what was said about it. The footer is `mt-auto` and only
-reaches the bottom of the panel while it is the last child of that flex column
-(`components/task/task-panel.tsx`, pinned by `task-panel.test.tsx`), so nothing may be appended
-after it.
+**Panel sırası.** `TaskPanel`, yukarıdan aşağı şunları compose eder: `TaskPanelFields` (title
+`md` ve üzerinde `title-lg`'de, description ise `read`'de, `md` altında ikisi de 16px; title
+durağanken borderless ve yalnızca focus'ta border'lı, `border-transparent focus:border-input`
+üzerinden), `TaskPropertiesPanel` (priority, due date, estimate, assignee'ler, label'lar),
+`TaskChecklists`, `TaskAttachments`,
+`TaskDiscussionPanel` (comment'ler, activity), ardından, mutate edebilen herkes için, bir delete
+footer'ı. Bu, kartın kendisinin okuduğu aynı sıra: önce task'ın ne olduğu, sonra içinde ne
+olduğu, sonra hakkında ne söylendiği. Footer `mt-auto`'dur ve yalnızca o flex column'un son
+child'ı olduğu sürece panelin altına ulaşır (`components/task/task-panel.tsx`,
+`task-panel.test.tsx` tarafından sabitlenmiş), bu yüzden ardına hiçbir şey eklenemez.
 
-Every titled section below the fields carries the same 1px top rule at 16px of padding. All four
-of them, not two: four headings of one weight with a rule above only two of them reads as an
-arbitrary line rather than as grouping. And the panel spends **no** full-strength copper of its own. Its
-section actions (create label, add checklist, post comment) are outline buttons, because they are
-three peers rather than the one primary action §2 budgets, and the board behind the panel is
-already spending the screen's other mark on the selected card's rail. `task-panel.test.tsx` fails
-on a default-variant button anywhere in the panel.
+Field'ların altındaki başlıklı her section aynı 1px üst çizgiyi 16px padding ile taşır. Dördü de,
+ikisi değil: aynı ağırlıkta dört başlığın yalnızca ikisinin üstünde çizgi olması gruplama gibi
+değil, keyfi bir çizgi gibi okunuyor. Ve panel kendi adına **hiç** tam güç bakır harcamaz. Section
+aksiyonları (label oluştur, checklist ekle, comment gönder) outline button'dır, çünkü bunlar
+§2'nin bütçelediği tek birincil aksiyon değil üç eşittir, ve panelin arkasındaki board ekranın
+diğer işaretini zaten seçili kartın rail'ine harcıyor. `task-panel.test.tsx` panelin herhangi bir
+yerindeki default varyant button'da kırılır.
 
-The assignee and label pickers fold at the same number the panel itself scans without searching:
-`INLINE_PICKER_MAX = 7` (`components/task/searchable-picker.tsx`) renders 7 or fewer options as
-a flat checkbox list and folds 8 or more behind a searchable, non-portalled popover
-(`components/ui/popover.tsx`) instead of letting the list outgrow the panel's own width.
-`Escape` closes only that popover, not the panel behind it (`ESCAPE_LAYER_SELECTOR` in
-`use-task-panel-focus.ts`).
+Assignee ve label picker'ları, panelin kendisinin search'süz taradığı aynı sayıda katlanır:
+`INLINE_PICKER_MAX = 7` (`components/task/searchable-picker.tsx`), 7 veya daha az seçeneği düz
+bir checkbox listesi olarak render eder ve 8 veya daha fazlasını, listenin panelin kendi
+genişliğini aşmasına izin vermek yerine, searchable, non-portalled bir popover'ın arkasına katlar
+(`components/ui/popover.tsx`). `Escape` yalnızca o popover'ı kapatır, arkasındaki paneli değil
+(`use-task-panel-focus.ts`'teki `ESCAPE_LAYER_SELECTOR`).
 
-**Settings IA: further down, harder to undo.** `/settings`'s sections read top to bottom on that
-rule. Members first, since it is the only section about other people and what a new workspace
-owner opens this screen to find. Language and notifications next, both about the person rather
-than the workspace. Tokens before workspace, since revoking one undoes itself the moment it is
-minted again, unlike anything below it. Workspace before account, since deleting a workspace
-stays inside it while deleting the account reaches past this workspace into every workspace the
-person is in on this instance ([ADR 0026](decisions/0026-account-deletion-anonymisation.md));
-nothing about this workspace is further down than that. The one block below it is
-`ActivationFunnel`, which is about the instance rather than the workspace and renders nothing at
-all for anyone who is not the instance operator
-(`components/settings/activation-funnel.tsx`), which is why it sits outside `SettingsSection` and
-outside this ordering. `/settings/members` and
-`/settings/account/delete` are the two sections the sub-route rule above promotes off this page;
-every other section stays inline as a `SettingsSection` (`components/settings/settings-section.tsx`).
+**Settings IA: aşağı indikçe, geri alınması zorlaşıyor.** `/settings`'in section'ları bu kurala
+göre yukarıdan aşağı okunur. Önce members, çünkü başka insanlar hakkındaki tek section o ve yeni
+bir workspace owner'ının bu ekranda bulmaya geldiği şey de o. Sonra language ve notifications,
+ikisi de workspace'ten çok kişiyle ilgili. Workspace'ten önce tokens, çünkü bir token'ı revoke
+etmek, yeniden mint edilir edilmez kendini geri alıyor, altındaki hiçbir şeyin yapamadığı bir
+şey. Account'tan önce workspace, çünkü bir workspace'i silmek onun içinde kalırken account'u
+silmek bu workspace'in ötesine, kişinin bu instance'ta bulunduğu her workspace'e uzanıyor
+([ADR 0026](decisions/0026-account-deletion-anonymisation.md)); bu workspace ile ilgili hiçbir şey
+bundan daha aşağıda değil. Altındaki tek blok `ActivationFunnel`: workspace'le değil instance'la
+ilgilidir ve instance operatörü olmayan hiç kimseye hiçbir şey render etmez
+(`components/settings/activation-funnel.tsx`), bu yüzden `SettingsSection`'ın ve bu sıralamanın
+dışında durur.
+`/settings/members` ve `/settings/account/delete`, yukarıdaki sub-route kuralının bu sayfadan
+çıkardığı iki section. Diğer her section inline bir `SettingsSection` olarak kalır
+(`components/settings/settings-section.tsx`).
 
-## 5. Interaction patterns
+## 5. Etkileşim kalıpları
 
-| Drag and drop | Rule                                                                                                                                                                                                                                                                                          |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lift          | Card scales to `1.02`, tilts `1deg`, takes the one drag shadow; the source leaves a `--muted` ghost at the same height, so the board never reflows mid-drag                                                                                                                                   |
-| Drop target   | Within a column, dnd-kit's displacement opens the card-height gap and a 2px copper rail marks its leading edge; across columns the rail alone marks the insertion point and nothing shifts. The destination column takes a `--signature-subtle` wash. No dashed outlines.                     |
-| Commit        | Optimistic — the card lands instantly, `PATCH .../tasks/:taskId/position` follows                                                                                                                                                                                                             |
-| Failure       | The rollback restores the position instantly and the card lands in place with a 220ms `--ease-in-out` settle (`translateY` -6px to 0, opacity 0.5 to 1); a toast says what happened with a **Try again** control. Never leave the optimistic state standing.                                  |
-| Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` lifts, arrows move within and across columns, `Space` drops, `Esc` cancels. Each transition announced via `aria-live="polite"`: "Dropped _Fix login redirect_ into In Progress." No position clause yet (Hardening track, "Board keyboard follow-ups"). |
-| Autoscroll    | Both axes, on `@dnd-kit`'s default threshold (a ratio of the scroller, not a pixel band); `DndContext` passes no `autoScroll` of its own                                                                                                                                                      |
+| Drag and drop | Kural                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lift          | Kart `1.02`'ye scale olur, `1deg` tilt olur, tek drag shadow'u alır; source, aynı yükseklikte %40 opaklıkta bir ghost olarak yerinde kalır, böylece board drag ortasında asla reflow olmaz                                                                                                                                                                                                                                                              |
+| Drop target   | Column içinde dnd-kit'in displacement'ı kart yüksekliğindeki gap'i açar ve 2px'lik bakır rail onun leading edge'ini işaretler; column'lar arasında yalnızca rail insertion noktasını gösterir, hiçbir şey kaymaz. Destination column bir `--signature-subtle` wash alır. Dashed outline yok.                                                                                                                                                            |
+| Commit        | Optimistic — kart anında yerine oturur, ardından `PATCH .../tasks/:taskId/position` gelir                                                                                                                                                                                                                                                                                                                                                               |
+| Failure       | Rollback pozisyonu anında geri alır, kart ise 220ms `--ease-in-out` bir oturmayla yerine iner (`translateY` -6px'ten 0'a, opacity 0.5'ten 1'e); bir toast, bir **Try again** (**Tekrar dene**) kontrolüyle ne olduğunu söyler. Optimistic state hiçbir zaman öylece bırakılmaz.                                                                                                                                                                         |
+| Keyboard      | `@dnd-kit` `KeyboardSensor` — `Space` ya da `Enter` lift yapar, arrow'lar column içinde ve column'lar arasında taşır, `Space` ya da `Enter` drop yapar, `Esc` cancel eder. Her transition `aria-live="polite"` üzerinden duyurulur: "Dropped _Fix login redirect_ into In Progress." ("_Fix login redirect_, In Progress içine bırakıldı.") Henüz pozisyon ifadesi yok (Sağlamlaştırma hattı, "Faz 6 parity taramasından Board klavye follow-up'ları"). |
+| Autoscroll    | Her iki axis, `@dnd-kit`'in varsayılan threshold'unda (bir piksel bandı değil, scroller'ın bir oranı); `DndContext` kendi `autoScroll`'unu geçmiyor                                                                                                                                                                                                                                                                                                     |
 
-| Realtime change        | Surfacing (never a layout jump)                                                                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Remote create / update | `--signature-subtle` background fading out over 1200ms. No movement, no size change. Color-only, so it survives `prefers-reduced-motion` unchanged.                                                    |
-| Remote move            | The card moves on the column's own sortable transition (dnd-kit's 200ms default); during a local drag the update is queued and applied on drop                                                         |
-| Remote delete          | **Not shipped yet:** the card goes and the gap closes on that same sortable transition. The two beats it should have, fade to 0 over 160ms then close the gap over 160ms, are still the intended shape |
-| Presence · disconnect  | Not shipped yet (topbar/card presence). Disconnect: a quiet inline "Connection lost, changes may not be showing" bar, kept until the socket is back and never dismissible, never a blocking overlay    |
+| Realtime değişikliği   | Surfacing (asla bir layout jump)                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remote create / update | 1200ms boyunca fade out olan bir `--signature-subtle` background. Hareket yok, size değişimi yok. Yalnızca renk, böylece `prefers-reduced-motion`'dan değişmeden çıkar.                                                                                                               |
+| Remote move            | Kart, column'un kendi sortable transition'ı ile hareket eder (dnd-kit'in 200ms varsayılanı); başkası bir task'ı taşıdığında local bir drag sürüyorsa drag iptal edilir ve bir toast "Someone else moved this task" ("Birisi bu task'ı taşıdı") der, update hemen uygulanır            |
+| Remote delete          | **Henüz gelmedi:** kart gider ve gap aynı sortable transition ile kapanır. Olması gereken iki beat, 160ms'te 0'a fade ve ardından 160ms'te gap'in kapanması, hâlâ hedeflenen biçim                                                                                                    |
+| Presence · disconnect  | Presence: henüz gelmedi (topbar/kart presence'ı). Disconnect: ship edildi; sessiz, inline bir "Connection lost, changes may not be showing" ("Bağlantı koptu, değişiklikler görünmüyor olabilir") bar'ı, socket geri gelene kadar duruyor ve kapatılamıyor, asla blocking bir overlay |
 
-**Keyboard baseline.** Focus is always visible, and it is exactly one indicator: 2px `--ring` at 2px
-offset, and `outline: none` without a replacement is a review blocker. That single mark is drawn
-once, from `@layer base`, on every keyboard-reachable control: the `focus-visible:ring-[3px]
-ring-ring/50` and `focus-visible:border-ring` utilities that used to sit beside it on the primitives
-are gone, and so is every `outline-none` / `outline-hidden` that would otherwise outrank the layered
-rule. What survives them is a short, named list of programmatic focus containers that take focus by
-script rather than by Tab, an arrow key or a link (a dialog's content, the drawer), plus a dropdown
-row, the skip link's `main` target and the task panel's heading, all three of which draw the same
-base outline as everything else rather than a suppressed one. A field that is both invalid and
-focused recolors that one outline to `--destructive` (`[aria-invalid='true']:focus-visible`) instead
-of growing a second mark beside the border; keeping a colored ring alongside the border was the
-earlier plan, dropped once Tailwind v4 turned out to paint nothing from a ring-color utility with no
-ring-width utility beside it. The offset turns inward only where the focused region fills the shell
-and an outside offset would be clipped away, which today is the skip link's `main`. That mark is
-also never transitioned: Tailwind v4 folds `outline-color` into `transition-colors` (v3 did not),
-so a shortcut like `transition-colors` or `transition-all` fades the outline from `currentColor`
-to copper over the transition duration while its width and offset appear at once. Every
-transition in the tree therefore names its properties, and none of those lists names the
-outline. Tab order
-follows visual order; the board is a composite widget, so the whole column strip is a single tab
-stop, `Home`, `End` and `Ctrl` + arrow move between the column headings inside it, and the bare
-arrow keys belong to the keyboard drag within a column. `Esc` closes the topmost layer only and
-returns focus to whatever opened it. `c` is mapped: it opens the creation composer at the foot of
-a column ([ADR 0035](decisions/0035-inline-task-composer.md)). Reserved now, mapped in Phase 4+:
-`⌘K` command palette, `/` filter, `?` help; nothing else claims a bare letter key.
+**Keyboard baseline.** Focus her zaman görünürdür, ve tam olarak tek bir göstergedir: 2px offset'te
+2px `--ring`, ve bir replacement olmadan `outline: none` bir review blocker'dır. O tek işaret,
+`@layer base`'den, her keyboard'la ulaşılabilir kontrolde bir kez çizilir: primitiflerin yanında
+duran `focus-visible:ring-[3px] ring-ring/50` ve `focus-visible:border-ring` class'ları kalktı, ve
+katmanlı kuralı ezecek her `outline-none` / `outline-hidden` de kalktı. Bunlardan geriye kalan,
+script ile focus alan (Tab, bir arrow key veya bir link ile değil) kısa, adı konmuş bir programmatic
+focus container listesidir (bir dialog'un content'i, drawer), artı bir dropdown row'u, skip link'in `main`
+hedefi ve task panel'in heading'i; üçü de bastırılmış değil, herkesle aynı base outline'ı çizer. Hem
+invalid hem focus'ta olan bir field, kenarın yanına ikinci bir işaret büyütmek yerine o tek
+outline'ı `--destructive`'e boyar (`[aria-invalid='true']:focus-visible`); border'ın yanında renkli
+bir ring'i de tutmak önceki plandı, Tailwind v4'ün bir ring-width class'ı yanında olmadan bir
+ring-color class'ından hiçbir şey boyamadığı ortaya çıkınca bu plandan vazgeçildi. Offset yalnızca
+focus alan bölge shell'i doldurduğunda ve dıştaki bir offset kırpılacağında içeri döner; bugün bu
+yalnızca skip link'in `main` hedefidir. O işaret ayrıca hiçbir zaman transition edilmez: Tailwind
+v4, `outline-color`'ı `transition-colors`'ın içine koyar (v3 koymuyordu), yani `transition-colors`
+veya `transition-all` gibi bir kısayol, outline'ın genişliği ve offset'i tek karede belirirken
+rengini `currentColor`'dan bakıra transition süresi boyunca yavaşça geçirir. Bu yüzden ağaçtaki
+her transition kendi property'lerini tek tek yazar ve o listelerin hiçbirinde outline yoktur. Tab order visual order'ı takip eder; board bir composite
+widget'tır, bu yüzden column strip'inin tamamı tek bir tab stop'tur, `Home`, `End` ve `Ctrl` +
+arrow onun içindeki column heading'leri arasında gezer, çıplak arrow tuşları ise bir column
+içindeki klavye drag'ine aittir. `Esc` yalnızca en üstteki layer'ı kapatır ve focus'u onu açan
+şeye geri verir. `c` ve `/` map edilmiştir: `c`, bir column'un dibindeki oluşturma composer'ını
+açar ([ADR 0035](decisions/0035-inline-task-composer.md)); `/`, board'un filtre arama kutusuna
+odaklanır. Şimdiden reserve edilmiş, Faz 4+'ta map edilecek: `⌘K` command palette, `?` help;
+başka hiçbir şey çıplak bir letter key talep etmez.
 
-**Dialogs are bounded and scroll their own body.** A dialog surface is at most
-`calc(100dvh - 4rem)` tall; its body scrolls, and the header and footer stay pinned outside that
-scroll so the submit and cancel controls are on screen at any window height and at the 200% zoom
-§9 asks for. The page behind an open dialog is scroll-locked, so a surface with no ceiling puts
-its own footer past the bottom of the screen with nothing left to scroll. The close control is
-pinned with the header rather than placed inside the scrollport, where an absolutely positioned
-box scrolls away with the content and is clipped by it.
+**Dialog'lar sınırlıdır ve kendi gövdelerini scroll eder.** Bir dialog yüzeyi en fazla
+`calc(100dvh - 4rem)` yüksekliğindedir; gövdesi scroll olur, header ve footer scroll alanının
+içinde `sticky` olarak yerinde kalır, böylece submit ve cancel kontrolleri her pencere
+yüksekliğinde ve §9'un istediği %200 zoom'da ekranda kalır. Açık bir dialog'un arkasındaki sayfa
+scroll kilidi altındadır, yani tavanı olmayan bir yüzey kendi footer'ını ekranın altına iter ve
+ona ulaşmak için scroll edilecek hiçbir şey kalmaz. Kapatma kontrolü scrollport'un içine değil,
+scroll gövdesinin dışında, yüzeye sabitlenir: absolute konumlanmış bir kutu, scroll
+container'ının içinde içerikle birlikte kayar ve onun tarafından kırpılır.
 
-**Motion.** Purposeful micro-interactions only, **at most one orchestrated moment per view** —
-on the board that is the first paint of the columns, and nothing else.
+**Motion.** Yalnızca amaçlı micro-interaction'lar, **view başına en fazla bir orchestrated an** —
+board'da bu, column'ların ilk paint'idir, başka hiçbir şey değil.
 
-| Case                                             | Duration                      | Curve                                                     |
-| ------------------------------------------------ | ----------------------------- | --------------------------------------------------------- |
-| Sancak rail moving                               | 150ms                         | `--ease-out`                                              |
-| Dropdown, menu, popover                          | 150ms in and out              | `--ease-out`, `transform-origin: var(--transform-origin)` |
-| Detail panel, sheet                              | 220ms                         | `--ease-drawer`                                           |
-| Dialog · toast (`translateY(100%)`)              | 200ms                         | `--ease-out`, dialog origin centered                      |
-| Dialog scrim                                     | 200ms                         | `--ease-out`                                              |
-| Card returning after a failed drop               | 220ms                         | `--ease-in-out`                                           |
-| Column stagger on first board paint              | 40ms between columns          | `--ease-out`                                              |
-| Skeleton pulse (loop, not a one-shot transition) | 1.6s, opacity 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
+| Durum                                                    | Süre                          | Curve                                                     |
+| -------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| Sancak rail'inin hareketi                                | 150ms                         | `--ease-out`                                              |
+| Dropdown, menu, popover                                  | açılışta ve kapanışta 150ms   | `--ease-out`, `transform-origin: var(--transform-origin)` |
+| Detay paneli, sheet                                      | 220ms                         | `--ease-drawer`                                           |
+| Dialog · toast (`translateY(100%)`)                      | 200ms                         | `--ease-out`, dialog origin ortalanmış                    |
+| Dialog perdesi                                           | 200ms                         | `--ease-out`                                              |
+| Başarısız bir drop'tan sonra kartın geri dönmesi         | 220ms                         | `--ease-in-out`                                           |
+| İlk board paint'inde column stagger'ı                    | column'lar arası 40ms         | `--ease-out`                                              |
+| Skeleton pulse (loop, tek seferlik bir transition değil) | 1.6s, opaklık 1.0 → 0.6 → 1.0 | `--ease-in-out`                                           |
 
 ```css
 --ease-out: cubic-bezier(0.23, 1, 0.32, 1); /* entering, exiting, default */
@@ -466,280 +486,297 @@ on the board that is the first paint of the columns, and nothing else.
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* panel and sheet */
 ```
 
-All three curves above are real custom properties in `app/globals.css`, also exposed as
-Tailwind `ease-out`, `ease-in-out` and `ease-drawer` utilities through `@theme inline`, not
-only this table's notation. The dialog surface and its scrim, the dropdown and submenu, and
-the off-canvas drawer all bind their keyframes through `data-slot`/`data-state` in
-`app/globals.css` rather than a Tailwind animation-plugin class, since this project ships
-plain `tailwindcss` with no such plugin: those classes would compile to nothing and every
-open would cut instead of transition.
+Yukarıdaki üç curve artık `app/globals.css` içinde gerçek birer custom property, `@theme
+inline` üzerinden Tailwind `ease-out`, `ease-in-out` ve `ease-drawer` utility'leri olarak da
+erişilebilir, yalnızca bu tablonun notasyonu değil. Dialog yüzeyi ve perdesi, dropdown ve
+submenu, off-canvas drawer, keyframe'lerini bir Tailwind animation plugin class'ı yerine
+`app/globals.css` içinde `data-slot`/`data-state` üzerinden bağlar, çünkü bu proje düz
+`tailwindcss` kullanır, böyle bir plugin yok: o class'lar hiçbir CSS üretmezdi ve her açılış
+transition yerine kesme olurdu.
 
-No tooltip primitive ships yet, so a tooltip duration is intent rather than behaviour and the
-table above does not carry a row for it; the only "tooltip" in the tree is Recharts' own on the
-dashboard charts (§8). `Select` is off the table for the opposite reason: it is a native
-`<select>` (`components/ui/select.tsx`), so the platform draws its list and nothing here
-animates it.
+Henüz bir tooltip primitifi ship edilmedi, bu yüzden bir tooltip süresi davranış değil niyettir
+ve yukarıdaki tabloda ona ait bir satır yok; ağaçtaki tek gerçek "tooltip", dashboard
+grafiklerinde Recharts'ın kendi tooltip'i (§8), geri kalan ipuçları tarayıcının yerel `title`
+ipucudur (collapsed rail'in ikonları, label noktası, priority ikonu, zaman damgaları).
+`Select` tablodan tam tersi sebeple çıktı: native bir
+`<select>` (`components/ui/select.tsx`), yani listesini platform çiziyor ve burada onu
+canlandıran hiçbir şey yok.
 
-A toast sits for 4s and the stack is three deep, bottom right (`components/ui/sonner.tsx`): long
-enough to read one line, short enough that a burst clears itself. Only the board's drag-failure
-toast passes its own longer duration at the call site (`ACTION_TOAST_MS = 8000` in
-`use-board-mutations.ts`), since a control nobody has time to reach is worse than no control;
-the task panel's retry toasts (comment and activity reload, field save) are not wired to it and
-still run at the 4s default.
+Bir toast 4s durur ve yığın sağ altta üç derindir (`components/ui/sonner.tsx`): tek satırı
+okumaya yetecek kadar uzun, bir seri toast'ın kendi kendini temizleyeceği kadar kısa. Yalnızca
+board'un drag failure toast'ı çağrı yerinde kendi daha uzun süresini geçer
+(`use-board-mutations.ts`'teki `ACTION_TOAST_MS = 8000`); çünkü kimsenin ulaşmaya vakti olmayan
+bir kontrol, hiç kontrol olmamasından kötüdür. Task panelinin retry toast'ları (comment ve
+activity reload, field save) buna bağlı değildir ve hâlâ 4s default'ta çalışır.
 
-- **Press feedback is not shipped.** Nothing scales on `:active`; a pressed control steps its
-  colour and stays where it is. The table above is what the app draws, not what it could.
-- **No animation on keyboard-initiated actions** — the command palette opens instantly; it runs
-  a hundred times a day and motion makes it feel slow.
-- **`transform` and `opacity` only** (accordion height excepted). Never `transition: all`, never
-  `scale(0)` — enter from `scale(0.96)` + `opacity: 0`. Never `ease-in` on UI: it delays the
-  exact moment the user is watching.
-- **Transitions, not keyframes**, for anything triggerable twice a second (toasts, toggles, the
-  rail) — transitions retarget from the current value, keyframes restart from zero.
-- Nothing over 300ms except the panel. Gate hover motion behind `@media (hover: hover) and
-(pointer: fine)`. Springs (`{ duration: 0.5, bounce: 0.2 }`) only where a gesture carries
-  velocity — drag preview, swipe-to-dismiss.
-- **Loop indicators sit outside the "nothing over 300ms" rule**: a skeleton's pulse (1.6s,
-  opacity 1.0 to 0.6 and back) and a loading button's spinner (700ms per rotation, linear, shown
-  only after 400ms) run continuously while work is in progress instead of once on enter or exit.
-  Both hold still under `prefers-reduced-motion: reduce`, the skeleton at a flat 0.75 opacity and
-  the spinner not spinning at all.
-- **Waiting for a response draws from exactly one mechanism**: `Button`'s `loading` prop,
-  `aria-busy` and `disabled` immediately, spinner after the 400ms threshold, drawn over the
-  control's own content and out of its layout flow, so the button keeps its exact box and no
-  label moves (§6 has the full shape). No screen swaps a control's label to a "sending" string of
-  its own.
-- **`prefers-reduced-motion: reduce`** drops movement and keeps opacity and color: the panel
-  cross-fades, the rail jumps, the highlight is unchanged. Fewer and gentler, not zero.
+- **Press feedback ship edilmedi.** Hiçbir şey `:active` üzerinde ölçeklenmiyor; basılan bir
+  kontrol yalnızca renk adımı değiştirir ve yerinde kalır. Yukarıdaki tablo uygulamanın çizdiğidir,
+  çizebileceği değil.
+- **Keyboard-initiated aksiyonlarda animasyon yok** — command palette anında açılır; günde yüz
+  kere çalışır ve motion onu yavaş hissettirir.
+- **Yalnızca `transform` ve `opacity`** (accordion height hariç). Asla `transition: all`, asla
+  `scale(0)` — `scale(0.96)` + `opacity: 0`'dan enter et. UI'de asla `ease-in`: kullanıcının tam
+  o an izlediği ana gecikme getirir.
+- Saniyede iki kez tetiklenebilecek her şey için (toast'lar, toggle'lar, rail) **keyframe değil
+  transition** — transition'lar mevcut değerden retarget eder, keyframe'ler sıfırdan yeniden
+  başlar.
+- Panel ile Remote create / update işareti (1200ms, yalnızca renk) hariç 300ms'i geçen hiçbir
+  şey yok. Hover motion'ı `@media (hover: hover) and
+(pointer: fine)`'ın arkasına gate'le. Spring'ler (`{ duration: 0.5, bounce: 0.2 }`) yalnızca
+  bir gesture'ın velocity taşıdığı yerlerde — drag preview, swipe-to-dismiss.
+- **Loop indicator'lar "300ms'i geçen hiçbir şey yok" kuralının dışında**: bir skeleton'un
+  pulse'ı (1.6s, opaklık 1.0'dan 0.6'ya ve geri) ve loading bir button'ın spinner'ı (rotation
+  başına 700ms, linear, yalnızca 400ms sonra görünür), work devam ederken enter veya exit'te bir
+  kez değil sürekli çalışır. İkisi de `prefers-reduced-motion: reduce` altında hareketsiz kalır:
+  skeleton sabit 0.75 opaklıkta, spinner ise hiç dönmeden.
+- **Bir yanıt beklenirken tam olarak tek bir mekanizma çalışır**: `Button`'ın `loading` prop'u,
+  `aria-busy` ve `disabled` anında, spinner 400ms eşiğinden sonra, control'ün kendi içeriğinin
+  üzerine ve layout akışının dışına çizilerek, böylece button kutusunu birebir korur ve hiçbir
+  label kaymaz (tam şekli §6'da). Hiçbir screen bir control'ün label'ını kendi "sending"
+  ("gönderiliyor") string'ine boyamaz.
+- **`prefers-reduced-motion: reduce`** hareketi düşürür ve opacity ile rengi korur: panel
+  cross-fade olur, rail zıplar, highlight değişmeden kalır. Daha az ve daha nazik, sıfır değil.
 
-## 6. States
+## 6. Durumlar
 
-**Empty states are invitations** — one damga mark and one primary action per screen. They name
-the next move; they do not explain the feature. Empty states and the auth screens are the only
-places damga marks appear (§2); `app/(auth)/layout.tsx` draws one at 64px above every auth form.
+**Empty state'ler birer davettir** — screen başına bir damga mark'ı ve bir primary action. Bir
+sonraki hamleyi adlandırırlar; feature'ı açıklamazlar. Damga mark'larının göründüğü yerler
+empty state'ler ve auth ekranlarıdır; wordmark ve marketing görselleri de izinlidir, ama bugün
+sidebar wordmark'ı mark taşımıyor (§2). `app/(auth)/layout.tsx` her auth formunun üstüne 64px
+bir tane çizer.
 
-**One primary action counts the whole screen.** Where the empty state carries the action, the
-page header's copy of the same action is hidden while the screen is empty and comes back with the
-first row. Two identical primary buttons on a first run is a choice the reader does not have.
+**Bir primary action, tüm ekranda bir tane demektir.** Aksiyonu empty state taşıyorsa, sayfa
+başlığındaki aynı aksiyonun kopyası ekran boşken gizlenir ve ilk satırla birlikte geri gelir.
+İlk çalıştırmada birbirinin aynısı iki primary buton, okuyucunun sahip olmadığı bir seçimdir.
 
-The dashboard is the one screen where two regions can be empty at once, and there the two actions
-are not the same action: with boards but no tasks, the charts invite "Open a board" while the board
-list below still carries its standing "Create board". Measured on the running app, both drew the
-fill, which with the sidebar rail put three full-strength marks on one screen. The fill stays with
-the action the route carries in every state, so the charts' shortcut is an outline button
-(`components/dashboard/dashboard-summary.tsx`).
+Dashboard, iki bölgesinin aynı anda boş olabildiği tek ekran, ve oradaki iki aksiyon aynı aksiyon
+değil: board varken hiç task yoksa, chart'lar "Open a board" davetini taşırken altındaki board
+listesi kendi sabit "Create board"unu taşımaya devam ediyor. Çalışan uygulamada ölçüldü: ikisi de
+dolguyu çiziyordu, bu da kenar çubuğundaki rail ile birlikte tek ekrana üç tam güç işaret koyuyor.
+Dolgu, rotanın her durumda taşıdığı aksiyonda kalıyor, dolayısıyla chart'ların kısayolu outline bir
+button (`components/dashboard/dashboard-summary.tsx`).
 
-| Surface               | Mark       | Headline                     | Body                                                                                                  | Action                           |
-| --------------------- | ---------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------- |
-| No boards yet         | Damga 96px | No boards yet                | A board is where the work gets divided. Start with one.                                               | Create board                     |
-| Board has no columns  | Damga 96px | This board has no columns    | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. | Add column · Use default columns |
-| Empty column          | —          | —                            | 56px solid `--border-strong` drop zone: "Drop a task here"                                            | Add task                         |
-| Filters match nothing | —          | No tasks match these filters | Three filters are active.                                                                             | Clear filters                    |
-| Dashboard, no data    | Damga 64px | Nothing to chart yet         | Charts fill in as tasks are created and moved.                                                        | Open a board                     |
-| Notifications         | —          | You're caught up             | —                                                                                                     | —                                |
+| Surface                           | Mark       | Headline                                                       | Body                                                                                                                                                                                                                                 | Action                                                                         |
+| --------------------------------- | ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Henüz board yok                   | Damga 96px | No boards yet (Henüz board yok)                                | A board is where the work gets divided. Start with one. (Bir board, işin bölüştüğü yerdir. Bir tane ile başlayın.)                                                                                                                   | Create board (Board oluştur)                                                   |
+| Board'da column yok               | Damga 96px | This board has no columns (Bu board'da column yok)             | Columns are the stages work moves through. Start with To Do, In Progress, and Done, or name your own. (Column'lar, işin içinden geçtiği aşamalardır. Yapılacak, Devam Ediyor ve Bitti ile başlayın, ya da kendi isimlerinizi verin.) | Add column · Use default columns (Column ekle · Varsayılan column'ları kullan) |
+| Boş column                        | —          | —                                                              | 56px solid `--border-strong` drop zone: "Drop a task here" ("Bir task'ı buraya bırakın")                                                                                                                                             | Add task (Task ekle)                                                           |
+| Filtreler hiçbir şeyle eşleşmiyor | —          | No tasks match these filters (Bu filtrelerle eşleşen task yok) | 3 filters are active. (3 filtre aktif.)                                                                                                                                                                                              | Clear filters (Filtreleri temizle)                                             |
+| Dashboard, veri yok               | Damga 64px | Nothing to chart yet (Henüz grafiklenecek bir şey yok)         | Charts fill in as tasks are created and moved. (Task'lar oluşturuldukça ve taşındıkça grafikler dolar.)                                                                                                                              | Open a board (Bir board aç)                                                    |
+| Bildirimler                       | —          | You're caught up (Her şeyi gördünüz)                           | —                                                                                                                                                                                                                                    | —                                                                              |
 
-**Loading** uses skeletons that match the final layout in `--accent`, with a 1.6s opacity pulse
-(1.0 → 0.6) and no shimmer sweep: the board renders three column-width skeleton blocks 256px
-tall in place of the columns, with no card skeletons inside them yet; the task panel opens immediately with the clicked card's
-title already in place, so it is never blank; inline actions are optimistic. Spinners exist in
-exactly one place: inside a pressed button, 14px, over its content, after 400ms. List
-content never gets one. Unknown-length work (import, export) gets a progress bar with a count.
+**Loading**, `--accent` içinde final layout'a uyan skeleton'lar kullanır, 1.6s'lik bir opacity
+pulse'ı ile (1.0 → 0.6) ve shimmer sweep olmadan: board, column'ların yerine column genişliğinde
+256px yüksekliğinde üç skeleton bloğu render eder, içlerinde henüz kart skeleton'ı yok; task
+paneli, tıklanan kartın
+title'ı zaten yerindeyken anında açılır, böylece asla boş görünmez; inline aksiyonlar
+optimistic'tir. Spinner'lar tam olarak tek bir yerde var: basılı bir button'ın içinde, 14px,
+400ms sonra içeriğinin üzerine geçerek. List içeriği asla bir tane almaz. Bilinmeyen uzunluktaki iş
+(import, export) count'lu bir progress bar alır.
 
-**A control the reader can be focused on is never `disabled` mid-request.** The browser blurs a
-disabled element, which drops a keyboard user onto `<body>` in the middle of their own edit.
-While a write is out: a text field goes `readOnly`; a native `<select>` and a checkbox, neither
-of which has a `readOnly`, stay enabled, carry `aria-disabled` and let their change handler
-refuse the change, which React puts back so a refused choice is never left on screen as a saved
-one; and `aria-busy` marks the region being written (the properties panel's fields, the member
-row, the composer's and the inline rename's own `<form>`), never the control the reader is
-standing on. Where the write has no other visible mark, because no pressed button is carrying
-`Button`'s `loading`, a sibling `role="status"` region mounted while idle carries the saving
-line: the task properties panel and the member row are the two places that need one. That region
-takes no `aria-busy` of its own,
-because `aria-busy` on a live region lets assistive tech defer the region's update until busy
-clears, and here that is the same moment the line goes empty again. Pending state is scoped to
-the one control in flight, never shared across a section: a save on one field may not lock the
-field beside it. `Button`'s `loading` is the single exception, and only because it disables the
-control the press already came from.
+**Okuyucunun üzerinde durabileceği bir control, istek sürerken asla `disabled` olmaz.** Tarayıcı
+disabled olan elemanı blur eder ve klavye kullanıcısı, kendi düzenlemesinin ortasında `<body>`
+üzerine düşer. Bir yazma sürerken: metin field'ı `readOnly` olur; `readOnly`'si olmayan native bir
+`<select>` ve bir checkbox enabled kalır, `aria-disabled` taşır ve değişikliği kendi change
+handler'ı reddeder (React gösterilen değeri geri koyar, böylece reddedilen bir seçim ekranda
+kaydedilmiş gibi durmaz); `aria-busy` ise okuyucunun üzerinde durduğu control'ü değil, yazılan
+bölgeyi işaretler (properties panel'inin field'ları, member satırı, composer'ın ve inline
+rename'in kendi `<form>`'u). Yazmanın başka görünür bir işareti yoksa, yani basılmış bir button
+`Button`'ın `loading`'ini taşımıyorsa, boştayken de mount edilmiş yanındaki bir `role="status"`
+bölgesi kaydetme satırını taşır: buna ihtiyacı olan iki yer, task properties panel'i ve member
+satırı. O bölge kendi
+`aria-busy`'sini almaz, çünkü bir live region üzerindeki `aria-busy`, assistive tech'in bölgenin
+güncellemesini busy kalkana kadar ertelemesine izin verir ve burada o an, satırın yeniden boşaldığı
+andır. Pending durumu, uçuştaki tek control'e daraltılır, bir bölümün tamamına yayılmaz: bir
+field'daki kayıt, yanındaki field'ı kilitleyemez. Tek istisna `Button`'ın `loading`'i, o da
+yalnızca basışın zaten geldiği control'ü disabled ettiği için.
 
-**Errors** derive from the problem-JSON shape in [api-conventions.md](api-conventions.md#errors).
-Per that contract the UI **branches on `statusCode` and `error`, never on `message` text** — so
-user-facing strings come from the i18n catalog and the API `message` is logged, not shown. Only
-`details[]` is surfaced, being field-level and safe. Name the object that failed, give the next
-action as a real control, keep it to one sentence, and never print an id, a stack trace, or the
-word "Oops".
+**Error'lar**, [api-conventions.md](api-conventions.md#hatalar)'daki problem-JSON şeklinden
+türer. O contract'a göre UI **`statusCode` ve `error` üzerinden branch'lenir, asla `message`
+metni üzerinden değil** — bu yüzden kullanıcıya görünen string'ler i18n katalogundan gelir ve API
+`message`'ı gösterilmez, loglanır. Yalnızca `details[]` surface edilir, çünkü field-level ve
+güvenlidir. Başarısız olan object'i adlandırın, bir sonraki aksiyonu gerçek bir control olarak
+verin, tek bir cümlede tutun ve asla bir id, bir stack trace, ya da "Oops" kelimesini
+yazdırmayın.
 
-| Status                         | Surface                                           | Copy                                                                                      |
-| ------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `400` / `422` with `details[]` | Inline under each field; focus moves to the first | From `details[].constraint`, mapped to a catalog string: "Title can't be empty"           |
-| `401`                          | Redirect to sign-in, keeping the return URL       | Your session ended. Sign in to pick up where you left off.                                |
-| `403`                          | Inline on the blocked control                     | You need admin access to change columns. Ask a workspace owner.                           |
-| `404` in panel                 | Replaces the panel body                           | This task no longer exists. Someone may have deleted it. → **Back to board**              |
-| `409`                          | Inline under the field, not a dialog              | Someone else changed this task. Reload it to edit again.                                  |
-| `429` · `5xx`                  | Toast · error block where the content should be   | Too many requests. Try again in a few seconds. · The board couldn't load. → **Try again** |
-| Offline                        | Persistent topbar strip                           | You're offline. Changes won't save until the connection is back.                          |
+| Status                         | Surface                                           | Metin                                                                                                                                                                                    |
+| ------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400` / `422`, `details[]` ile | Her field'ın altında inline; focus ilkine gider   | `details[].constraint`'ten, bir katalog string'ine map'lenir: "Title can't be empty" ("Title boş olamaz")                                                                                |
+| `401`                          | Return URL'i koruyarak sign-in'e redirect         | Your session ended. Sign in to pick up where you left off. (Oturumunuz sona erdi. Kaldığınız yerden devam etmek için giriş yapın.)                                                       |
+| `403`                          | Block edilen control üzerinde inline              | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.)                     |
+| Panelde `404`                  | Panel body'sinin yerini alır                      | This task no longer exists. Someone may have deleted it. (Bu task artık yok. Birisi silmiş olabilir.) → **Back to board** (**Board'a dön**)                                              |
+| `409`                          | Field'ın altında inline, dialog değil             | Someone else changed this task. Reload it to edit again. (Bu task'ı başka biri değiştirdi. Düzenlemek için yeniden yükleyin.)                                                            |
+| `429` · `5xx`                  | Toast · içeriğin olması gereken yerde error block | Too many requests. Try again in a few seconds. (Çok fazla istek. Birkaç saniye içinde tekrar deneyin.) · The board couldn't load. (Board yüklenemedi.) → **Try again** (**Tekrar dene**) |
+| Offline                        | Kalıcı topbar strip'i                             | You're offline. Changes won't save until the connection is back. (Çevrimdışısınız. Bağlantı geri gelene kadar değişiklikler kaydedilmeyecek.)                                            |
 
-## 7. UI writing
+## 7. UI metni
 
-From the user's side of the screen, active voice, sentence case.
+Ekranın kullanıcıya bakan tarafından, active voice, sentence case.
 
-| Instead of                 | Write                                       | Why                                  |
-| -------------------------- | ------------------------------------------- | ------------------------------------ |
-| Submit                     | Save changes                                | Says what happens                    |
-| Oops! Something went wrong | The board couldn't load.                    | Names the object                     |
-| Task successfully created! | Task created                                | The button's verb, no exclamation    |
-| Are you sure?              | Delete this board?                          | The question is the consequence      |
-| Invalid input              | Title can't be empty                        | Specific beats clever                |
-| Users / Org / Entity       | Members / Workspace / Task                  | Product vocabulary, not schema       |
-| Socket disconnected        | Connection lost, changes may not be showing | What it costs them, not what dropped |
-| Position updated           | Moved to In Progress                        | What they did, not what the row did  |
+| Bunun yerine                                             | Şunu yaz                                                                                        | Neden                                       |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Submit (Gönder)                                          | Save changes (Değişiklikleri kaydet)                                                            | Ne olacağını söyler                         |
+| Oops! Something went wrong (Hata! Bir şeyler ters gitti) | The board couldn't load. (Board yüklenemedi.)                                                   | Object'i adlandırır                         |
+| Task successfully created! (Task başarıyla oluşturuldu!) | Task created (Task oluşturuldu)                                                                 | Button'ın verb'i, ünlem yok                 |
+| Are you sure? (Emin misiniz?)                            | Delete this board? (Bu board'u sil?)                                                            | Soru, sonucun kendisidir                    |
+| Invalid input (Geçersiz giriş)                           | Title can't be empty (Title boş olamaz)                                                         | Spesifik olmak akıllı olmaktan iyidir       |
+| Users / Org / Entity                                     | Members / Workspace / Task                                                                      | Schema değil, product vocabulary'si         |
+| Socket disconnected (Socket bağlantısı kesildi)          | Connection lost, changes may not be showing (Bağlantı koptu, değişiklikler görünmüyor olabilir) | Onlara neye mal olduğu, neyin düştüğü değil |
+| Position updated (Pozisyon güncellendi)                  | Moved to In Progress (In Progress'e taşındı)                                                    | Row'un değil, kullanıcının ne yaptığı       |
 
-- **One verb through a flow:** button **Create board** → dialog **Create board** → toast **Board
-  created**. Buttons name their action, never Yes/No/OK; destructive ones name the object. The
-  verb holds all the way to the failure: an **Add column** button does not fail with "Could not
-  _create_ this column."
-- **The third beat only exists where the screen cannot show the result.** A card lands under the
-  cursor, a renamed column shows its new name, a deleted board leaves the grid — those confirm
-  themselves, and a toast on top is noise. Confirm when the effect is off-screen (an inbox, a
-  stored preference), when the thing that changed has no on-screen representation (a column's
-  `category`), or when the change reaches further than the view admits (deleting a board label
-  strips it from every task). Silence is the default; a message is the exception that has to
-  earn itself.
-- **One job per element.** A label labels, helper text explains, a placeholder shows an example
-  — a placeholder is never a label.
-- **Never expose internals** (`workspaceId`, `position`, "fractional index", "optimistic
-  update"). Ids appear only behind a copy-id affordance, in mono.
-- **Dates and durations:** relative near now ("in 2 days"), absolute beyond a week, exact value
-  always in `title`. `estimatedMinutes` renders "2h 30m", never "150".
+- **Bir flow boyunca tek bir verb:** button **Create board** (**Board oluştur**) → dialog
+  **Create board** (**Board oluştur**) → toast **Board created** (**Board oluşturuldu**).
+  Button'lar aksiyonlarını adlandırır, asla Yes/No/OK değil; destructive olanlar object'i
+  adlandırır. Verb, failure'a kadar korunur: bir **Add column** (**Column ekle**) button'ı
+  "Could not _create_ this column." ("Bu column _oluşturulamadı_.") diye başarısız olmaz.
+- **Üçüncü vuruş yalnızca ekranın sonucu gösteremediği yerde vardır.** Bir card cursor'ın altına
+  iner, yeniden adlandırılmış bir column yeni adını gösterir, silinen bir board grid'den çıkar —
+  bunlar kendilerini doğrular, üstüne bir toast gürültüdür. Etki ekran dışındaysa (bir inbox,
+  saklanan bir tercih), değişen şeyin ekranda bir karşılığı yoksa (bir column'ın `category`'si),
+  ya da değişiklik view'ın kabul ettiğinden daha uzağa uzanıyorsa (bir board label'ını silmek onu
+  her task'tan çıkarır) doğrula. Sessizlik default'tur; mesaj, kendini hak etmesi gereken
+  istisnadır.
+- **Element başına bir görev.** Bir label label'lar, helper text açıklar, bir placeholder bir
+  örnek gösterir — bir placeholder asla bir label değildir.
+- **Internal'ları asla ifşa etme** (`workspaceId`, `position`, "fractional index", "optimistic
+  update"). Id'ler yalnızca bir copy-id affordance'ının arkasında, mono'da görünür.
+- **Date'ler ve süreler:** şimdiye yakın relative ("3 hours ago" / "3 saat önce"), bir haftadan
+  öte absolute, exact değer her zaman `title`'da. `estimatedMinutes`, asla "150" değil "2h 30m"
+  ("2s 30dk") render eder.
 
-**Every error ends with a way out.** Naming the object that failed is only half the message; the
-other half is the next move. Which half carries it is decided by one question — **could the
-identical request succeed on a second attempt?**
+**Her error bir çıkış yoluyla biter.** Başarısız olan object'i adlandırmak mesajın yalnızca
+yarısıdır; diğer yarısı bir sonraki hamledir. Bunu hangi yarının taşıdığına tek bir soru karar
+verir — **aynı request ikinci bir denemede başarılı olabilir mi?**
 
-|                   | **No** — the server explained itself                                                                        | **Yes** — the server did not                                                          |
-| ----------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Recovery lives in | **The sentence**                                                                                            | **The surface**                                                                       |
-| The user gets     | The reason, then the one move that changes it: ask an admin, reload, use the other address, send a new link | The object that failed, then a control: `action` on a toast, **Try again** on a block |
-| Typical causes    | `400` · `401` · `403` · `404` · `409`, a rejected credential, an expired link                               | network · timeout · `429` · `5xx`                                                     |
-| Example           | You need admin access to change columns. Ask a workspace owner.                                             | The board couldn't load. → **Try again**                                              |
+|                       | **Hayır** — server kendini açıkladı                                                                                                                                  | **Evet** — server açıklamadı                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Recovery nerede yaşar | **Cümlede**                                                                                                                                                          | **Surface'te**                                                                         |
+| Kullanıcı ne alır     | Sebep, ardından onu değiştiren tek hamle: bir admin'e sor, reload et, diğer adresi kullan, yeni bir link gönder                                                      | Başarısız olan object, ardından bir control: toast'ta `action`, block'ta **Try again** |
+| Tipik sebepler        | `400` · `401` · `403` · `404` · `409`, reddedilen bir credential, süresi dolmuş bir link                                                                             | network · timeout · `429` · `5xx`                                                      |
+| Örnek                 | You need admin access to change columns. Ask a workspace owner. (Column'ları değiştirmek için yönetici erişimine ihtiyacınız var. Bir workspace sahibinden isteyin.) | The board couldn't load. → **Try again** (Board yüklenemedi. → **Tekrar dene**)        |
 
-Two things keep the right-hand column honest. A control that re-fails on every press teaches the
-user the product is broken, so an **explained** failure never gets one — re-sending a write the
-server rejected on a `403`, or against a task that is gone, only repeats the toast. And when the
-control that failed is **still on screen and still live** — a dialog's submit button, "Load more",
-a select — that already _is_ the retry; a second one beside it is clutter, which is why the
-create/rename/delete dialogs carry no action of their own.
+Sağdaki sütunu iki şey dürüst tutar. Her basışta yeniden başarısız olan bir control, kullanıcıya
+ürünün bozuk olduğunu öğretir; bu yüzden **açıklanmış** bir failure asla control almaz — server'ın
+`403` ile reddettiği bir write'ı, ya da artık var olmayan bir task'a yapılan bir write'ı yeniden
+göndermek yalnızca toast'ı tekrarlar. Ve başarısız olan control **hâlâ ekrandaysa ve hâlâ
+canlıysa** — bir dialog'un submit button'ı, "Load more", bir select — retry zaten odur; yanına bir
+ikincisini koymak karmaşadır. Create/rename/delete dialog'larının kendi action'ını taşımamasının
+sebebi budur.
 
-Every user-visible string goes through **next-intl** from the first component. English and
-Turkish both ship today (`SUPPORTED_LOCALES` is `['en', 'tr']`); the roadmap's Beyond-MVP
-"Further UI language packs" row is about a third language, and the plumbing landed with the
-Phase 1 skeleton because retrofitting it costs far more than starting with it.
+Kullanıcıya görünen her string, ilk component'ten itibaren **next-intl** üzerinden geçer.
+İngilizce ve Türkçe bugün ikisi de ship ediliyor (`SUPPORTED_LOCALES`, `['en', 'tr']`);
+roadmap'in MVP ötesi bölümündeki "Başka arayüz dil paketleri" satırı üçüncü bir
+dille ilgilidir, ve plumbing Faz 1 skeleton'uyla birlikte geldi çünkü onu sonradan eklemek,
+onunla başlamaktan çok daha pahalıya mal olur.
 
-| i18n rule                     |                                                                                                                                                                                                                                          |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No hardcoded strings          | User-facing copy goes through `useTranslations` / `getTranslations` and `messages/*.json`. There is no ESLint rule forbidding JSX string literals yet — `messages/catalog.test.ts` catches missing/orphan keys for bound `t('…')` calls. |
-| Keys                          | By domain, mirroring the component tree: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                                                                                                             |
-| Catalogs                      | `messages/en.json` is canonical; `messages/tr.json` ships beside it and `messages/catalog.test.ts` fails the build on a key one has and the other does not                                                                               |
-| Plurals, interpolation        | ICU format (`{count, plural, …}`). Never concatenate sentence fragments — word order differs per language.                                                                                                                               |
-| Dates, numbers, relative time | `Intl.*` via next-intl formatters with the active locale; no hand-formatted dates                                                                                                                                                        |
-| Casing                        | **No `text-transform: uppercase` on translated strings** — Turkish `i → İ` breaks under CSS casing. Write the intended casing into the catalog.                                                                                          |
-| Layout                        | Assume ±35% string length; nothing is a fixed pixel width because the English fits                                                                                                                                                       |
+| i18n kuralı                      |                                                                                                                                                                                                                                                                        |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hardcode edilmiş string yok      | Kullanıcıya görünen metin `useTranslations` / `getTranslations` ve `messages/*.json` üzerinden geçer. JSX string literal'lerini yasaklayan bir ESLint kuralı henüz yok; `messages/catalog.test.ts`, bağlanmış `t('…')` çağrıları için eksik ve öksüz key'leri yakalar. |
+| Key'ler                          | Domain'e göre, component tree'yi mirror'layarak: `board.column.addAction`, `task.priority.urgent`, `errors.http.409`                                                                                                                                                   |
+| Kataloglar                       | `messages/en.json` kanoniktir; `messages/tr.json` onun yanında gelir ve `messages/catalog.test.ts`, birinde olup diğerinde olmayan bir key'de build'i düşürür                                                                                                          |
+| Plural'lar, interpolation        | ICU format (`{count, plural, …}`). Cümle parçalarını asla concat etme — word order dilden dile değişir.                                                                                                                                                                |
+| Date'ler, sayılar, relative time | Aktif locale ile next-intl formatter'ları üzerinden `Intl.*`; elle formatlanmış date yok                                                                                                                                                                               |
+| Casing                           | **Çevrilmiş string'lerde `text-transform: uppercase` yok** — Turkish `i → İ`, CSS casing altında bozuluyor. İstenen casing'i doğrudan kataloğa yaz.                                                                                                                    |
+| Layout                           | ±35% string uzunluğu varsay; İngilizcesi sığıyor diye hiçbir şey fixed pixel width olmasın                                                                                                                                                                             |
 
-## 8. Charts and dashboard
+## 8. Grafikler ve dashboard
 
-For the dashboard ([ROADMAP.md](../ROADMAP.md#shipped-mvp-summary), Phase 7), rendered with Recharts. Form is chosen by the
-reader's job, before any color decision. Never a dual y-axis, never a pie past two slices,
-never a generated ninth hue — fold the tail into "Other" or facet into small multiples.
+Dashboard için ([ROADMAP.md](../ROADMAP.md#sevkedilen-mvp-özet), Faz 7), Recharts ile render edilir. Form, herhangi bir renk
+kararından önce, reader'ın job'ına göre seçilir. Asla dual bir y-axis, asla iki slice'ı geçen bir
+pie, asla generate edilmiş bir dokuzuncu ton — tail'i "Other" ("Diğer") içine katla ya da small
+multiple'lara facet'le.
 
-| Aggregate                                      | Form                                                                                                    | Color job                  |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------- |
-| Open tasks, overdue count, completed this week | **Stat tile** — label, value, signed delta vs a named period, optional sparkline                        | none / emphasis            |
-| Completion over time                           | **Line**, one series (10% area fill only if it is alone)                                                | sequential                 |
-| Created vs completed over time                 | **Two lines**, legend above; direct labels at the right edge are the intended shape and are not shipped | categorical 1–2            |
-| Tasks per column · per assignee                | **Horizontal bar**, sorted; assignees top 8 then "Other"                                                | sequential                 |
-| Priority breakdown                             | **Horizontal stacked bar**, one row, LOW→URGENT                                                         | the priority scale (§3)    |
-| Label distribution                             | **Horizontal bar**                                                                                      | categorical, by label slot |
-| Column composition over time                   | **Stacked area / column**, ≤ 6 series                                                                   | categorical                |
-| More than ~7 categories that all matter        | **Table**, or table plus chart                                                                          | —                          |
+| Aggregate                                        | Form                                                                                             | Renk görevi                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------------------- |
+| Open task'lar, overdue count, bu hafta completed | **Stat tile** — label, value, adlandırılmış bir periyoda karşı signed delta, opsiyonel sparkline | none / emphasis                  |
+| Zaman içinde completion                          | **Line**, tek series (yalnızca yalnızsa 10% area fill)                                           | sequential                       |
+| Zaman içinde created vs completed                | **Two lines**, üstte legend; sağ kenardaki direct label'lar amaçlanan biçim, ship edilmedi       | categorical 1–2                  |
+| Column başına · assignee başına task             | **Horizontal bar**, sorted; assignee'ler top 8 sonra "Other" ("Diğer")                           | sequential                       |
+| priority breakdown'ı                             | **Horizontal stacked bar**, tek satır, LOW→URGENT                                                | priority skalası (§3)            |
+| Label distribution'ı                             | **Horizontal bar**                                                                               | categorical, label slot'una göre |
+| Zaman içinde column composition'ı                | **Stacked area / column**, ≤ 6 series                                                            | categorical                      |
+| Hepsi önemli olan ~7'den fazla category          | **Table**, ya da table artı chart                                                                | —                                |
 
-Palette validated against Kurul's own surfaces (`#FFFFFF` light, `#212523` dark). These slots
-also back `Label.color`.
+Palette, Kurul'un kendi surface'lerine karşı validate edildi (`#FFFFFF` açık, `#212523` koyu).
+Bu slot'lar aynı zamanda `Label.color`'ın arkasındadır.
 
-| Slot | Hue    | Light     | Dark      |     | Slot | Hue     | Light     | Dark      |
-| ---- | ------ | --------- | --------- | --- | ---- | ------- | --------- | --------- |
-| 1    | blue   | `#2A78D6` | `#3987E5` |     | 5    | magenta | `#E87BA4` | `#D55181` |
-| 2    | orange | `#EB6834` | `#D95926` |     | 6    | green   | `#008300` | `#2A9D3C` |
-| 3    | aqua   | `#1BAF7A` | `#199E70` |     | 7    | violet  | `#4A3AA7` | `#9085E9` |
-| 4    | yellow | `#EDA100` | `#C98500` |     | 8    | red     | `#E34948` | `#E66767` |
+| Slot | Ton     | Açık      | Koyu      |     | Slot | Ton     | Açık      | Koyu      |
+| ---- | ------- | --------- | --------- | --- | ---- | ------- | --------- | --------- |
+| 1    | mavi    | `#2A78D6` | `#3987E5` |     | 5    | macenta | `#E87BA4` | `#D55181` |
+| 2    | turuncu | `#EB6834` | `#D95926` |     | 6    | yeşil   | `#008300` | `#2A9D3C` |
+| 3    | turkuaz | `#1BAF7A` | `#199E70` |     | 7    | mor     | `#4A3AA7` | `#9085E9` |
+| 4    | sarı    | `#EDA100` | `#C98500` |     | 8    | kırmızı | `#E34948` | `#E66767` |
 
-Validator — **light**: lightness band, chroma, CVD (worst adjacent ΔE 9.1) and normal-vision
-(19.6) all PASS; contrast WARN on slots 2, 3, 4, 5 (2.61 / 2.29 / 1.76 / 2.19, below 3:1 as a dot
-on the signature tint, the worst ground `app/globals.contrast.test.ts` measures a label chip
-against). The dot is never the only channel: it is `aria-hidden` and always paired with the
-label's own name, and every chart carrying these slots still offers **the table view** as the
-relief route. **Dark**: lightness band, chroma, normal-vision (worst adjacent ΔE
-19.3) and contrast against the dark surface all PASS; CVD separation lands in the 6 to 8 floor band
-at worst adjacent ΔE 7.2 (deutan, slot 5 magenta against slot 6 green), recomputed after slot 6
-moved to `#2A9D3C` to clear 3:1 on the dark surfaces. That band is legal only with a second
-channel, and every use of these slots already carries one: the label's own name in the chip, a
-legend plus the table view in a chart.
+Validator — **açık**: lightness band, kroma, CVD (worst adjacent ΔE 9.1) ve normal-vision (19.6)
+hepsi PASS; slot 2, 3, 4, 5'te contrast WARN (2.61 / 2.29 / 1.76 / 2.19, signature tint üzerinde
+bir dot olarak 3:1'in altında, `app/globals.contrast.test.ts`'in bir label chip'i karşı ölçtüğü en
+kötü ground). Dot asla tek kanal değildir: `aria-hidden`'dır ve her zaman label'ın kendi ismiyle
+eşleşir, ve bu slot'ları taşıyan her chart hâlâ **table view**'ı relief
+route olarak sunar. **Koyu**: lightness band, kroma, normal-vision (worst adjacent ΔE 19.3) ve
+koyu surface'e karşı contrast PASS; CVD separation ise worst adjacent ΔE 7.2 ile (deutan, slot 5
+macenta ile slot 6 yeşil arasında) 6 ile 8 arasındaki floor band'ine düşüyor, slot 6 koyu
+surface'lerde 3:1'i geçmek için `#2A9D3C`'ye taşındıktan sonra yeniden hesaplandı. O band yalnızca
+ikinci bir kanalla legaldir ve bu slot'ların her kullanımı o kanalı zaten taşıyor: chip'te label'ın
+kendi ismi, chart'ta legend artı table view.
 
-| Rule                   |                                                                                                                                                                                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Slot assignment        | Fixed order, assigned in sequence, **never cycled**. Color follows the entity, not its rank — filtering out a series must not repaint the survivors.                                                                                                                                 |
-| Series cap             | 6 soft / 8 hard for bars, lines, stacks; **3** for scatter, bubble, and small multiples (the all-pairs gate)                                                                                                                                                                         |
-| Sequential · diverging | One hue, blue, light→dark for magnitude · blue ↔ red with a **neutral gray** midpoint (`#F0EFEC` / `#383835`), only for "vs target" views                                                                                                                                            |
-| Emphasis               | One series in `--signature` copper, the rest in `--label-slot-1`. The only copper in a chart, and the right answer whenever the story is "this one".                                                                                                                                 |
-| Status and priority    | Reserved — never reused as "series 4"                                                                                                                                                                                                                                                |
-| Marks                  | Bars ≤ 24px thick, 4px rounded data-end, square at the baseline, 2px surface-colored gap between adjacent bars and stacked segments; lines 2px round cap/join; markers ≥ 8px with a 2px surface ring                                                                                 |
-| Grid and axes          | Horizontal gridlines only, 1px solid `--border`, never dashed. No chart border, no background fill. Ticks rounded to clean numbers, thousands-separated, `tabular-nums`, in `--muted-foreground`.                                                                                    |
-| Legend and labels      | Legend always present at 2+ series, none for one — the title names it. Direct labels are selective (endpoint, extreme, or the one series that is the story), never a number on every point. **Text wears text tokens, never the series hue**; identity comes from the dot beside it. |
-| Tooltip                | Default-on: crosshair + tooltip on line and area, per-mark on bar and cell. Canvas surface (`--background`), 1px `--border`, `md` radius, 8px padding, Recharts' own dot + name + value rows (no `tabular-nums` yet), hit target larger than the mark.                               |
-| Filters and table view | Filters in one row above the charts, never inside a chart. Every chart has a "View as table" affordance — also the relief channel for the light-mode contrast WARN.                                                                                                                  |
+| Kural                    |                                                                                                                                                                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Slot ataması             | Fixed order, sırayla assign edilir, **asla cycle'lanmaz**. Renk, rank'ini değil entity'yi takip eder — bir series'i filtrelemek, kalanları repaint etmemeli.                                                                                                                                     |
+| Series cap'i             | Bar'lar, line'lar, stack'ler için 6 soft / 8 hard; scatter, bubble ve small multiple'lar için **3** (all-pairs gate)                                                                                                                                                                             |
+| Sequential · diverging   | Magnitude için tek bir ton, mavi, açık→koyu · **neutral gray** (`#F0EFEC` / `#383835`) midpoint'li mavi ↔ kırmızı, yalnızca "vs target" view'ları için                                                                                                                                           |
+| Emphasis                 | `--signature` bakırında tek bir series, kalanı `--label-slot-1`'da. Bir chart'taki tek bakır, ve story "this one" ("bu") olduğunda doğru cevap.                                                                                                                                                  |
+| status ve priority       | Reserved — asla "series 4" olarak reuse edilmez                                                                                                                                                                                                                                                  |
+| Mark'lar                 | Bar'lar ≤ 24px kalınlığında, 4px rounded data-end, baseline'da square, adjacent bar'lar ve stacked segment'ler arasında 2px surface-colored gap; line'lar 2px round cap/join; marker'lar ≥ 8px, 2px'lik bir surface ring'iyle                                                                    |
+| Grid ve axis'ler         | Yalnızca horizontal gridline, 1px solid `--border`, asla dashed değil. Chart border yok, background fill yok. Tick'ler temiz sayılara rounded, thousands-separated, `tabular-nums`, `--muted-foreground`'da.                                                                                     |
+| Legend ve label'lar      | 2+ series'te legend her zaman var, tek series'te yok — title onu zaten adlandırıyor. Direct label'lar selective'tir (endpoint, extreme, ya da story olan tek series), asla her point'te bir sayı değil. **Metin text token giyer, asla series ton'unu değil**; identity yanındaki dot'tan gelir. |
+| Tooltip                  | Default-on: line ve area'da crosshair + tooltip, bar ve cell'de per-mark. Canvas surface'i (`--background`), 1px `--border`, `md` radius, 8px padding, Recharts'ın kendi dot + name + value satırları (henüz `tabular-nums` yok), mark'tan daha büyük bir hit target.                            |
+| Filter'lar ve table view | Filter'lar chart'ların üzerinde tek bir satırda, asla bir chart'ın içinde değil. Her chart'ın bir "View as table" ("Tablo olarak görüntüle") affordance'ı var — aynı zamanda light-mode contrast WARN'ı için relief channel.                                                                     |
 
-**Stat tiles.** Label in `small` `--muted-foreground`, sentence case, no trailing colon · value in
-`text-stat` (Archivo 600 at 28px, its own type-scale step, never Fraunces, since a display face on
-a number reads as decoration) with **proportional**, comma-grouped figures (`1,284`), colored
-`--foreground` or, on the one tile marked `emphasize`, `--destructive` when the count is above
-zero (`components/dashboard/stat-tile.tsx`). Not shipped yet: auto-compaction (`12.9K`), a signed
-delta against a named period, its up-is-good-or-not colouring and arrow, the optional sparkline,
-and a ≥48px hero-figure step: none has a call site or a token today, so none is claimed as
-current.
+**Stat tile'lar.** `small` `--muted-foreground`'da label, sentence case, sondan colon yok ·
+`text-stat`'ta value (28px'te Archivo 600, kendi type-scale adımı, asla Fraunces'te, çünkü bir sayının
+üzerindeki bir display face dekorasyon gibi okunur), **proportional**, binlik ayraçlı figure'larla
+(`1,284`), `--foreground` ya da, `emphasize` işaretli tek tile'da, count sıfırın üzerindeyken
+`--destructive`'te renklenir (`components/dashboard/stat-tile.tsx`). Henüz ship edilmedi:
+auto-compaction (`12.9K`), adlandırılmış bir periyoda karşı signed bir delta, onun
+up-is-good-or-not renklenmesi ve arrow'u, opsiyonel sparkline, ve ≥48px'lik bir hero-figure
+adımı: hiçbirinin bugün bir call site'ı ya da token'ı yok, bu yüzden hiçbiri current diye iddia
+edilmiyor.
 
-## 9. Accessibility
+## 9. Erişilebilirlik
 
-Target **WCAG 2.1 AA** in both themes, verified per token pair rather than per screenshot.
+Her iki temada da **WCAG 2.1 AA**'yı hedefle, screenshot başına değil token pair'i başına
+verify edilmiş olarak.
 
-| Requirement                       | Floor                                                 | Applies to                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Body text on its surface          | 4.5:1                                                 | `app/globals.contrast.test.ts`: every text token in §3 against six real surfaces (canvas, column, card, popover, hover step, signature tint); boundary tokens hold the same six at 3:1. Nothing is waved through on prose: every exemption is a named entry in that file carrying its measured number and its reason, re-measured on each run and failing the gate when it drifts off that number or stops being needed. There are four classes of them. `--border`, the decorative hairline that carries no state. Copper text on the signature tint, which §3 forbids outright, and on the hover step, which no call site draws, both light only. The four light label slots, measured as dots and relieved by the name beside them (§8). And the alpha derivatives whose full-strength twin is the real mark: `opacity-50` on an inactive control (WCAG exempts it, the gate holds it to 3:1 anyway) and the hole a dragged card leaves in its column. |
-| APCA on dark small type           | Lc 48, under Lc 75 or gate it instead of reporting it | `app/globals.contrast.test.ts`: dark `--foreground-secondary` and `--muted-foreground` (the 11-12px meta row) against all six dark surfaces, alongside their WCAG floor above; `--foreground` clears Lc 75 (body text) on all six. Worst case: `--muted-foreground` Lc 48.5 on `--accent` (WCAG 5.3:1), `--foreground-secondary` Lc 63.7 on the same surface. The three-token ink ramp is order-checked on every surface too, so a token move cannot re-rank `--foreground` > `--foreground-secondary` > `--muted-foreground` while each still clears its own floor alone.                                                                                                                                                                                                                                                                                                                                                                                |
-| Large text (≥18.66px bold / 24px) | 3:1                                                   | Titles, hero figures                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Component boundaries and states   | 3:1                                                   | Input borders, focus ring, sancak rail, chart marks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Disabled text                     | exempt, held to 3:1 anyway                            | Placeholders, disabled controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Chart marks on the chart surface  | 3:1, or the table view                                | Light slots 2, 3, 4, 5 take the relief route (§8 measures all four under 3:1 as a dot on the signature tint)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Gereksinim                               | Taban                                                    | Uygulandığı yer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kendi surface'i üzerinde body metni      | 4.5:1                                                    | `app/globals.contrast.test.ts`: §3'teki her metin token'ı altı gerçek surface'e karşı (canvas, column, kart, popover, hover adımı, signature tint); boundary token'ları aynı altısını 3:1'de tutar. Hiçbir şey prose ile geçmez: her muafiyet, o dosyada ölçülen sayısını ve gerekçesini taşıyan adlandırılmış bir kayıttır, her run'da yeniden ölçülür ve o sayıdan saparsa ya da artık gerekmiyorsa gate'i kırar. Dört sınıfı var. `--border`, state taşımayan dekoratif hairline. signature tint üzerinde bakır metin (§3 bunu zaten yasaklar) ve hover adımı üzerinde bakır metin (hiçbir call site onu çizmez), ikisi de yalnız açık temada. Nokta olarak ölçülen ve yanındaki isimle relief alan dört açık tema label slot'u (§8). Ve tam güçteki ikizi gerçek mark olan alpha türevleri: inaktif bir control üzerinde `opacity-50` (WCAG onu muaf tutar, gate yine de 3:1'e tutar) ve sürüklenen bir kartın column'da bıraktığı boşluk. |
+| Koyu temada küçük tip için APCA          | Lc 48, Lc 75'in altında ya da rapor etmek yerine gate'le | `app/globals.contrast.test.ts`: koyu `--foreground-secondary` ve `--muted-foreground` (11-12px meta satırı) altı koyu surface'e karşı, yukarıdaki WCAG floor'unun yanında; `--foreground` altısında da Lc 75'i (body metni) geçiyor. En kötü durum: `--muted-foreground` `--accent` üzerinde Lc 48.5 (WCAG 5.3:1), `--foreground-secondary` aynı surface'te Lc 63.7. Üç token'lık ink ramp'i de her surface'te sıra kontrolünden geçiyor, bu yüzden her biri kendi floor'unu tek başına geçerken bir token hareketi `--foreground` > `--foreground-secondary` > `--muted-foreground` sırasını bozamıyor.                                                                                                                                                                                                                                                                                                                                       |
+| Büyük metin (≥18.66px bold / 24px)       | 3:1                                                      | Title'lar, hero figure'lar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Component sınırları ve state'leri        | 3:1                                                      | Input border'ları, focus ring, sancak rail'i, chart mark'ları                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Disabled metin                           | muaf, yine de 3:1'e tutulur                              | Placeholder'lar, disabled control'ler                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Chart surface'i üzerinde chart mark'ları | 3:1, ya da table view                                    | Açık slot 2, 3, 4, 5 relief route'unu alır (§8 dördünü de signature tint üzerinde nokta olarak 3:1'in altında ölçer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
-| Rule                         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Keyboard parity              | Every pointer interaction has a keyboard path, drag and drop included (§5). If a feature can only be done by dragging, it is unfinished.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Color is never alone         | Priority and status ship an icon and a word; labels carry their name in the chip; series get a legend at 2+ series, and the table view (§8) as the second channel; direct labels are not shipped; the rail is accompanied by `aria-current` and a weight change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Focus management             | The non-modal panel moves focus to its heading on open, without trapping. On close it should return focus to the originating card; today it lands on `<main>` instead, because the card node is replaced while the panel route is mounted and `use-task-panel-focus.ts` falls back (Hardening track, "Board keyboard follow-ups"). Dialogs _do_ trap, restore focus on close, and close on `Esc`; popovers return focus to their trigger.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Focus inside a menu          | Radix moves focus into a dropdown's content when it opens and onto a row on pointer move, and the rows carry no outline suppressor, so the row under the pointer wears the same single focus outline an arrowed-to row does, on top of its `bg-accent` step. Kept deliberately: the alternative is suppressing the outline again on the one row type a keyboard reaches by arrow key. One mark too many for a pointer is accepted; one too few for a keyboard is not. Measured on the running app in Chromium 151 and Firefox 153.                                                                                                                                                                                                                                                                                                                                                 |
-| Announcements                | Drag transitions, optimistic failures, realtime arrivals, and toasts go through `aria-live="polite"`; only a session-ending error is `assertive`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Reduced motion               | Respected everywhere and never removes a state change: the state still changes, it just stops moving                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Structure                    | One `h1` per route; landmarks for sidebar, main, panel; the board as a labelled composite widget; column counts exposed as text, not inferred                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Zoom, reflow, forced colors  | Usable at 200%: the sidebar collapses and the panel becomes a sheet rather than the board scrolling in two directions. `forced-colors: active` keeps borders and focus rings; a chart has no automatic fallback, so its "View as table" control (§8) is the reader's own route out.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Forced colors, high contrast | Every state built on a surface step or a tint carries a border-based twin, with one named exception. Under `forced-colors: active`: the selected card takes a `Highlight` outline, a card another member just changed takes a dotted `Highlight` border (dotted so it stays distinct from selection's solid one), the column drop target takes a `Highlight` outline inset, and a highlighted menu row paints `Highlight` / `HighlightText` in place of its tint. The exception is the card's hover step: forced colours collapse `--border` and `--border-strong` onto one `CanvasText`, so its twin would have to borrow `Highlight` and would then read as selection; hover is also the only state with no keyboard path to lose, and focus keeps its own ring. Under `prefers-contrast: more`: `--border` takes `--border-strong`'s value instead of opening a second palette. |
-| `--input` alias              | `--input` reads `--border-strong`'s value (`--input: var(--border-strong)` in `app/globals.css`), so every field, select and textarea wearing `border-input` already clears the 3:1 boundary floor without a token of its own.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `dark:` binding              | Tailwind's `dark:` variant is bound to the `.dark` class next-themes writes (`@custom-variant dark (&:where(.dark, .dark *))` in `app/globals.css`), not to `prefers-color-scheme`, so a viewer's chosen theme controls every `dark:` utility in `components/ui/` regardless of the OS setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Kural                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Klavye paritesi              | Her pointer etkileşiminin bir klavye yolu vardır, drag and drop dahil (§5). Bir feature yalnızca drag ile yapılabiliyorsa, bitmemiş demektir.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Renk asla tek başına değil   | priority ve status bir ikon ve bir kelimeyle ship edilir; label'lar isimlerini chip'te taşır; series'ler 2+ series'te bir legend alır ve ikinci kanal olarak table view'ı (§8) alır; direct label'lar ship edilmedi; rail'e `aria-current` ve bir weight değişimi eşlik eder                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Focus yönetimi               | Non-modal panel, açılışta focus'u kendi heading'ine taşır, trap etmeden (masaüstünde; `md` altında panel tam ekran bir sheet'tir ve Tab arkadaki board'a kaçmasın diye elle hapsedilir). Kapanışta focus'u onu açan karta geri döndürmesi gerekir; bugün bunun yerine `<main>` üzerine düşüyor, çünkü panel route'u mount'luyken kartın node'u değişiyor ve `use-task-panel-focus.ts` fallback'e geçiyor (Sağlamlaştırma hattı, "Faz 6 parity taramasından Board klavye follow-up'ları"). Dialog'lar _gerçekten_ trap eder, kapanışta focus'u restore eder ve `Esc`'te kapanır; popover'lar focus'u trigger'larına geri döndürür.                                                                                                                                                                                                                                                                                                                |
+| Menü içinde focus            | Radix, bir dropdown açılırken focus'u content'e, pointer hareket ettikçe de row'a taşır ve row'larda outline bastırıcı yok; bu yüzden pointer'ın altındaki row, `bg-accent` adımının üstünde, arrow ile gelinen row ile aynı tek focus outline'ını giyer. Bilerek böyle: alternatifi, klavyenin arrow key ile ulaştığı tek row türünde outline'ı yeniden bastırmak. Pointer için bir işaret fazla kabul edilir; klavye için bir işaret eksik kabul edilmez. Çalışan uygulamada Chromium 151 ve Firefox 153'te ölçüldü.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Announcement'lar             | Drag transition'ları, optimistic failure'lar, realtime arrival'lar ve toast'lar `aria-live="polite"` üzerinden geçer; yalnızca session'ı bitiren bir error `assertive`'dir                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Reduced motion               | Her yerde respect edilir ve bir state değişimini asla kaldırmaz: state yine değişir, yalnızca hareket etmeyi bırakır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Structure                    | Route başına bir `h1`; sidebar, main, panel için landmark; labelled composite widget olarak board; text olarak expose edilen column count'ları, infer edilmeyen                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Zoom, reflow, forced colors  | 200%'de kullanılabilir: board iki yönde scroll olmak yerine sidebar collapse olur ve panel bir sheet'e dönüşür. `forced-colors: active`, border'ları ve focus ring'leri korur; bir chart'ın otomatik fallback'i yok, dolayısıyla kendi "View as table" kontrolü (§8) okuyucunun kendi çıkış yoludur.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Forced colors, high contrast | Bir surface adımı veya bir tint üzerine kurulu her state, adı konmuş tek bir istisna dışında border tabanlı bir ikizini taşır. `forced-colors: active` altında: seçili kart bir `Highlight` outline alır, başka bir üyenin az önce değiştirdiği kart noktalı (dotted) bir `Highlight` border alır (seçimin solid border'ından ayrı okunsun diye noktalı), column'un drop target'ı kendi tint'i yerine inset bir `Highlight` outline alır, ve highlighted bir menü satırı kendi tint'i yerine `Highlight` / `HighlightText` boyar. İstisna, kartın hover adımıdır: forced colors `--border` ile `--border-strong`'u tek bir `CanvasText`'e indirir, dolayısıyla ikizi `Highlight`'ı ödünç almak zorunda kalır ve seçim gibi okunur; ayrıca hover, kaybedecek bir klavye yolu olmayan tek state'tir ve focus kendi ring'ini korur. `prefers-contrast: more` altında: `--border`, ikinci bir palet açmak yerine `--border-strong`'un değerini alır. |
+| `--input` takma adı          | `--input`, `--border-strong`'un değerini okur (`app/globals.css`'te `--input: var(--border-strong)`), böylece `border-input` taşıyan her field, select ve textarea kendi token'ı olmadan zaten 3:1 boundary tabanını geçer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `dark:` binding'i            | Tailwind'in `dark:` variant'ı, next-themes'in yazdığı `.dark` class'ına bağlıdır (`app/globals.css`'te `@custom-variant dark (&:where(.dark, .dark *))`), `prefers-color-scheme`'e değil; kullanıcının seçtiği tema, OS ayarından bağımsız olarak `components/ui/` içindeki her `dark:` utility'sini kontrol eder.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
-## 10. Cross-references
+## 10. Çapraz referanslar
 
-| Document                                                               | What it binds here                                                                                                                                                                                |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` is shadcn output only: tokens are edited in the theme, never in a primitive; no arbitrary hex in components beyond the two pinned exceptions; conditional classes through `cn()` |
-| [architecture.md](architecture.md#4-appsweb--structure)                | The `(auth)` / `(app)` route groups and the `board/`, `task/`, `dashboard/`, `layout/` component domains this document lays out                                                                   |
-| [api-conventions.md](api-conventions.md#errors)                        | The problem-JSON shape error copy derives from, and the rule to branch on `statusCode`                                                                                                            |
-| [Shipped MVP summary](../ROADMAP.md#shipped-mvp-summary)               | Phase 3 lands tokens, shell, and board chrome; Phase 4 the drag interaction and detail panel; Phase 5 priority and label rendering; Phase 7 the charts                                            |
-| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts: the toolkit every rule above is written against                                                                                          |
-| [tech-stack.md](tech-stack.md)                                         | Why that toolkit                                                                                                                                                                                  |
+| Doküman                                                                | Burada neyi bağlıyor                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [coding-standards.md](coding-standards.md#nextjs-appsweb)              | `components/ui/` yalnızca shadcn output'udur: token'lar theme'de edit edilir, asla bir primitive'de değil; component'lerde, sabitlenmiş iki istisna dışında, arbitrary hex yok; conditional class'lar `cn()` üzerinden |
+| [architecture.md](architecture.md#4-appsweb--yapı)                     | Bu dokümanın ortaya koyduğu `(auth)` / `(app)` route group'ları ve `board/`, `task/`, `dashboard/`, `layout/` component domain'leri                                                                                    |
+| [api-conventions.md](api-conventions.md#hatalar)                       | Error metninin türediği problem-JSON şekli, ve `statusCode` üzerinden branch'leme kuralı                                                                                                                               |
+| [Sevkedilen MVP özeti](../ROADMAP.md#sevkedilen-mvp-özet)              | Faz 3 token'ları, shell'i ve board chrome'unu getirir; Faz 4 drag etkileşimini ve detay panelini; Faz 5 priority ve label render'ını; Faz 7 grafikleri                                                                 |
+| [`decisions/0003-frontend-stack.md`](decisions/0003-frontend-stack.md) | Next.js 16 + Tailwind + shadcn/ui + @dnd-kit + Recharts: yukarıdaki her kuralın karşısında yazıldığı toolkit                                                                                                           |
+| [tech-stack.md](tech-stack.md)                                         | Neden o toolkit                                                                                                                                                                                                        |

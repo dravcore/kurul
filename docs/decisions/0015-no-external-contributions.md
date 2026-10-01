@@ -1,126 +1,57 @@
-# 0015. No External Contributions; Legal Spend Deferred
+# 0015. Dış Katkı Kabul Edilmiyor; Hukuk Masrafı Ertelendi
 
-**Status:** Superseded by [0028](0028-open-contributions-hosted-service.md)
-**Date:** 2026-08-12
+**Durum:** [0028](0028-open-contributions-hosted-service.md) tarafından yerini aldı
+**Tarih:** 2026-08-12
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0015-no-external-contributions.md)
+> **Yerini aldı:** katkılar 2026-08-21'de [0028](0028-open-contributions-hosted-service.md) ile yeniden açıldı. Kod, doküman ve çeviri pull request'leri, CLA olmadan ve imzalanacak hiçbir şey olmadan, düz AGPL-3.0 altında yeniden kabul ediliyor. Aşağıdaki FSEK sorusunun artık cevaplanması gerekmiyor, çünkü hiçbir şey yeniden lisanslanmıyor. Bu kayıt tarihsel olarak duruyor; içindeki hiçbir şey yürürlükte değil.
 
-> **Superseded:** contributions were reopened on 2026-08-21 by
-> [0028](0028-open-contributions-hosted-service.md). Code, documentation and translation pull
-> requests are accepted again under plain AGPL-3.0, with no CLA and nothing to sign. The FSEK
-> question below no longer needs an answer, because nothing is relicensed any more. This record
-> is kept as history; nothing in it is in force.
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "`docs/tr/` altındaki
+Türkçe ayna" ifadesi kaldırılan İngilizce asıl + Türkçe ayna düzenine aittir, anılan dokümanların
+artık tek bir kopyası var; bkz. [ADR 0036](0036-turkish-only-documentation.md).
 
-## Context
+## Bağlam
 
-[ADR 0014](0014-dual-licensing-cla.md) settled the business model — dual licensing, with a
-Contributor License Agreement making it legally possible — and shipped
-`docs/cla.md` (deleted 2026-08-22, in git history) as a Harmony-derived draft plus a merge-blocking GitHub Actions
-check. It also recorded, honestly, that the legal work was not finished: the document carries
-unresolved `[FILL: …]` and `[ASK A LAWYER: …]` markers and a prominent not-in-force banner.
+[ADR 0014](0014-dual-licensing-cla.md) iş modelini karara bağladı — çift lisanslama ve bunu hukuken mümkün kılan bir Katkıda Bulunan Lisans Sözleşmesi — ve `docs/cla.md` (2026-08-22'de silindi, git geçmişinde)'yi Harmony türevi bir taslak olarak, merge'ü bloklayan bir GitHub Actions kontrolüyle birlikte yayımladı. Aynı ADR, hukuki işin bitmediğini de dürüstçe kaydetti: belgede çözülmemiş `[FILL: …]` ve `[HUKUKÇUYA SOR: …]` işaretleri ve öne çıkan bir "yürürlükte değil" uyarısı var.
 
-The hardest of those open questions is not cosmetic. The maintainer is a natural person
-resident in Turkey, so FSEK (Law No. 5846) governs, and FSEK requires agreements over economic
-rights in a work to be **in writing**. Whether a GitHub pull-request comment satisfies that
-form requirement — and whether the requirement reaches a sublicensable license grant at all,
-or only an outright transfer — is not something that can be reasoned out from documentation.
-It needs a lawyer, and the answer decides whether every signature already collected is worth
-anything.
+Bu açık soruların en zoru yüzeysel bir eksiklik değil. Sahip, Türkiye mukimi bir gerçek kişi; dolayısıyla FSEK (5846 sayılı Kanun) uygulanıyor ve FSEK, bir eser üzerindeki mali haklara ilişkin sözleşmelerin **yazılı** olmasını şart koşuyor. Bir GitHub pull request yorumunun bu şekil şartını karşılayıp karşılamadığı — ve şartın alt lisans verilebilir bir lisans vermeye uzanıp uzanmadığı, yoksa yalnızca tam bir devri mi kapsadığı — dokümantasyondan akıl yürüterek çözülebilecek bir şey değil. Hukukçu gerektiriyor ve cevap, o güne kadar toplanmış her imzanın bir işe yarayıp yaramadığını belirliyor.
 
-The maintainer is not going to have that conversation now, and has no date in mind for it.
-That leaves the CLA permanently un-actionable in the near term, and leaves a live CLA check
-demanding signatures against a draft. A decision that assumed the review would land shortly is
-no longer describing reality, so the reality has to be written down instead.
+Sahip bu görüşmeyi şimdi yapmayacak ve aklında bir tarih de yok. Bu da CLA'yı öngörülebilir gelecekte uygulanamaz bırakıyor, ve taslak bir metne karşı imza isteyen canlı bir CLA kontrolünü ortada bırakıyor. İncelemenin kısa sürede geleceğini varsayan bir karar artık gerçeği tarif etmiyor; o hâlde gerçeğin kendisi yazılmalı.
 
-## Decision
+## Karar
 
-**Kurul does not accept external contributions.** No outside code, documentation, or
-translation pull request is merged. The codebase stays single-authored: the maintainer writes
-it, and copyright in all of it stays in one pair of hands — the model [SQLite](https://www.sqlite.org/copyright.html)
-has run on for decades. Bug reports, feature ideas, design feedback and discussion are wanted
-as much as ever; a one-line typo or dead-link fix still carries no copyright worth arguing
-about and is still welcome.
+**Kurul dış katkı kabul etmiyor.** Dışarıdan gelen hiçbir kod, doküman veya çeviri pull request'i merge edilmiyor. Kod tabanı tek yazarlı kalıyor: sahip kodu kendisi yazıyor ve kodun tamamının telifi tek elde kalıyor — [SQLite](https://www.sqlite.org/copyright.html)'ın onlarca yıldır yürüttüğü model. Hata bildirimleri, özellik fikirleri, tasarım geri bildirimi ve tartışma her zamanki kadar isteniyor; tek satırlık bir yazım hatası veya kırık bağlantı düzeltmesi hâlâ tartışmaya değer bir telif taşımıyor ve hâlâ hoş karşılanıyor.
 
-**The CLA draft is kept, not enacted.** `docs/cla.md` (deleted 2026-08-22, in git history) stays in the repository with
-its not-in-force banner intact, and the CLA workflow
-(`.github/workflows/cla.yml`, deleted by 0028, last version in git history) is disabled — triggers cut
-back to `workflow_dispatch` and the job guarded with `if: ${{ false }}` — rather than deleted.
-The work is done and waiting; if the legal review ever happens, enabling it is a small change,
-not a rewrite.
+**CLA taslağı korunuyor, yürürlüğe konmuyor.** `docs/cla.md` (2026-08-22'de silindi, git geçmişinde) "yürürlükte değil" uyarısı yerinde kalmak üzere depoda duruyor ve CLA workflow'u (`.github/workflows/cla.yml`, 0028 ile silindi, son hali git geçmişinde) silinmek yerine devre dışı bırakılıyor — tetikleyiciler `workflow_dispatch`'e indirildi ve job `if: ${{ false }}` ile korumaya alındı. İş yapılmış ve hazır bekliyor; hukuki inceleme bir gün gerçekleşirse etkinleştirmek küçük bir değişiklik, yeniden yazım değil.
 
-**Legal spend is deferred to the first commercial sale.** The lawyer this project actually
-needs is not one for the CLA but one for the commercial license agreement, and that document
-is only needed when there is a paying customer to sign it. At that point the revenue justifies
-the fee, and the customer's own counsel reviews the text as well — two readings for one
-expense.
+**Hukuk masrafı ilk ticari satışa erteleniyor.** Bu projenin asıl ihtiyaç duyduğu hukukçu CLA için değil, ticari lisans sözleşmesi için; o belge de ancak imzalayacak ödeme yapan bir müşteri olduğunda gerekiyor. O noktada gelir ücreti gerekçelendiriyor ve müşterinin kendi hukukçusu da metni inceliyor — tek masrafa iki okuma.
 
-This ADR does **not** supersede [ADR 0014](0014-dual-licensing-cla.md). 0014's target model —
-one AGPL-3.0 codebase, sold in parallel under a commercial license, with a CLA covering any
-external contribution — remains the intended destination. 0015 suspends the route to it: the
-CLA half is dormant until legal review happens, and the contribution half is closed in the
-meantime so that nothing accumulates that would need a CLA retroactively.
+Bu ADR, [ADR 0014](0014-dual-licensing-cla.md)'ün **yerini almıyor**. 0014'ün hedef modeli — tek bir AGPL-3.0 kod tabanı, paralelde ticari lisansla satılan aynı kod, ve her dış katkıyı kapsayan bir CLA — hedeflenen varış noktası olmaya devam ediyor. 0015 oraya giden yolu askıya alıyor: CLA yarısı hukuki inceleme gerçekleşene kadar uykuda, katkı yarısı ise bu arada kapalı — ki geriye dönük olarak CLA gerektirecek hiçbir şey birikmesin.
 
-## Rationale
+## Gerekçe
 
-- **100% copyright ownership closes no doors.** As the sole author, the maintainer can dual
-  license, sell a commercial license, relicense, or close the source entirely — every option
-  ADR 0014 wanted, and several it did not, all available without asking anyone. The CLA exists
-  only to buy back that freedom after it has been given away in pieces. Not giving it away in
-  the first place is strictly simpler.
-- **The CLA solves a problem the project does not have yet.** It is machinery for handling
-  external contributions, and there are zero external contributors. Standing up unreviewed
-  legal machinery to govern traffic that does not exist is risk without benefit: the risk is
-  real (invalid signatures), the benefit is hypothetical (a contributor who has not appeared).
-- **Collecting invalid signatures is worse than collecting none.** A signature that fails
-  FSEK's form requirement does not announce itself. It sits in the ledger looking like
-  coverage, and the defect surfaces at the worst possible moment — during a commercial
-  customer's due diligence, when the code has already shipped under terms the maintainer
-  may not have had the right to grant. Zero signatures is an obvious, honest gap that can be
-  planned around. A drawer of unenforceable ones is a hidden liability.
-- **A live check against a draft is disrespectful, not just untidy.** Someone who opens a code
-  pull request today is asked by a bot to sign an unreviewed legal document in order to unblock
-  a pull request that will not be merged regardless. The honest move is to refuse the
-  contribution up front and turn the bot off.
-- **Deferral is the cheapest correct order of operations.** Paying for a CLA review now buys
-  the right to accept contributions that nobody is offering. Paying for a commercial license
-  review at the first sale buys a document that produces revenue on the day it is signed.
+- **%100 telif sahipliği hiçbir kapıyı kapatmıyor.** Tek yazar olarak sahip çift lisanslayabilir, ticari lisans satabilir, yeniden lisanslayabilir veya kaynağı tamamen kapatabilir — ADR 0014'ün istediği her seçenek, istemediği birkaçı da dahil, kimseye sormadan elde. CLA yalnızca bu özgürlüğü parça parça verdikten sonra geri satın almak için var. En baştan hiç vermemek kesinlikle daha basit.
+- **CLA, projenin henüz sahip olmadığı bir sorunu çözüyor.** Dış katkıları yönetmek için bir mekanizma ve ortada sıfır dış katkıcı var. Var olmayan bir trafiği yönetmek üzere incelenmemiş hukuki mekanizma kurmak, faydasız risk demek: risk gerçek (geçersiz imzalar), fayda varsayımsal (henüz ortaya çıkmamış bir katkıcı).
+- **Geçersiz imza toplamak, hiç toplamamaktan kötü.** FSEK'in şekil şartını karşılamayan bir imza kendini ele vermez. Defterde koruma gibi görünerek durur ve kusur en kötü anda ortaya çıkar — ticari bir müşterinin durum tespiti sırasında, kod sahibin vermeye hakkı olmayabilecek şartlarla çoktan teslim edilmişken. Sıfır imza, planlanabilir, açık ve dürüst bir boşluktur. Bir çekmece dolusu uygulanamaz imza ise gizli bir yükümlülüktür.
+- **Taslak metne karşı canlı bir kontrol, dağınıklık değil saygısızlık.** Bugün bir kod pull request'i açan kişiden bot, zaten merge edilmeyecek bir PR'ın engelini kaldırmak için incelenmemiş bir hukuki belgeyi imzalamasını istiyor. Dürüst olan, katkıyı baştan reddetmek ve botu kapatmak.
+- **Erteleme, doğru işlem sırasının en ucuzu.** CLA incelemesine şimdi ödeme yapmak, kimsenin sunmadığı katkıları kabul etme hakkını satın alıyor. Ticari lisans incelemesine ilk satışta ödeme yapmak ise imzalandığı gün gelir üreten bir belge satın alıyor.
 
-## Consequences
+## Sonuçlar
 
-- **No code community forms.** This gives up one of open source's largest advantages —
-  outside eyes, outside patches, outside maintenance — and it is the biggest cost of this
-  decision, taken deliberately rather than reluctantly. The code is still open, readable,
-  forkable and self-hostable under AGPL-3.0; what is closed is the inbound path.
-- **The single developer is the bottleneck.** If the project grows, throughput is capped at
-  one person's time, and there is no mechanism to relieve it. A backlog cannot be delegated,
-  and a bus factor of one is not mitigated by anything.
-- **People who want to help will be turned away, and some will take it personally.** A refused
-  pull request reads as rejection no matter how carefully the reasoning is written, and some
-  contributors will conclude the project is not really open source. [CONTRIBUTING.md](../../CONTRIBUTING.md)
-  states the position plainly and in advance so that nobody discovers it after doing the work,
-  which is the most that can be done about it.
-- **The pause has no end date.** ADR 0014 was written expecting the CLA to come into force;
-  this one deliberately promises no timeline, because a promised date that slips is worse than
-  an honest "indefinite".
-- **The decision is reversible, and reversing it brings the problem straight back.** Reopening
-  contributions requires the CLA to be in force first, which requires the legal review this ADR
-  defers — the FSEK question does not get easier or cheaper with time. Nothing here is a
-  one-way door, but the door only opens in the order 0014 described.
-- **Documentation stays single-language-canonical by necessity, not just by convention.** With
-  translation contributions closed, the Turkish mirror under `docs/tr/` remains the
-  maintainer's own work to keep in sync.
-- **The dormant CLA machinery needs occasional upkeep.** `contributor-assistant/github-action`
-  is archived (ADR 0014) and will eventually stop working on GitHub's runners. Because the
-  workflow is disabled rather than deleted, that decay is silent until someone tries to
-  re-enable it.
+- **Kod yazan bir topluluk oluşmuyor.** Bu, açık kaynağın en büyük avantajlarından birinden — dışarıdan gözler, dışarıdan yamalar, dışarıdan bakım — vazgeçmek demek ve bu kararın en büyük maliyeti; isteksizce değil, bilinçli olarak göze alınıyor. Kod hâlâ açık, okunabilir, fork'lanabilir ve AGPL-3.0 ile self-host edilebilir; kapalı olan, içeri gelen yol.
+- **Tek geliştirici darboğaz.** Proje büyürse üretim hızı tek kişinin zamanıyla sınırlı ve bunu rahatlatacak bir mekanizma yok. Birikmiş iş devredilemiyor ve bus factor'ün bir olması hiçbir şeyle telafi edilmiyor.
+- **Yardım etmek isteyenler geri çevrilecek ve bir kısmı bunu kişisel algılayacak.** Reddedilen bir pull request, gerekçesi ne kadar dikkatli yazılırsa yazılsın reddedilme olarak okunuyor ve bazı katkıcılar projenin gerçekten açık kaynak olmadığı sonucuna varacak. [CONTRIBUTING.md](../../CONTRIBUTING.md) bu duruşu açıkça ve önceden söylüyor ki kimse emeğini harcadıktan sonra öğrenmesin; bu konuda yapılabilecek en fazlası bu.
+- **Duraklamanın bitiş tarihi yok.** ADR 0014 CLA'nın yürürlüğe gireceği beklentisiyle yazılmıştı; bu karar bilinçli olarak hiçbir takvim vaat etmiyor, çünkü kayan bir tarih vaadi dürüst bir "belirsiz"den daha kötü.
+- **Karar geri alınabilir ve geri alındığı an sorun aynen geri geliyor.** Katkıları yeniden açmak önce CLA'nın yürürlükte olmasını, o da bu ADR'nin ertelediği hukuki incelemeyi gerektiriyor — FSEK sorusu zamanla ne kolaylaşıyor ne ucuzluyor. Buradaki hiçbir şey tek yönlü bir kapı değil, ama kapı yalnızca 0014'ün tarif ettiği sırayla açılıyor.
+- **Dokümantasyonun tek dilde kanonik kalması yalnızca gelenek değil, artık zorunluluk.** Çeviri katkıları kapalı olduğu için `docs/tr/` altındaki Türkçe ayna, güncel tutulması sahibin kendi işi olan bir yük olmaya devam ediyor.
+- **Uykudaki CLA mekanizması ara sıra bakım isteyecek.** `contributor-assistant/github-action` arşivlenmiş durumda (ADR 0014) ve er ya da geç GitHub runner'larında çalışmayı bırakacak. Workflow silinmek yerine devre dışı bırakıldığı için bu çürüme, biri onu yeniden açmayı denerken fark edilecek.
 
-## Alternatives considered
+## Değerlendirilen Alternatifler
 
-| Alternative                                             | Why not                                                                                                                                                                                                                                                         |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Enact the CLA without legal review                      | Signatures could fail FSEK's written-form requirement and be worthless, with the defect surfacing during a commercial customer's due diligence — after the code has shipped. An invisible defect is worse than a visible gap                                    |
-| Drop dual licensing; accept contributions as plain AGPL | No CLA needed and the community path stays open, but the commercial model closes: contributed code could never appear in a commercially licensed build, and ADR 0007's leverage becomes unsellable. The maintainer is not willing to give up the business model |
-| Talk to a lawyer now                                    | The correct fix, and it stays the plan — deferred, not rejected. Today it is an expense with no revenue behind it, to license contributions that nobody has offered                                                                                             |
-| Accept contributions under a DCO only                   | Certifies provenance, grants no relicensing right (ADR 0014). Contributed code would have to be excluded from every commercial build, which is unworkable once it touches shared code                                                                           |
-| Keep the CLA check live but treat it as advisory        | The bot still asks a contributor to sign a draft to unblock a pull request that will not be merged. Wastes their effort and misrepresents the project's actual state                                                                                            |
-| Delete the CLA draft and the workflow                   | Throws away finished work for tidiness. Both are inert while disabled, and having them ready is exactly what makes the decision cheap to reverse                                                                                                                |
+| Alternatif                                             | Neden değil                                                                                                                                                                                                                      |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLA'yı hukukçu incelemesi olmadan yürürlüğe koymak     | İmzalar FSEK'in yazılı şekil şartını karşılamayıp değersiz olabilir ve kusur, kod çoktan teslim edildikten sonra ticari bir müşterinin durum tespitinde ortaya çıkar. Görünmez bir kusur, görünür bir boşluktan kötüdür          |
+| Çift lisanslamadan vazgeçip katkıları saf AGPL almak   | CLA gerekmezdi ve topluluk yolu açık kalırdı, ama ticari model kapanırdı: katkı gelen kod ticari lisanslı bir build'de asla yer alamaz ve ADR 0007'nin kaldıracı satılamaz hâle gelirdi. Sahip iş modelinden vazgeçmek istemiyor |
+| Hukukçuyla şimdi görüşmek                              | Doğru çözüm ve plan olmaya da devam ediyor — reddedilmedi, ertelendi. Bugün, kimsenin sunmadığı katkıları lisanslamak için, arkasında gelir olmayan bir masraf                                                                   |
+| Katkıları yalnızca DCO ile kabul etmek                 | Menşei tasdik ediyor, yeniden lisanslama hakkı vermiyor (ADR 0014). Katkı gelen kodun her ticari build'den dışlanması gerekirdi; ortak koda dokunduğu anda bu uygulanamaz                                                        |
+| CLA kontrolünü canlı tutup tavsiye niteliğine indirmek | Bot yine de katkıcıdan, merge edilmeyecek bir PR'ın engelini kaldırmak için taslak bir metni imzalamasını istiyor. Emeğini boşa harcıyor ve projenin gerçek durumunu yanlış anlatıyor                                            |
+| CLA taslağını ve workflow'u silmek                     | Düzen uğruna bitmiş işi çöpe atıyor. İkisi de devre dışıyken atıl duruyor ve hazır olmaları, kararı geri almayı ucuzlatan şeyin ta kendisi                                                                                       |

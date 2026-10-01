@@ -77,8 +77,9 @@ import { UploadBudgetGuard } from './upload-budget.guard';
         // (`lib/make-middleware.js:83` hands busboy `limits.fileSize + 1`), so a `+ 1` here
         // would now accept a file one byte over ATTACHMENT_MAX_BYTES.
         //
-        // The byte matters in both directions. One byte tight is the failure ADR 0022:170-176
-        // added the proxy line to prevent: the proxy half rejects a body that *exceeds* 26214400
+        // The byte matters in both directions. One byte tight is the failure ADR 0022
+        // ("Gerekçe", "Proxy sözleşmesinin neden bir gövde-boyutu satırına ihtiyacı var.") added
+        // the proxy line to prevent: the proxy half rejects a body that *exceeds* 26214400
         // and passes one that equals it (measured in #215), so an upload of exactly
         // ATTACHMENT_MAX_BYTES would clear Caddy and die at Nest, an untraceable 413 produced by
         // library semantics rather than by anything an operator configured. One byte loose

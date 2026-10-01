@@ -74,7 +74,7 @@ import { apiEnv, API_URL, webEnv, WEB_URL } from './stack-env';
  * it.
  *
  * **Why the number went from seven to eight.** `tests/board-composer.spec.ts` was added for P6,
- * and it meets the admission criterion for the reason ADR 0035 gives in its own Consequences:
+ * and it meets the admission criterion for the reason ADR 0035 gives in its own "Sonuçlar":
  * the create dialog is gone, so the inline composer is the only way a task comes into being,
  * and what makes it usable is a run of focus moves that only a browser performs. `Enter`
  * activating a focused button, implicit form submission, and the caret staying in an emptied

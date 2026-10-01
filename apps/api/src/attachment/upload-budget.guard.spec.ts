@@ -132,7 +132,7 @@ describe('UploadBudgetGuard', () => {
       const refused = await multipart(200).expect(429);
 
       // The envelope a client branches on: its own `error`, distinct from the request
-      // throttle's "Too Many Requests" (docs/api-conventions.md#errors).
+      // throttle's "Too Many Requests" (docs/api-conventions.md#hatalar).
       expect(refused.body).toMatchObject({
         statusCode: 429,
         error: UPLOAD_BUDGET_ERROR,

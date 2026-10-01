@@ -950,7 +950,7 @@ describe('configureApp JSON body value ceiling', () => {
 });
 
 /**
- * The envelope's `path` is the request path (`docs/api-conventions.md#errors`), and it used to be
+ * The envelope's `path` is the request path (`docs/api-conventions.md#hatalar`), and it used to be
  * the whole request URL. Asserted through the whole stack `configureApp` installs because two
  * layers wrote the URL: `AllExceptionsFilter` in `path`, and Nest's own not-found handler in
  * `message`, which only a real router produces.

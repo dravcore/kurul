@@ -157,7 +157,7 @@ export class WorkspaceInvitationService {
    * nothing, and re-inviting the same address is a fresh invitation, not an action on this one.
    *
    * Ordered and paged by `id` — UUIDv7, so ascending id is the order the invitations were
-   * sent (docs/api-conventions.md#the-cursor-key-is-always-id-never-position).
+   * sent (docs/api-conventions.md#cursor-anahtarı-her-zaman-iddir-asla-position-değil).
    */
   async listPendingInvitations(
     workspaceId: string,

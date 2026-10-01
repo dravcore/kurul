@@ -1,117 +1,115 @@
-# 0031. API Versioning: a `/v1` URI Prefix Introduced at 1.0, and the Order Things Ship In
+# 0031. API Versiyonlama: 1.0'da Tanıtılan Bir `/v1` URI Öneki ve Şeylerin Gönderilme Sırası
 
-**Status:** Accepted
-**Date:** 2026-08-23
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-23
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0031-api-versioning.md)
+## Bağlam
 
-## Context
+REST API, `apps/api/openapi.json`'da commit edilen ve `/docs`'ta servis edilen, üretilmiş bir
+OpenAPI belgesiyle tarif edilir; kod ile belge uyuşmadığında başarısız olan bir CI kapısı vardır
+([api-conventions.md](../api-conventions.md#openapi-belgesi)). Uyumluluk hakkında herhangi bir söz
+verebilmenin ön koşulu budur: bir kontratın değişmeyeceği söylenebilmeden önce yazılı hale
+getirilmiş olması gerekir.
 
-The REST API is described by a generated OpenAPI document, committed at
-`apps/api/openapi.json` and served at `/docs`, with a CI gate that fails when the code and the
-document disagree ([api-conventions.md](../api-conventions.md#the-openapi-document)). That is
-the precondition for promising anything about compatibility: a contract has to be written down
-before anyone can say it will not change.
+[api-conventions.md](../api-conventions.md#versiyonlama), bu kayıt var olmadan önce de bu
+pozisyonu belirtiyordu: 1.0 öncesi `/v1` öneki yok, breaking değişiklikler herhangi bir `0.y.0`
+release'inde gelebilir ve `CHANGELOG.md`'de belgelenir, ve `@kurul/shared-types` monorepo ile
+birlikte versiyonlanır, dolayısıyla paketi pinleyen bir client kontratı da pinler. Açık bırakılan
+şey şemanın kendisiydi ("URI öneki muhtemel seçim, gerçekten ihtiyaç duyulduğunda karar
+verilecek") ve alternatiflerdi, ki bunlar hiçbir zaman yazılı olarak reddedilmemişti.
+`ROADMAP.md`'nin "API 1.0" bölümü, 1.0'ın büyümesi beklenen üç şeyi kapsadı (bir `/v1` öneki,
+kişisel erişim token'ları, minimal webhook'lar) ve tam olarak bunu istedi: diğer şemaları atlamak
+yerine reddeden, ve üçünün hangi sırayla gönderildiğini kayda geçiren bir ADR.
 
-[api-conventions.md](../api-conventions.md#versioning) has stated the position since before
-this record existed: no `/v1` prefix before 1.0, breaking changes may ship in any `0.y.0`
-release and are documented in `CHANGELOG.md`, and `@kurul/shared-types` is versioned with the
-monorepo so a client that pins the package pins the contract. What it left open was the scheme
-itself ("URI prefix is the likely choice, decided when it is actually needed") and the
-alternatives, which were never rejected in writing. `ROADMAP.md`'s "API 1.0" section scoped the
-three things 1.0 is expected to grow (a `/v1` prefix, personal access tokens, minimal
-webhooks) and asked for exactly this: an ADR that rejects the other schemes rather than skipping
-them, and that records the order the three ship in.
+Masada üç şema vardı.
 
-Three schemes were on the table.
+1. **Bir URI öneki.** `/v1/workspaces/...`. Versiyon path'in içindedir, her log satırında ve her
+   `curl`'de görünür, ve ikinci bir versiyon ikinci bir router mount'udur.
+2. **Header negotiation.** Tek bir path, versiyon `Accept`'te (`application/vnd.kurul.v1+json`)
+   ya da özel bir `X-Api-Version` header'ında, ve header yokken bir varsayılan.
+3. **Versiyonlama yok.** Kontratı 1.0'da dondur ve sonsuza dek yalnızca eklemeli genişlet;
+   eklemeli olamayan bir değişiklik bütün ürünün 2.0'ıdır.
 
-1. **A URI prefix.** `/v1/workspaces/...`. The version is in the path, visible in every log line
-   and every `curl`, and a second version is a second router mount.
-2. **Header negotiation.** One path, with the version in `Accept` (`application/vnd.kurul.v1+json`)
-   or a custom `X-Api-Version` header, and a default when the header is absent.
-3. **No versioning.** Freeze the contract at 1.0 and evolve it additively forever; a change that
-   cannot be additive is a 2.0 of the whole product.
+## Karar
 
-## Decision
+**Her route'ta bir `/v1` URI öneki, 1.0'da tanıtılır, öncesinde değil.** `/auth/*` ve iki health
+probe'u bunun dışındadır: Better Auth ilkinin sahibidir ([ADR 0004](0004-auth-better-auth.md)), ve
+API versiyonuyla birlikte taşınan bir probe, release gününde her healthcheck'i kırardı. 1.0'a
+kadar hiçbir şey değişmez: route'lar önek almadan kalır, api-conventions.md'deki 1.0-öncesi
+kurallar yürürlükte kalır, ve şimdi görünecek bir versiyon segmenti, projenin API'nin en çok
+çalkalanması beklenen döneminde henüz vermediği bir söz olurdu.
 
-**A `/v1` URI prefix on every route, introduced at 1.0 and not before.** `/auth/*` and the two
-health probes are outside it: Better Auth owns the first ([ADR 0004](0004-auth-better-auth.md)),
-and a probe that moved with the API version would break every healthcheck on the day of the
-release. Until 1.0 nothing changes: routes stay unprefixed, the pre-1.0 rules in
-api-conventions.md stay in force, and a version segment that appeared now would be a promise the
-project is not yet making, during the period the API is most expected to churn.
+**Header negotiation ve versiyonsuzluk reddedilir**, aşağıdaki gerekçelerle, ve bu reddin kendisi
+kaydın önemli olan kısmıdır: önek yaygın bir seçimdir, ve bunu yazıya dökmenin sebebi kimsenin
+alternatifleri bir PR yorumunda yeniden açmamasını sağlamaktır.
 
-**Header negotiation and no-versioning are rejected**, for the reasons below, and the rejection
-is the part of this record that matters: the prefix itself is a common choice, and the reason to
-write it down is so that nobody reopens the alternatives in a PR comment.
+**Sıralama: önce kişisel erişim token'ları, sonra `/v1`, sonra webhook'lar.** Token'lar öneksiz
+route'lara karşı ilk gönderilir. Önek 1.0'da gelir, tarayıcı olmayan ve kararlı bir path'in bir
+değer taşıdığı bir çağıran ortaya çıktığında. Webhook'lar en sona kalır, çünkü imzalı teslimat ve
+bir başarısızlık politikası kendi ADR'lerini ve işaret edecekleri bir kontratı hak eder. Her adım
+`ROADMAP.md`'de bir satırdır, ve sıra bir tarih değil bir bağımlılıktır.
 
-**Sequencing: personal access tokens, then `/v1`, then webhooks.** Tokens ship first, against
-the unprefixed routes. The prefix lands at 1.0, once there is a non-browser caller for whom a
-stable path is worth something. Webhooks come last, because signed delivery and a failure
-policy deserve their own ADR and a contract to point at. Each step is a row in `ROADMAP.md`,
-and the order is a dependency, not a date.
+## Gerekçe
 
-## Rationale
+**Neden header negotiation yerine önek.** Self-host edilen bir instance, script'ler, CI job'ları
+ve bir operatörün bir araya getirdiği her şey tarafından çağrılır, ve bu çağıranlar bir API
+versiyonunun var olmasının bütün sebebidir. Path versiyonu erişim logunda, bir reverse proxy'nin
+routing kurallarında, bir bookmark'ta ve bir bug raporunda görünür; header versiyonu dördünde de
+görünmezdir, ve iki çağıran hangi versiyonu konuştukları konusunda ilk kez anlaşamadığında
+operatörün grep'leyecek hiçbir şeyi yoktur. Negotiation ayrıca header göndermeyen bir çağıran için
+bir varsayılana ihtiyaç duyar, ve hangi varsayılan seçilirse seçilsin iki popülasyondan biri için
+yanlıştır: en yeniye varsayılan olunca her pinlenmemiş script upgrade'de kırılır, en eskiye
+varsayılan olunca her yeni çağıran sihirli header'ı öğrenene kadar eski şekli alır. Path'in yanlış
+olabilecek bir varsayılanı yoktur. Son olarak, bu API bir Nest router tarafından Caddy'nin
+arkasında servis edilir ve üretilmiş bir OpenAPI dosyasıyla belgelenir: önek bir mount noktası ve
+bir `servers` girdisidir, header şeması ise framework'ün sağlamadığı ve OpenAPI belgesinin tek bir
+kontrat olarak ifade edemediği bir content-negotiation katmanıdır.
 
-**Why a prefix over header negotiation.** A self-hosted instance is called by scripts, CI jobs
-and whatever an operator wires together, and those callers are the whole reason an API
-version exists. A path version is visible in the access log, in a reverse proxy's routing
-rules, in a bookmark and in a bug report; a header version is invisible in all four, and the
-first time two callers disagree about which version they are speaking the operator has
-nothing to grep. Negotiation also needs a default for a caller that sends no header, and
-whichever default is chosen is wrong for one of the two populations: default to the newest and
-every unpinned script breaks on upgrade, default to the oldest and every new caller gets the
-legacy shape until they learn the magic header. The path has no default to get wrong. Finally,
-this API is served by a Nest router behind Caddy and documented by a generated OpenAPI file:
-a prefix is a mount point and a `servers` entry, while a header scheme is a content-negotiation
-layer the framework does not provide and the OpenAPI document cannot express as one contract.
+**Neden versiyonsuzluk yerine önek.** "Sonsuza dek eklemeli", her yanıtın gelecekteki şekli
+hakkında bir sözdür, ve bu proje iyi sebeplerle zaten bir kez gönderdiği şekilleri kırdı (üye
+listesi bir cursor sayfasına dönüştü, davet yanıtı bir teslimat durumu kazandı). Hiçbir zaman bir
+alanı yeniden adlandıramayan ya da bir tipi sıkılaştıramayan bir API, hatalarının kalıcı olduğu
+bir API'dir. Versiyonsuzluk ayrıca ürünün major versiyonunu API'nin major versiyonu yapar: web
+uygulamasının bir 2.0'ı her route'un bir 2.0'ı olmak zorunda kalırdı, ve breaking bir route
+değişikliği bunu beklemek zorunda kalırdı. İkisinin ayrı hareket edebilmesi gerekir.
 
-**Why a prefix over no versioning.** "Additive forever" is a promise about the future shape of
-every response, and this project has already broken shapes it once shipped, for good reasons
-(the member roster became a cursor page, the invitation response gained a delivery status). An
-API that cannot ever rename a field or tighten a type is one whose mistakes become permanent
-the day it is declared stable. No-versioning also makes the product's major version the API's
-major version: a 2.0 of the web app would have to mean a 2.0 of every route, and a breaking
-route change would have to wait for one. The two should be allowed to move separately.
+**Neden 1.0'da ve şimdi değil.** Önek lehindeki argüman ucuz olmasıdır; şimdi eklememenin karşı
+argümanı bedava olmamasıdır. Her client'ta, her belgede, her README'deki her `curl`'de bir
+satırdır, ve içindeki `v1` bir yalan olurdu: arkasındaki route'lar herhangi bir `0.y.0`'da hâlâ
+değişebilir. 1.0-öncesi çalkalanma sırasında bump edilmek zorunda kalan bir önek, çağıranlara onu
+yok saymayı öğretir, ve kontrat hareket ederken `v1`'e pinlenmiş bir önek daha kötü bir şey
+öğretir. SemVer 0.y'nin ne anlama geldiğini zaten söylüyor; önek 1.0 sinyalidir ve onunla birlikte
+gelmelidir.
 
-**Why at 1.0 and not now.** The argument for a prefix is that it is cheap; the argument against
-adding it today is that it is not free. It is a line in every client, every document, every
-`curl` in every README, and the `v1` in it would be a lie: the routes behind it may still
-change in any `0.y.0`. A prefix that has to be bumped during the pre-1.0 churn teaches callers
-to ignore it, and a prefix that is pinned at `v1` while the contract moves teaches them
-something worse. SemVer already says what 0.y means; the prefix is the 1.0 signal and should
-arrive with it.
+**Neden önekten önce token'lar.** Web uygulaması olmayan bir çağıran ortaya çıkana kadar önek
+kimseyi korumaz. Kişisel erişim token'ları bu ilk çağırandır, ve bugünün öneksiz route'larına karşı
+çalışırlar çünkü token'ı geçerli kılan versiyon değildir; dolayısıyla bağımlılık önce token'lar
+sonra önek şeklinde işler, asla tersi değil. Webhook'lar tam tersi sebeple en sondadır: bunlar
+API'nin dışarıyı çağırmasıdır, teslimat formatı kendi başına bir kontrattır, ve bu kontrat önek
+tarafından yeniden kırılmak yerine `/v1`'in şekillerine karşı yazılmalıdır.
 
-**Why tokens before the prefix.** Until there is a caller that is not the web app, the prefix
-protects nobody. Personal access tokens are the first such caller, and they work against today's
-unprefixed routes because the version is not what makes a token valid; so the dependency runs
-tokens then prefix, never the other way round. Webhooks are last for the opposite reason: they
-are the API calling out, the delivery format is itself a contract, and that contract should be
-written against `/v1`'s shapes rather than re-broken by it.
+## Sonuçlar
 
-## Consequences
+- 1.0'da, her Nest route'u global bir path prefix'i üzerinden `/v1` önekini kazanır, OpenAPI
+  `servers` girdisi `/`'den `/v1`'e değişir, ve web uygulamasının API client'ı bunu takip eder.
+  `/auth/*`, `/health` ve `/health/ready` oldukları yerde kalır.
+- Bir `/v2`, değişen route'ların `/v1`'in yanında ikinci bir mount'udur, `CHANGELOG.md`'de
+  duyurulan bir deprecation penceresi için. Pencerenin uzunluğu ilk `/v2` ihtiyaç duyulduğunda
+  karar verilir; bu kayıt bir tanesinin olacağına söz verir, ne kadar süreceğine değil.
+- [api-conventions.md](../api-conventions.md#versiyonlama)'nin 1.0-öncesi bölümü, öneki ekleyen
+  release'e kadar yürürlükte kalır, ve o release'in changelog girdisi migration notudur.
+- Kişisel erişim token'ları öneksiz route'lara karşı gönderilir ve önek geldikten sonra da çalışmaya
+  devam eder: token bir kullanıcıyı ve bir workspace'i tanımlar, ve ikisi de yerinden oynamaz.
+- ROADMAP'ın "API 1.0" bölümü kapsamı korur ve sıra için buraya link verir; bu kayıt gerekçedir, o
+  bölüm ise durumdur.
 
-- At 1.0, every Nest route gains the `/v1` prefix via a global path prefix, the OpenAPI
-  `servers` entry changes from `/` to `/v1`, and the web app's API client follows. `/auth/*`,
-  `/health` and `/health/ready` stay where they are.
-- A `/v2` is a second mount of the routes that changed, beside `/v1`, for a deprecation window
-  announced in `CHANGELOG.md`. The window's length is decided when the first `/v2` is needed;
-  this record commits to there being one, not to how long it is.
-- The pre-1.0 section of [api-conventions.md](../api-conventions.md#versioning) stays in force
-  until the release that adds the prefix, and that release's changelog entry is the migration
-  note.
-- Personal access tokens ship against unprefixed routes and keep working after the prefix
-  lands: the token identifies a user and a workspace, and neither moves.
-- The ROADMAP's "API 1.0" section keeps the scope and links here for the order; this record is
-  the reason, that section is the status.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative                                    | Rejected because                                                                                                                                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Header negotiation (`Accept` or custom header) | Invisible in logs, proxies and bug reports; needs a default that is wrong for one population; not a single contract the generated OpenAPI document can express                        |
-| No versioning, additive changes only           | Makes every shipped shape permanent; couples the API's major version to the product's; this project has already needed non-additive changes before 1.0                                |
-| Add `/v1` now, bump it freely before 1.0       | A version that moves during churn is one callers learn to ignore; a pinned `v1` over a moving contract is a false promise                                                             |
-| Version per resource (`/workspaces/v2/...`)    | Every client holds a table of versions instead of one; the OpenAPI document becomes several; the operational visibility argument for a prefix is lost in the noise                    |
-| Date-based versions (`/2026-08-23/...`)        | Honest about churn, but every date is a breaking release and callers pin a calendar instead of a contract; SemVer already exists for this and the rest of the project uses it         |
-| Webhooks before tokens                         | Delivery is a contract of its own and would be written against pre-`/v1` shapes; tokens are the caller the prefix exists for, so they establish the need before the prefix answers it |
+| Alternatif                                             | Neden değil                                                                                                                                                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Header negotiation (`Accept` ya da özel header)        | Loglarda, proxy'lerde ve bug raporlarında görünmez; bir popülasyon için yanlış olan bir varsayılana ihtiyaç duyar; üretilmiş OpenAPI belgesinin ifade edebileceği tek bir kontrat değildir |
+| Yalnızca eklemeli değişikliklerle versiyonlama yok     | Gönderilen her şekli kalıcı yapar; API'nin major versiyonunu ürününkine bağlar; bu proje 1.0'dan önce zaten eklemeli olmayan değişikliklere ihtiyaç duydu                                  |
+| `/v1`'i şimdi ekleyip 1.0'a kadar serbestçe bump etmek | Çalkalanma sırasında hareket eden bir versiyon, çağıranların yok saymayı öğrendiği bir versiyondur; hareket eden bir kontratın üzerinde pinlenmiş bir `v1` yanlış bir sözdür               |
+| Kaynak başına versiyon (`/workspaces/v2/...`)          | Her client tek bir yerine bir versiyon tablosu tutar; OpenAPI belgesi birden çoğa bölünür; önekin operasyonel görünürlük argümanı gürültüde kaybolur                                       |
+| Tarih tabanlı versiyonlar (`/2026-08-23/...`)          | Çalkalanma konusunda dürüst, ama her tarih bir breaking release'tir ve çağıranlar bir kontrat yerine bir takvim pinler; SemVer bunun için zaten var ve projenin geri kalanı onu kullanıyor |
+| Token'lardan önce webhook'lar                          | Teslimat kendi başına bir kontrattır ve `/v1`-öncesi şekillere karşı yazılmış olurdu; token'lar önekin var olduğu çağırandır, dolayısıyla önek cevap vermeden önce ihtiyacı onlar kurar    |

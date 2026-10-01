@@ -1,84 +1,47 @@
 # 0003. Frontend Stack: Next.js + Tailwind + shadcn/ui + @dnd-kit + Recharts
 
-**Status:** Accepted
-**Date:** 2026-08-08
-**Updated:** 2026-08-08 — the @dnd-kit rationale was contradicted by the registry and has been rewritten honestly; the Recharts bundle figure was unsourced and is replaced by its dependency surface.
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-08
+**Güncellendi:** 2026-08-08 — @dnd-kit gerekçesi registry ile çelişiyordu ve dürüstçe yeniden yazıldı; kaynaksız Recharts bundle rakamı yerine bağımlılık yüzeyi kondu.
+**Güncellendi:** 2026-10-01 — Sonuçlar'daki "Kendimiz klavye desteği inşa etmeden, kutudan çıktığı gibi
+erişilebilir drag-and-drop" yalnız sürükleme için doğrudur: klavye sürüklemesi kütüphaneden gelir, ama
+@dnd-kit'in ekran okuyucu duyuruları İngilizce sabit olduğu için yerelleştirilmiş duyurular
+`apps/web/components/task/task-dnd-announcements.ts`'te yazıldı ve column'lar arası klavye gezinmesi
+`apps/web/components/board/board-canvas.tsx`'te elle yazılı.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0003-frontend-stack.md)
+## Bağlam
 
-## Context
+Frontend; interaktif bir kanban board'u (drag-and-drop ile yeniden sıralama), stillendirilmiş bir component sistemini ve grafikli bir dashboard'u render etmeli, aynı zamanda solo/küçük ekip kod tabanının bakımını yapabileceği kadar hafif kalmalı.
 
-The frontend must render an interactive kanban board (drag-and-drop reordering),
-a styled component system, and a dashboard with charts, while staying
-lightweight enough for a solo/small-team codebase to maintain.
+## Karar
 
-## Decision
+**Next.js 16 (App Router)** + **Tailwind CSS** + **shadcn/ui** + **@dnd-kit** + **Recharts**.
 
-**Next.js 16 (App Router)** + **Tailwind CSS** + **shadcn/ui** + **@dnd-kit** +
-**Recharts**.
+## Gerekçe
 
-## Rationale
+- `react-beautiful-dnd` deprecated — Atlassian bakımından çekildi, dolayısıyla yeni iş için uygulanabilir bir seçim değil.
+- **@dnd-kit, klasik hat** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0). MIT, ~6 KB core, erişilebilir (klavye ve ekran okuyucu desteği), framework-agnostik ve en yaygın kullanılan React drag-and-drop kütüphanesi.
+- **Bilinçli olarak kaydedilmiştir: bu hat donmuş durumda, aktif bakımda değil.** Klasik paketler Aralık 2024'ten beri hiçbir sürüm çıkarmadı ve dokümantasyon sitesinin repository'si Şubat 2026'da arşivlendi. Bakım çabası yeni nesil bir yeniden yazıma (`@dnd-kit/react`) kaydı; bu hat hâlâ 1.0 öncesi, farklı bir API'ye sahip ve burada **benimsenmiyor**. Donmuş bir kütüphane bozuk bir kütüphane değildir — 50–200 kartlık bir board için "sürüm yok" makul biçimde "bitti" anlamına gelebilir — ama karar bu bilinerek veriliyor, buna rağmen değil.
+- **Alternatif aktif bakımda ve yine de kaybediyor.** Atlassian'ın `pragmatic-drag-and-drop`'u (2.0.x, Apache-2.0) düzenli sürüm çıkarıyor, ama collision detection'ın elle yazılmasını gerektiriyor ve v2'si ince bir upgrade dokümantasyonuyla geldi. Solo bir maintainer için, upgrade sancısı olmayan sabit bir bağımlılık, özel collision kodu gerektiren aktif sürümlü bir bağımlılıktan daha değerli; sabitlenmiş-ve-donmuş risk etrafından dolaşamayacağımız bir bug — bu, kalıcı bir bakım vergisinden daha küçük ve daha görünür bir risk.
+- Sürümler **tam olarak pinlenir** (`^` yok), çünkü "latest" hiçbir fix garantisi taşımıyor.
+- **Recharts**, çoğu React dashboard'u için en güvenli varsayılan: güçlü ekosistem benimsenmesi, anlaşılır bir component API'si, SVG rendering, shadcn/ui ile iyi uyum, MIT lisanslı. En hafif seçenek değil, ve kaydetmeye değer maliyet bir byte sayısı değil bağımlılık yüzeyi: v3, `@reduxjs/toolkit`, `react-redux`, `immer` ve `victory-vendor`'ı (d3) runtime bağımlılığı olarak deklare ediyor, yani başka hiçbir state kütüphanesi olmayan bir uygulamaya Redux Toolkit'i sokuyor. Grafik sayısı büyürse, bir bundle bütçesi daralırsa veya o bağımlılık grafiği uygulama seviyesindeki state seçimleriyle çatışırsa Canvas tabanlı bir kütüphane (Chart.js, Apache ECharts) yeniden değerlendirilmeli.
 
-- `react-beautiful-dnd` is deprecated — Atlassian withdrew from maintaining it,
-  so it is not a viable pick for new work.
-- **@dnd-kit, classic line** (`@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable`
-  10.0.0). MIT, ~6 KB core, accessible (keyboard and screen-reader support),
-  framework-agnostic, and the most widely deployed React drag-and-drop library.
-- **Recorded deliberately: this line is frozen, not actively maintained.** The
-  classic packages have shipped no release since December 2024, and the
-  documentation-site repository was archived in February 2026. Maintainer
-  effort has moved to a next-generation rewrite (`@dnd-kit/react`), which is
-  still pre-1.0 with a different API and is **not** being adopted here. A
-  frozen library is not a broken one — for a 50–200-card board, "no releases"
-  plausibly means "done" — but the decision is made with that known, not in
-  spite of it.
-- **The alternative is actively maintained, and it still loses.** Atlassian's
-  `pragmatic-drag-and-drop` (2.0.x, Apache-2.0) ships regularly, but it
-  requires hand-writing collision detection, and its v2 landed with thin
-  upgrade documentation. For a solo maintainer, a stable dependency with no
-  upgrade churn is worth more than an actively released one that costs custom
-  collision code; the pinned-and-frozen risk is a bug we cannot work around,
-  which is a smaller and more visible risk than a permanent maintenance tax.
-- Versions are **pinned exactly** (no `^`), since "latest" carries no fixes.
-- **Recharts** is the safest default for most React dashboards: strong ecosystem
-  adoption, an understandable component API, SVG rendering, good fit with
-  shadcn/ui, MIT-licensed. It is not the lightest option, and the real cost is
-  its dependency surface rather than a byte count: v3 declares
-  `@reduxjs/toolkit`, `react-redux`, `immer`, and `victory-vendor` (d3) as
-  runtime dependencies, so it pulls Redux Toolkit into an app that otherwise
-  has no state library. If the chart count grows, a bundle budget tightens, or
-  that graph conflicts with app-level state choices, a Canvas-based library
-  (Chart.js, Apache ECharts) should be reconsidered.
+## Sonuçlar
 
-## Consequences
+- Kendimiz klavye desteği inşa etmeden, kutudan çıktığı gibi erişilebilir drag-and-drop.
+- Tailwind + shadcn/ui üzerinden tutarlı görsel dil, tek seferlik stillendirmeyi azaltıyor.
+- Recharts'ın sade API'siyle dashboard'lar hızlıca yayına alınıyor.
+- Board etkileşimleri daha karmaşıklaştıkça (nested sortable'lar, çok kolonlu drag) `@dnd-kit`'in collision detection'ı özel ayarlama gerektirebilir — ve klasik hat için gelecek bir upstream fix yok, dolayısıyla her ayarlama bize ait.
+- Etrafından dolaşamayacağımız bir `@dnd-kit` bug'ı bu kararın kabul ettiği başarısızlık modu. **Yeniden değerlendirme tetikleyicisi: Faz 4'te**
+  (MVP yol haritasının Faz 4'ü; checklist'i artık yalnızca git geçmişinde), board etkileşimi gerçekten inşa edildiğinde, ya da böyle bir bug daha erken ortaya çıkarsa veya `@dnd-kit/react` 1.0'a ulaşırsa daha erken. Göç hedefi
+  `pragmatic-drag-and-drop`, "collision detection yaz" olarak maliyetlendirildi, "board'u yeniden mimarile" olarak değil.
+- **Faz 4 yeniden değerlendirme (2026-08-09):** klasik `@dnd-kit` çok kolonlu board'u taşıdı (`MouseSensor` + `TouchSensor` + `KeyboardSensor`, `closestCorners`, kolon başına `SortableContext`, optimistic taşıma + toast ile rollback); bloklayıcı çıkmadı — **pin'li klasik hat korunuyor**. Yalnızca donmuş hattaki bir bug sonraki bir board etkileşimini engellerse veya `@dnd-kit/react` net bir göç yoluyla 1.0'a ulaşırsa yeniden bak.
+- Recharts'ın bağımlılık yüzeyi analitik özellikler genişledikçe yeniden ele alınmalı — bu bir gözden kaçırma değil, bilinçli bir "sonra tekrar bak" trade-off'u.
 
-- Accessible drag-and-drop out of the box, without building keyboard support
-  ourselves.
-- Consistent visual language via Tailwind + shadcn/ui reduces one-off styling.
-- Ships dashboards quickly with Recharts' straightforward API.
-- `@dnd-kit`'s collision detection may need custom tuning as board interactions
-  grow more complex (nested sortables, multi-column drag) — and no upstream fix
-  is coming for the classic line, so any tuning is ours to own.
-- A `@dnd-kit` bug we cannot work around is the failure mode this decision
-  accepts. **Re-evaluation trigger: at Phase 4**
-  (the MVP roadmap's Phase 4; its checklist now lives only in git history), when the board
-  interaction is actually built, or earlier if such a bug appears or if
-  `@dnd-kit/react` reaches 1.0. The migration target is
-  `pragmatic-drag-and-drop`, costed at "write collision detection", not at
-  "rearchitect the board".
-- **Phase 4 re-evaluation (2026-08-09):** classic `@dnd-kit` shipped the
-  multi-column board (`MouseSensor` + `TouchSensor` + `KeyboardSensor`, `closestCorners`,
-  per-column `SortableContext`, optimistic move + toast rollback). No blocker
-  appeared; **keep the pinned classic line**. Revisit only if a frozen-line
-  bug blocks a later board interaction or `@dnd-kit/react` reaches 1.0 with a
-  clear migration path.
-- Recharts' dependency surface will need revisiting once analytics features
-  expand — this is a deliberate "revisit later" trade-off, not an oversight.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative               | Why not                                                                                                                                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| react-beautiful-dnd       | Deprecated; Atlassian withdrew maintenance                                                                                                                                                                               |
-| pragmatic-drag-and-drop   | Actively maintained (2.0.x, Apache-2.0) and the designated fallback, but requires hand-written collision detection and shipped v2 with thin upgrade documentation — a permanent cost accepted only if @dnd-kit blocks us |
-| Chart.js / Apache ECharts | Canvas-based, better for very large datasets, but heavier integration and less idiomatic with shadcn/ui right now                                                                                                        |
+| Alternatif                | Neden değil                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| react-beautiful-dnd       | Deprecated; Atlassian bakımından çekildi                                                                                                                                                                                                    |
+| pragmatic-drag-and-drop   | Aktif bakımda (2.0.x, Apache-2.0) ve belirlenmiş fallback, ama collision detection'ın elle yazılmasını gerektiriyor ve v2'si ince bir upgrade dokümantasyonuyla geldi — yalnızca @dnd-kit bizi engellerse kabul edilecek kalıcı bir maliyet |
+| Chart.js / Apache ECharts | Canvas tabanlı, çok büyük veri setleri için daha iyi, ama entegrasyonu daha ağır ve şu an shadcn/ui ile daha az idiomatic                                                                                                                   |

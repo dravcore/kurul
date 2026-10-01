@@ -198,7 +198,7 @@ describe('AllExceptionsFilter', () => {
   });
 
   /**
-   * `path` is the request path (`docs/api-conventions.md#errors`), and the envelope used to carry
+   * `path` is the request path (`docs/api-conventions.md#hatalar`), and the envelope used to carry
    * the whole request URL there: a query string as long as Node lets a request's head be, and any
    * token a link put in it. The request-level case, with Nest's real not-found handler, is in
    * `configure-app.spec.ts`.

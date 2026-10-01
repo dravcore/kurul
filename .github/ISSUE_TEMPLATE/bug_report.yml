@@ -1,75 +1,76 @@
-name: Bug report
-description: Report something that isn't working as expected
+name: Hata bildirimi
+description: Beklendiği gibi çalışmayan bir şeyi bildirin
 labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: |
-        **Logs, error messages, stack traces and screenshots are exactly what we need.**
+        **Loglar, hata mesajları, stack trace'ler ve ekran görüntüleri tam olarak ihtiyacımız olan şeylerdir.**
 
-        Paste as many as you like. If you already have a fix in mind, say so: a pull request
-        is welcome once the bug is confirmed here, and pointing at the file and line you think
-        is wrong is useful on its own. Kurul is issue-first, so the report comes before the PR.
+        İstediğiniz kadarını yapıştırın. Aklınızda zaten bir düzeltme varsa söyleyin: hata burada
+        doğrulandıktan sonra bir pull request memnuniyetle karşılanır ve yanlış olduğunu
+        düşündüğünüz dosyayı ve satırı göstermek tek başına da işe yarar. Kurul issue-first
+        çalışır, dolayısıyla bildirim PR'dan önce gelir.
 
-        See [CONTRIBUTING.md](https://github.com/dravcore/kurul/blob/develop/CONTRIBUTING.md).
+        Bkz. [CONTRIBUTING.md](https://github.com/dravcore/kurul/blob/develop/CONTRIBUTING.md).
 
   - type: checkboxes
     id: existing-issue
     attributes:
-      label: Is there an existing issue for this?
-      description: Search open and closed issues before filing a new one.
+      label: Bunun için mevcut bir issue var mı?
+      description: Yeni bir issue açmadan önce açık ve kapalı issue'larda arama yapın.
       options:
-        - label: I searched and found no existing issue for this bug
+        - label: Arama yaptım ve bu hata için mevcut bir issue bulamadım
           required: true
 
   - type: textarea
     id: description
     attributes:
-      label: What happened?
-      description: A clear description of the bug.
+      label: Ne oldu?
+      description: Hatanın açık bir tanımı.
     validations:
       required: true
 
   - type: textarea
     id: repro
     attributes:
-      label: Steps to reproduce
-      description: The exact steps that trigger the bug.
+      label: Yeniden üretme adımları
+      description: Hatayı tetikleyen kesin adımlar.
       placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. See error
+        1. '...' sayfasına gidin
+        2. '...' öğesine tıklayın
+        3. Hatayı görün
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
+      label: Beklenen davranış
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: Actual behavior
+      label: Gerçekleşen davranış
     validations:
       required: true
 
   - type: dropdown
     id: environment
     attributes:
-      label: Environment
-      description: Where did this happen?
+      label: Ortam
+      description: Bu nerede oldu?
       options:
-        - Local development (docker compose)
-        - Self-hosted deployment
-        - Other
+        - Yerel geliştirme (docker compose)
+        - Self-host edilmiş deployment
+        - Diğer
     validations:
       required: true
 
   - type: textarea
     id: context
     attributes:
-      label: Additional context
-      description: Logs, screenshots, or anything else relevant.
+      label: Ek bağlam
+      description: Loglar, ekran görüntüleri ya da ilgili başka her şey.

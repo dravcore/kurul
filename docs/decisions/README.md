@@ -1,102 +1,89 @@
-# Architecture Decision Records
+# Mimari Karar Kayıtları
 
-Lightweight, MADR-style records of the significant decisions behind Kurul.
+Kurul'un ardındaki önemli kararların hafif, MADR tarzı kayıtları.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/README.md)
+## Neden ADR
 
-## Why ADRs
+Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunlukla solo) tarafından inşa ediliyor. "Neden Drizzle yerine Prisma" veya "neden AGPL" gibi kararlar, gerçek trade-off'lar tartılarak bir kez veriliyor ve yazılı hale getirilmedikçe unutuluyor. Bir ADR, kararın verildiği anda bağlamı, kararı ve gerekçeyi yakalar, böylece gelecekteki bir katkıda bulunanın (gelecekteki biz dahil) gerekçeyi bir Slack thread'inden yeniden inşa etmesi veya kapanmış bir tartışmayı yeniden açması gerekmez. Bunlar bilinçli olarak kısa ve olgusal, tasarım dokümanları değil.
 
-Kurul is built by a small team (often solo) before and during active
-development. Decisions like "why Prisma over Drizzle" or "why AGPL" get made
-once, with real trade-offs weighed, and then forgotten unless they're written
-down. An ADR captures the context, the decision, and the reasoning at the
-moment it was made, so a future contributor (including a future us) doesn't
-have to reconstruct the reasoning from a Slack thread or reopen a settled
-debate. These are intentionally short and factual, not design documents.
+## Dizin
 
-## Index
+| #                                                      | Başlık                                                                                                                               | Durum                                                 | Tarih      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ---------- |
+| [0001](0001-monorepo-modular-monolith.md)              | Monorepo + Modüler Monolit                                                                                                           | Kabul edildi                                          | 2026-08-08 |
+| [0002](0002-backend-stack.md)                          | Backend Stack: NestJS + Prisma + PostgreSQL + Redis                                                                                  | Kabul edildi                                          | 2026-08-08 |
+| [0003](0003-frontend-stack.md)                         | Frontend Stack: Next.js + Tailwind + shadcn/ui + @dnd-kit + Recharts                                                                 | Kabul edildi                                          | 2026-08-08 |
+| [0004](0004-auth-better-auth.md)                       | Auth: Organization Plugin ile Better Auth                                                                                            | Kabul edildi                                          | 2026-08-08 |
+| [0005](0005-realtime-socketio.md)                      | Realtime: Socket.io + Redis Adapter                                                                                                  | Kabul edildi                                          | 2026-08-08 |
+| [0006](0006-fractional-indexing.md)                    | Task ve Column Pozisyonu için Fractional Indexing                                                                                    | Kabul edildi                                          | 2026-08-08 |
+| [0007](0007-license-agpl.md)                           | Lisans: AGPL-3.0                                                                                                                     | Kabul edildi                                          | 2026-08-08 |
+| [0008](0008-git-flow-semver.md)                        | Git Flow + Conventional Commits + SemVer                                                                                             | Kabul edildi                                          | 2026-08-08 |
+| [0009](0009-board-column-permissions.md)               | Board ve Column İzinleri                                                                                                             | Kabul edildi                                          | 2026-08-09 |
+| [0010](0010-task-permissions.md)                       | Task İzinleri                                                                                                                        | Kabul edildi                                          | 2026-08-09 |
+| [0011](0011-label-task-metadata-permissions.md)        | Label ve Task-Metadata İzinleri                                                                                                      | Kabul edildi (yorum-silme satırının yerini 0012 aldı) | 2026-08-09 |
+| [0012](0012-comment-delete-authorship.md)              | Yorum Silme Yazarlığı                                                                                                                | Kabul edildi                                          | 2026-08-09 |
+| [0013](0013-invitation-email-verification.md)          | Davet Kabulünde E-posta Doğrulaması                                                                                                  | Kabul edildi                                          | 2026-08-10 |
+| [0014](0014-dual-licensing-cla.md)                     | Çift Lisanslama ve Katkıda Bulunan Lisans Sözleşmesi                                                                                 | 0028 tarafından yerini aldı                           | 2026-08-11 |
+| [0015](0015-no-external-contributions.md)              | Dış Katkı Kabul Edilmiyor; Hukuk Masrafı Ertelendi                                                                                   | 0028 tarafından yerini aldı                           | 2026-08-12 |
+| [0016](0016-foreign-key-violation-status.md)           | Yabancı Anahtar İhlalleri 422'ye Değil 409'a Eşlenir                                                                                 | Kabul edildi                                          | 2026-08-12 |
+| [0017](0017-partial-indexes-outside-prisma-schema.md)  | Kısmi İndeksler Migration'larda Yaşar, Testlerle Korunur                                                                             | Kabul edildi                                          | 2026-08-12 |
+| [0018](0018-localization-strategy.md)                  | Yerelleştirme Stratejisi: URL Yönlendirmesi Olmadan next-intl                                                                        | Kabul edildi                                          | 2026-08-12 |
+| [0019](0019-column-category.md)                        | Kolon Tamamlanmışlığı Bir Kategoridir, Ad Değil                                                                                      | Kabul edildi                                          | 2026-08-12 |
+| [0020](0020-data-retention.md)                         | Veri Saklama: Tablo Başına Pencereler, Gecelik Bir Süpürme ile Uygulanır                                                             | Kabul edildi                                          | 2026-08-14 |
+| [0021](0021-activation-funnel-and-opt-in-telemetry.md) | Aktivasyon Hunisi Instance İçinde, Telemetri Opt-In ve Varsayılan Kapalı                                                             | Kabul edildi                                          | 2026-08-14 |
+| [0022](0022-attachment-storage.md)                     | Dosya Eki Depolaması: Bir Port Arkasında Yerel Disk, API Origin'inden Servis                                                         | Kabul edildi (tip ve limit kararları 0024'te verildi) | 2026-08-14 |
+| [0023](0023-checklist-data-model.md)                   | Checklist Veri Modeli: Kart Başına Çoklu Liste, Türetilmiş İlerleme, Yeni Realtime Event Yok                                         | Kabul edildi                                          | 2026-08-14 |
+| [0024](0024-attachment-kinds-and-serving-policy.md)    | Dosya Eki Tipleri ve Servis Politikası: FILE ya da LINK, İki Katmanda Tek Boyut Sayısı, Yalnız Görsellerde Inline                    | Kabul edildi                                          | 2026-08-15 |
+| [0025](0025-trello-import-mapping.md)                  | Trello Import Eşlemesi: Hiçbir Şey Tahmin Edilmez, Gelmeyen Her Şey Sayılır                                                          | Kabul edildi                                          | 2026-08-15 |
+| [0026](0026-account-deletion-anonymisation.md)         | Hesap Silme: `User` Satırını Yerinde Anonimleştir, Sahip Olunan Workspace Kararını Akışın İçinde Sor                                 | Kabul edildi                                          | 2026-08-15 |
+| [0027](0027-attachment-quotas.md)                      | Dosya Eki Depolama Kotaları: Workspace Başına ve Instance Geneli Yumuşak Bayt Tavanları                                              | Kabul edildi                                          | 2026-08-18 |
+| [0028](0028-open-contributions-hosted-service.md)      | AGPL-3.0 Altında Açık Katkılar, CLA Yok; Gelir Yalnızca Barındırılan Bir Servisten                                                   | Kabul edildi (0014 ve 0015'in yerini aldı)            | 2026-08-21 |
+| [0029](0029-client-data-layer.md)                      | İstemci Veri Katmanı El Yapımı Kalıyor; Geçiş Tetikleyicisi Üçüncü Generation Sayacı                                                 | Kabul edildi                                          | 2026-08-23 |
+| [0030](0030-typescript-7-hold.md)                      | TypeScript, typescript-eslint ve ts-jest 7'yi Destekleyene Kadar 5.x Hattında Kalır                                                  | Kabul edildi                                          | 2026-08-23 |
+| [0031](0031-api-versioning.md)                         | API Versiyonlama: 1.0'da Tanıtılan Bir `/v1` URI Öneki ve Şeylerin Gönderilme Sırası                                                 | Kabul edildi                                          | 2026-08-23 |
+| [0032](0032-plan-limits.md)                            | Plan Limitleri: Her Tavan İçin Tek Çözümleyici, Ayarlanana Kadar Sınırsız                                                            | Kabul edildi                                          | 2026-08-23 |
+| [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Teslimi ve Hata Politikası: Workspace'e Ait Endpoint'ler, Bir Outbox Satırı ve İmzalı Bir Zarf                               | Önerildi                                              | 2026-08-26 |
+| [0034](0034-hosted-billing-and-plan-assignment.md)     | Barındırılan Faturalandırma ve Plan Ataması: Bir Merchant of Record, Tek Bir Subscription Satırı ve Yapılandırılmadığında Hiçbir Şey | Önerildi                                              | 2026-08-26 |
+| [0035](0035-inline-task-composer.md)                   | Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok                                      | Kabul edildi                                          | 2026-08-26 |
+| [0036](0036-turkish-only-documentation.md)             | Dokümantasyon Yalnız Türkçe                                                                                                          | Kabul edildi                                          | 2026-10-01 |
 
-| #                                                      | Title                                                                                                                | Status                                                 | Date       |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ---------- |
-| [0001](0001-monorepo-modular-monolith.md)              | Monorepo + Modular Monolith                                                                                          | Accepted                                               | 2026-08-08 |
-| [0002](0002-backend-stack.md)                          | Backend Stack: NestJS + Prisma + PostgreSQL + Redis                                                                  | Accepted                                               | 2026-08-08 |
-| [0003](0003-frontend-stack.md)                         | Frontend Stack: Next.js + Tailwind + shadcn/ui + @dnd-kit + Recharts                                                 | Accepted                                               | 2026-08-08 |
-| [0004](0004-auth-better-auth.md)                       | Auth: Better Auth with Organization Plugin                                                                           | Accepted                                               | 2026-08-08 |
-| [0005](0005-realtime-socketio.md)                      | Realtime: Socket.io + Redis Adapter                                                                                  | Accepted                                               | 2026-08-08 |
-| [0006](0006-fractional-indexing.md)                    | Fractional Indexing for Task and Column Position                                                                     | Accepted                                               | 2026-08-08 |
-| [0007](0007-license-agpl.md)                           | License: AGPL-3.0                                                                                                    | Accepted                                               | 2026-08-08 |
-| [0008](0008-git-flow-semver.md)                        | Git Flow + Conventional Commits + SemVer                                                                             | Accepted                                               | 2026-08-08 |
-| [0009](0009-board-column-permissions.md)               | Board and Column Permissions                                                                                         | Accepted                                               | 2026-08-09 |
-| [0010](0010-task-permissions.md)                       | Task Permissions                                                                                                     | Accepted                                               | 2026-08-09 |
-| [0011](0011-label-task-metadata-permissions.md)        | Label and Task-Metadata Permissions                                                                                  | Accepted (comment-delete row superseded by 0012)       | 2026-08-09 |
-| [0012](0012-comment-delete-authorship.md)              | Comment Delete Authorship                                                                                            | Accepted                                               | 2026-08-09 |
-| [0013](0013-invitation-email-verification.md)          | Invitation-Acceptance Email Verification                                                                             | Accepted                                               | 2026-08-10 |
-| [0014](0014-dual-licensing-cla.md)                     | Dual Licensing and a Contributor License Agreement                                                                   | Superseded by 0028                                     | 2026-08-11 |
-| [0015](0015-no-external-contributions.md)              | No External Contributions; Legal Spend Deferred                                                                      | Superseded by 0028                                     | 2026-08-12 |
-| [0016](0016-foreign-key-violation-status.md)           | Foreign-Key Violations Map to 409, Not 422                                                                           | Accepted                                               | 2026-08-12 |
-| [0017](0017-partial-indexes-outside-prisma-schema.md)  | Partial Indexes Live in Migrations, Guarded by Tests                                                                 | Accepted                                               | 2026-08-12 |
-| [0018](0018-localization-strategy.md)                  | Localization Strategy: next-intl Without URL Routing                                                                 | Accepted                                               | 2026-08-12 |
-| [0019](0019-column-category.md)                        | Column Completion Is a Category, Not a Name                                                                          | Accepted                                               | 2026-08-12 |
-| [0020](0020-data-retention.md)                         | Data Retention: Per-Table Windows Enforced by a Nightly Sweep                                                        | Accepted                                               | 2026-08-14 |
-| [0021](0021-activation-funnel-and-opt-in-telemetry.md) | Activation Funnel In-Instance, Telemetry Opt-In and Off by Default                                                   | Accepted                                               | 2026-08-14 |
-| [0022](0022-attachment-storage.md)                     | Attachment Storage: Local Disk Behind a Port, Served From the API Origin                                             | Accepted (attachment kinds and limits settled in 0024) | 2026-08-14 |
-| [0023](0023-checklist-data-model.md)                   | Checklist Data Model: Multi-List Per Card, Derived Progress, No New Realtime Event                                   | Accepted                                               | 2026-08-14 |
-| [0024](0024-attachment-kinds-and-serving-policy.md)    | Attachment Kinds and Serving Policy: FILE or LINK, One Size Number in Two Layers, Inline Only for Images             | Accepted                                               | 2026-08-15 |
-| [0025](0025-trello-import-mapping.md)                  | Trello Import Mapping: Nothing Is Guessed, Everything Missing Is Counted                                             | Accepted                                               | 2026-08-15 |
-| [0026](0026-account-deletion-anonymisation.md)         | Account Deletion: Anonymise the User Row, Decide the Owned Workspace in the Flow                                     | Accepted                                               | 2026-08-15 |
-| [0027](0027-attachment-quotas.md)                      | Attachment Storage Quotas: Soft Byte Ceilings per Workspace and per Instance                                         | Accepted                                               | 2026-08-18 |
-| [0028](0028-open-contributions-hosted-service.md)      | Open Contributions Under AGPL-3.0, No CLA; Revenue Only From a Hosted Service                                        | Accepted (supersedes 0014, 0015)                       | 2026-08-21 |
-| [0029](0029-client-data-layer.md)                      | The Client Data Layer Stays Hand-Rolled; the Flip Trigger Is the Third Generation Counter                            | Accepted                                               | 2026-08-23 |
-| [0030](0030-typescript-7-hold.md)                      | TypeScript Stays on the 5.x Line Until typescript-eslint and ts-jest Support 7                                       | Accepted                                               | 2026-08-23 |
-| [0031](0031-api-versioning.md)                         | API Versioning: a `/v1` URI Prefix Introduced at 1.0, and the Order Things Ship In                                   | Accepted                                               | 2026-08-23 |
-| [0032](0032-plan-limits.md)                            | Plan Limits: One Resolver for Every Ceiling, Unlimited Until Configured                                              | Accepted                                               | 2026-08-23 |
-| [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Delivery and Failure Policy: Workspace-Owned Endpoints, an Outbox Row, and a Signed Envelope                 | Proposed                                               | 2026-08-26 |
-| [0034](0034-hosted-billing-and-plan-assignment.md)     | Hosted Billing and Plan Assignment: a Merchant of Record, One Subscription Row, and Nothing at All When Unconfigured | Proposed                                               | 2026-08-26 |
-| [0035](0035-inline-task-composer.md)                   | Inline Task Composer: One Creation Path at the Foot of the Column, and No Dialog for a Title                         | Accepted                                               | 2026-08-26 |
+Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 
-A status can later change to **Superseded**, with a link to the ADR that
-replaces it (e.g. `**Status:** Superseded by [0012](0012-....md)`).
+## Yeni bir ADR eklemek
 
-## Adding a new ADR
+1. Aşağıdaki şablonu yeni bir dosyaya kopyala: `docs/decisions/NNNN-kebab-title.md`, burada `NNNN` sıradaki bir sonraki sıfırla-doldurulmuş dört haneli sayı.
+2. Her bölümü doldur, hiçbir yeri placeholder olarak bırakma.
+3. Yukarıdaki dizin tablosuna bir satır ekle.
+4. Bir PR aç. Tartışma PR üzerinde gerçekleşir; karar PR'da verildiyse merge edildikten sonra ADR'in durumu `Kabul edildi` olur ve kayıt tarihsel olarak ele alınır (sonraki kararları yerini alma yoluyla düzenle, geçmişi yeniden yazarak değil). Karar henüz verilmemişse ADR `Önerildi` durumuyla merge edilebilir (0033 ve 0034 böyle) ve karar verildiğinde durumu hem ADR'de hem dizinde `Kabul edildi` yapılır.
 
-1. Copy the template below into a new file: `docs/decisions/NNNN-kebab-title.md`,
-   where `NNNN` is the next zero-padded four-digit number in sequence.
-2. Fill in every section, leaving nothing as a placeholder.
-3. Add a row to the index table above.
-4. Open a PR. Discussion happens on the PR; once merged, the ADR's status is
-   `Accepted` and the record is treated as historical (edit later decisions by
-   superseding, not by rewriting history).
-
-## Template
+## Şablon
 
 ```markdown
-# NNNN. Title
+# NNNN. Başlık
 
-**Status:** Proposed | Accepted | Superseded by [NNNN](NNNN-file.md)
-**Date:** YYYY-MM-DD
+**Durum:** Önerildi | Kabul edildi | [NNNN](NNNN-file.md) tarafından yerini aldı
+**Tarih:** YYYY-AA-GG
+**Güncellendi:** YYYY-AA-GG — ne değişti, tek cümle (opsiyonel: yalnız kayıt merge'den sonra düzeltilirse)
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/NNNN-kebab-title.md)
+## Bağlam
 
-## Context
+Bu kararı hangi problem veya soru zorladı? Hangi kısıtlar geçerliydi?
 
-What problem or question forced this decision? What constraints applied?
+## Karar
 
-## Decision
+Verilen seçim, bir veya iki cümleyle açıkça ifade edilir.
 
-The choice made, stated plainly in one or two sentences.
+## Gerekçe
 
-## Rationale
+Bu seçenek neden diğerlerine tercih edildi, yukarıdaki bağlam göz önüne alındığında.
 
-Why this option, over the others, given the context above.
+## Sonuçlar
 
-## Consequences
+Bunun neyi kolaylaştırdığı, neyi zorlaştırdığı ve olumsuz trade-off'lar; sadece artıları değil, dürüstçe belirtilmiş.
 
-What this makes easier, what it makes harder, and any negative trade-offs,
-stated honestly rather than only the upside.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative | Why not |
-| ----------- | ------- |
-| ...         | ...     |
+| Alternatif | Neden değil |
+| ---------- | ----------- |
+| ...        | ...         |
 ```

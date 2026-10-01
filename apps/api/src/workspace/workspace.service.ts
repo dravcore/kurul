@@ -272,7 +272,7 @@ export class WorkspaceService {
    * gathered *before* the call: afterwards the row is gone and even the workspace's name cannot
    * be looked up. The counts are what turn "workspace X was deleted" into something an incident
    * responder can size — an empty trial tenant and a workspace with forty members and nine
-   * boards are otherwise the same line. `docs/architecture.md` ("Audit trail") records this as
+   * boards are otherwise the same line. `docs/architecture.md` ("Denetim izi") records this as
    * the one event that lives in the log rather than in the table.
    */
   async remove(workspaceId: string, actorId: string, request: Request): Promise<void> {

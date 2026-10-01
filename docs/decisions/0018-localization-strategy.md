@@ -1,185 +1,191 @@
-# 0018. Localization Strategy: next-intl Without URL Routing
+# 0018. Yerelleştirme Stratejisi: URL Yönlendirmesi Olmadan next-intl
 
-**Status:** Accepted
-**Date:** 2026-08-12
-**Updated:** 2026-08-21: both key counts below are snapshots from different moments and have
-since moved together: `en.json` and `tr.json` each carry 514 leaf keys today, still equal to each
-other as the catalogue-parity gate requires.
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-12
+**Güncellendi:** 2026-08-21: aşağıdaki iki key sayısı farklı anların fotoğrafı ve o zamandan beri
+birlikte ilerledi: `en.json` ve `tr.json` bugün her biri 514 yaprak key taşıyor, katalog-parity
+kapısının şart koştuğu gibi hâlâ birbirine eşit.
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Bağlam'daki "İngilizce kanonik + `docs/tr`
+aynası" ve Sonuçlar'daki "`docs/tr/**` içinde ise İngilizce kalır" ifadeleri kaldırılan İngilizce asıl +
+Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md). Rol adlarının dokümanda İngilizce kalması kuralı `docs/**`
+için sürüyor. Ürün yerelleştirme kararı (arayüzde `en` ve `tr`, `messages/en.json` kanonik) değişmedi.
+**Güncellendi:** 2026-10-01 — Başlıktaki 2026-08-21 notunun key sayıları anlık görüntüdür: `en.json` ve
+`tr.json` bugün her biri 603 yaprak key taşıyor, eşitliği `apps/web/messages/catalog.test.ts` korumaya
+devam ediyor. Gerekçe'deki `apps/web/middleware.ts` Next 16 ile `apps/web/proxy.ts` oldu ve `PUBLIC_PATHS`
+bugün `/forgot-password` ile `/reset-password`'ü de tutuyor. Çözümleme zinciri `apps/web/i18n/user-locale.ts`'te
+(`resolveRequestLocale`) yaşar ve `i18n/request.ts` onu çağırır; dil çerezi istemcide
+`apps/web/lib/locale-cookie.ts` ile yazılır.
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0018-localization-strategy.md)
+## Bağlam
 
-## Context
+Ürün planı, İngilizce arayüzü baştan sona bitirmek ve ardından ikinci dil olarak Türkçeyi
+eklemek. Bu da şu soruyu doğurdu: Türkçe için doğru araç next-intl mi, yoksa farklı bir
+yaklaşım mı gerekiyor?
 
-The product plan is to finish the English interface completely, then add Turkish as a second
-language. That raised the question of whether next-intl is the right vehicle for Turkish or
-whether a different approach is needed.
-
-The answer to the narrow question is that next-intl is already the vehicle, and has been for
-some time. `NextIntlClientProvider` wraps the root layout, `getLocale()` / `getMessages()`
-feed it, 53 files call `useTranslations` or `getTranslations`, and `apps/web/messages/en.json`
-holds roughly 279 keys. `formatRelativeTime` already takes a locale parameter rather than
-pinning `'en'`. The only thing keeping the app monolingual is one line in
-`apps/web/i18n/request.ts`:
+Dar sorunun cevabı şu: next-intl zaten kullanılan araç ve bir süredir öyle.
+`NextIntlClientProvider` root layout'u sarıyor, `getLocale()` / `getMessages()` onu besliyor,
+53 dosya `useTranslations` veya `getTranslations` çağırıyor ve `apps/web/messages/en.json`
+yaklaşık 279 anahtar tutuyor. `formatRelativeTime` sabit `'en'` yerine zaten bir locale
+parametresi alıyor. Uygulamayı tek dilli tutan tek şey `apps/web/i18n/request.ts` içindeki
+tek satır:
 
 ```ts
 const locale = 'en';
 ```
 
-So the real decision is not "which library" but the three questions that line defers: how a
-locale gets chosen, where the preference lives, and what happens to strings that are stored
-in the database rather than in a message catalog.
+Yani asıl karar "hangi kütüphane" değil, o satırın ertelediği üç soru: locale nasıl seçilecek,
+tercih nerede yaşayacak ve mesaj kataloğunda değil veritabanında duran metinlere ne olacak?
 
-Two constraints shape the answer. First, every page in Kurul is behind authentication —
-there is no indexable content, and a marketing or documentation site, if one is built, will
-live outside this Next.js application. Second, `apps/api` has no locale awareness at all:
-errors are returned as stable codes plus an HTTP status, and the web maps them to translation
-keys through `resolveApiMessage`.
+Cevabı iki kısıt şekillendiriyor. Birincisi, Kurul'daki her sayfa kimlik doğrulama arkasında
+— indekslenecek içerik yok ve bir tanıtım ya da dokümantasyon sitesi yapılırsa bu Next.js
+uygulamasının dışında yaşayacak. İkincisi, `apps/api` tarafında hiç locale farkındalığı yok:
+hatalar sabit kodlar ve bir HTTP durumu olarak dönüyor, web bunları `resolveApiMessage` ile
+çeviri anahtarlarına eşliyor.
 
-This ADR is about product localization. The English-canonical / `docs/tr` mirror rule for
-repository documentation is a separate, unrelated convention.
+Bu ADR ürün yerelleştirmesi hakkında. Depo dokümantasyonundaki "İngilizce kanonik + `docs/tr`
+aynası" kuralı ayrı ve ilgisiz bir gelenektir.
 
-## Decision
+## Karar
 
-next-intl stays; no second i18n library is introduced. Locale is resolved **without URL
-routing**, from a chain implemented in `apps/web/i18n/request.ts`:
+next-intl kalıyor; ikinci bir i18n kütüphanesi getirilmiyor. Locale, **URL yönlendirmesi
+olmadan**, `apps/web/i18n/request.ts` içinde uygulanan bir zincirden çözülüyor:
 
 ```
-User.locale  →  locale cookie  →  Accept-Language  →  'en'
+User.locale  →  locale çerezi  →  Accept-Language  →  'en'
 ```
 
-There is no `[locale]` path segment and no i18n middleware. Alongside that:
+`[locale]` yol parçası yok, i18n middleware'i yok. Bunun yanında:
 
-1. **Locale is a user-level preference**, stored as a nullable IETF tag on `User` and mirrored
-   into a cookie when the user picks a language. It is not a workspace setting.
-2. **The backend stays free of UI translation.** The API keeps returning error codes and
-   statuses; the web owns the message catalog. The API reads `Accept-Language` only for
-   content it writes into the database on the user's behalf, and for outbound email.
-3. **Stored strings follow the renameability rule:** if a user can rename it, it is user data —
-   seed it in the creator's locale and store it as a plain string. If a user cannot rename it
-   (`priority`, roles, enum labels), it is system data — store the enum and translate on the
-   web.
-4. **English remains canonical.** `messages/en.json` is the source of truth; `tr.json` is added
-   only once the English interface is complete.
+1. **Locale kullanıcı düzeyinde bir tercihtir**, `User` üzerinde nullable bir IETF etiketi
+   olarak saklanır ve kullanıcı dil seçtiğinde bir çereze yansıtılır. Workspace ayarı değildir.
+2. **Backend arayüz çevirisinden uzak durur.** API hata kodları ve durumları döndürmeye devam
+   eder; mesaj kataloğunun sahibi web'dir. API `Accept-Language`'ı yalnızca kullanıcı adına
+   veritabanına yazdığı içerik için ve giden e-postalar için okur.
+3. **Saklanan metinler yeniden adlandırılabilirlik kuralına uyar:** kullanıcı yeniden
+   adlandırabiliyorsa o kullanıcı verisidir — yaratıcının dilinde tohumla ve düz string olarak
+   sakla. Kullanıcı yeniden adlandıramıyorsa (`priority`, roller, enum etiketleri) sistem
+   verisidir — enum'u sakla, çeviriyi web yapsın.
+4. **İngilizce kanonik kalır.** `messages/en.json` tek doğruluk kaynağıdır; `tr.json` ancak
+   İngilizce arayüz tamamlandığında eklenir.
 
-## Rationale
+## Gerekçe
 
-- The one real payoff of a `[locale]` path segment is SEO: distinct URLs per language plus
-  `hreflang`. Nothing in Kurul is indexed, so that payoff does not apply, and the marketing
-  site that would need it is planned to live elsewhere.
-- The costs of the path segment are paid immediately and in full: the entire `app/` tree moves
-  under `app/[locale]/`, and every `<Link>` and `router.push` has to switch to next-intl's
-  locale-aware wrappers — any call site that misses the switch silently resets the user's
-  language, a quiet failure mode no test naturally catches.
-- The middleware cost is worse than it first looks. `apps/web/middleware.ts` already exists and
-  gates every route on a session, and all of its routing logic is **literal path matching**: a
-  `PUBLIC_PATHS` set holding `/login`, `/register` and `/verify-email`, a
-  `pathname.startsWith('/invite/')` check, and `pathname === '/'` for the root redirect. A
-  locale prefix invalidates every one of those comparisons at once. Adopting routed i18n
-  therefore means composing next-intl's middleware with the auth gate _and_ rewriting the auth
-  gate's matching in the same change — on the one file where a mistake logs users out or, worse,
-  lets an unauthenticated request through.
-- next-intl documents the no-routing setup as a first-class configuration, so this choice does
-  not fight the library or fall off the supported path.
-- User-level rather than workspace-level, because one workspace legitimately contains members
-  who read different languages. A workspace-wide setting would force one of them into the
-  wrong interface.
-- Keeping translation out of the backend avoids maintaining the same catalog twice. The API
-  already speaks in codes; giving it prose in two languages would make the web's catalog and
-  the API's catalog drift.
+- `[locale]` yol parçasının tek gerçek getirisi SEO'dur: her dil için ayrı URL artı `hreflang`.
+  Kurul'da indekslenen hiçbir şey yok, dolayısıyla bu getiri geçerli değil; ona ihtiyaç
+  duyacak tanıtım sitesinin de başka yerde yaşaması planlanıyor.
+- Yol parçasının maliyeti ise anında ve eksiksiz ödenir: tüm `app/` ağacı `app/[locale]/`
+  altına taşınır ve her `<Link>` ile `router.push` next-intl'in locale-farkında
+  sarmalayıcılarına geçmek zorunda kalır — bu geçişi kaçıran her çağrı yeri kullanıcının dilini
+  sessizce sıfırlar, doğal olarak yakalayan bir testi olmayan sessiz bir hata biçimi.
+- Middleware maliyeti ilk bakışta göründüğünden ağır. `apps/web/middleware.ts` zaten var ve her
+  route'u oturuma karşı geçitliyor; üstelik tüm yönlendirme mantığı **literal yol eşlemesi**:
+  `/login`, `/register` ve `/verify-email` tutan bir `PUBLIC_PATHS` kümesi, bir
+  `pathname.startsWith('/invite/')` kontrolü ve kök yönlendirmesi için `pathname === '/'`. Dil
+  öneki bu karşılaştırmaların hepsini birden geçersiz kılar. Dolayısıyla yönlendirmeli i18n'e
+  geçmek, next-intl'in middleware'ini auth geçidiyle bileştirmek **ve** aynı değişiklikte auth
+  geçidinin eşlemesini yeniden yazmak demek — hatanın kullanıcıları oturumdan atacağı ya da daha
+  kötüsü kimliksiz bir isteği içeri alacağı tek dosyada.
+- next-intl, yönlendirmesiz kurulumu birinci sınıf bir yapılandırma olarak belgeliyor;
+  dolayısıyla bu seçim kütüphaneye ters düşmüyor ve desteklenen yolun dışına çıkmıyor.
+- Workspace düzeyi yerine kullanıcı düzeyi, çünkü bir workspace meşru şekilde farklı diller
+  okuyan üyeler barındırır. Workspace geneli bir ayar, bunlardan birini yanlış arayüze mahkûm
+  ederdi.
+- Çeviriyi backend'in dışında tutmak aynı kataloğu iki kez sürdürmeyi önler. API zaten kodlarla
+  konuşuyor; ona iki dilde düzyazı vermek web'in kataloğuyla API'nin kataloğunun ayrışmasına
+  yol açardı.
 
-## Consequences
+## Sonuçlar
 
-- `User` gains a nullable `locale` column and a migration; a settings screen has to expose it.
-  Because outbound email needs the recipient's language, the preference must live in the
-  database and not only in a cookie.
-- `apps/web/i18n/request.ts` grows the resolution chain and a cookie write on language change.
-- Unauthenticated routes — notably `/invite/[invitationId]` — resolve from `Accept-Language`,
-  so an invitee sees their own language without being signed in. This is the desired behavior
-  and the main reason the invite flow does not force the path-segment approach.
-- A shared board URL carries no language: the recipient sees it in _their_ language, not the
-  sender's. Accepted deliberately; it is usually what people want.
-- Reviewing two languages side by side requires separate browser profiles or a private window.
-- **Deferred, not dismissed:** if a marketing or documentation site is ever moved _into_ this
-  application, `[locale]` routing has to be introduced at that point, and the migration is the
-  full cost described above. That trigger is recorded here so the deferral stays a decision
-  rather than an oversight.
-- From now on every new user-visible string goes through `messages/en.json`. A hardcoded string
-  is a defect, not a shortcut, because it is invisible to the Turkish pass and will not show up
-  as a missing key.
-- The API gains a small amount of locale awareness — reading `Accept-Language` — which it did
-  not have before. It is confined to database seeding and email.
-- **The seed column names live in the API, not in `@kurul/shared-types`.** Settled during
-  implementation, because §3 leaves it open. They are data the API writes on the user's behalf,
-  and once the web stopped seeding — `POST …/columns/defaults` replaced its three-request loop —
-  the API became their only writer. A shared copy would ship every language's seed vocabulary
-  into a browser bundle that never renders it. What stays shared is `SUPPORTED_LOCALES`, which
-  genuinely crosses the boundary: the web renders the picker from it, the API validates
-  `PATCH /me` against it. The structural half of the seed list (position, `ColumnCategory`) is
-  held apart from the names so a translation cannot move a column or change what it means.
-- **Board templates extend that ruling by one step, and the step is deliberate.** The catalogue
-  in `apps/api/src/common/board-templates.ts` holds each template's columns _and_ its label
-  preset under the same `Record<Locale, …>` discipline, which §3 already covers: both are rows
-  the API writes on the user's behalf. What is new is that a template also has a **name and a
-  description of its own**, and those are returned localised by
-  `GET /workspaces/:workspaceId/board-templates` rather than rendered from `messages/<tag>.json`.
-  That is an interface string by §3's renameability test, and it is served from the API anyway,
-  because a picker card is a promise about the rows a create is about to write. Splitting it
-  would render the title in the browser's language and the columns beneath it in the creator's
-  stored one, which are not always the same language. One card, one language, one source.
-  `defaultColumnsFor` is a call into this catalogue, so the board every client already creates
-  and the template the picker calls by the same name cannot drift apart.
-- Adding a language is a change to `SUPPORTED_LOCALES` plus the three things that then fail on
-  their own: the API's `Record<Locale, …>` of seed names and its `Record<Locale, …>` of mail
-  copy both stop compiling, and `messages/<tag>.json` fails the catalogue parity test until it
-  exists and matches English key for key. No data migration, and no `User.locale` backfill —
-  the column stays nullable, and null keeps meaning "follow the browser".
-- `GET /me` reads `User.locale` from the database rather than from the session. Better Auth
-  caches the session user in a cookie for 60 seconds, and `/me` is what the web's chain
-  consults, so a session-carried locale would leave the interface in the old language for up to
-  60 seconds after the user changed it.
-- **§4's condition is met: Turkish ships.** The English interface was complete, so
-  `messages/tr.json` was written against it — 486 keys, the same key set, the same ICU
-  arguments. Seed column names gained a `tr` row (`Yapılacak / Devam Ediyor / Bitti`) and both
-  transactional emails are now written in the recipient's language. English stays canonical:
-  `en.json` is still the file a new string is added to, and the one the Turkish catalogue is
-  measured against.
-- **Role names are translated in the interface (`Sahip / Yönetici / Üye / Misafir`) and left in
-  English in `docs/tr/**` (`owner'ından`, `admin'e`) — a deliberate split, not drift.** The docs
-  are talking about the `OWNER`/`ADMIN` enum values and the `@kurul/auth-access` role
-  identifiers, which are never translated; the badge is a word a person reads.
-- **"100% translated" is a gate, not a claim.** `apps/web/messages/catalog.test.ts` fails the
-  build on a key `en.json` has and another catalogue does not, on a key another catalogue has
-  and English does not, and on a message whose ICU arguments differ between the two. It reads
-  `SUPPORTED_LOCALES` rather than a hardcoded `['tr']`, so a third language is gated the day it
-  is declared. Nothing else could catch this: next-intl resolves a missing message to its raw
-  key path at runtime, so a half-translated locale compiles, passes type-checking and shows the
-  user `app.board.column.deleteAction`.
-- **Outbound mail resolves a language with no request in flight, and the chain has one more
-  link than the interface's.** Settled during implementation, because §2 says only "and for
-  outbound email". It is `recipient's User.locale → sender's User.locale → Accept-Language of
-the triggering request → 'en'` (`apps/api/src/mail/recipient-locale.ts`). The middle link is
-  the decision: an invitation may be addressed to someone who has no account on this instance
-  at all, so there is no preference of theirs to read. Rather than defaulting those people to
-  English, the invitation is written in the language of the person who sent it — the only human
-  in the exchange whose language is known, who chose to write to that address, and whose
-  language the invitation already discloses by naming them. For a verification email, actor and
-  recipient are the same brand-new account, so the chain collapses to the browser they signed
-  up in. A failed lookup degrades to the next link and is logged; it never fails the signup or
-  the invitation that triggered it.
-- **The mail copy is a `Record<Locale, …>` in the API, for the same reason the seed names are.**
-  It is not interface text — nothing re-renders it in a viewer's language — and a language
-  added to `SUPPORTED_LOCALES` fails to compile until its email copy exists, so a locale cannot
-  ship with a translated interface and English email. Word order is what makes it a table of
-  functions rather than of format strings: Turkish puts the workspace name before the verb and
-  the verb last, and a shared `{inviter} invited you to {workspace}` template would force one
-  language into the other's grammar.
+- `User` nullable bir `locale` sütunu ve bir migration kazanır; bir ayarlar ekranı bunu açığa
+  çıkarmalıdır. Giden e-postaların alıcının dilini bilmesi gerektiği için tercih yalnızca
+  çerezde değil veritabanında yaşamak zorundadır.
+- `apps/web/i18n/request.ts` çözümleme zincirini ve dil değişiminde bir çerez yazımını kazanır.
+- Kimlik doğrulaması olmayan route'lar — özellikle `/invite/[invitationId]` — `Accept-Language`
+  üzerinden çözülür, yani davet edilen kişi oturum açmadan kendi dilini görür. İstenen davranış
+  budur ve davet akışının yol parçası yaklaşımını zorunlu kılmamasının başlıca sebebidir.
+- Paylaşılan bir board URL'i dil taşımaz: alıcı onu göndericinin değil **kendi** dilinde görür.
+  Bilinçli olarak kabul edildi; genellikle insanların istediği de budur.
+- İki dili yan yana incelemek ayrı tarayıcı profilleri ya da gizli pencere gerektirir.
+- **Ertelendi, reddedilmedi:** bir tanıtım veya dokümantasyon sitesi bir gün bu uygulamanın
+  _içine_ taşınırsa, `[locale]` yönlendirmesi o noktada getirilmek zorundadır ve geçiş yukarıda
+  anlatılan tam maliyettir. Erteleme bir gözden kaçırma değil bir karar olarak kalsın diye
+  tetikleyici burada kayıtlıdır.
+- Bundan sonra kullanıcıya görünen her yeni metin `messages/en.json` üzerinden geçer. Sabit
+  kodlanmış bir string kestirme değil bir kusurdur, çünkü Türkçe turuna görünmez ve eksik
+  anahtar olarak da ortaya çıkmaz.
+- API daha önce hiç sahip olmadığı küçük bir locale farkındalığı — `Accept-Language` okuma —
+  kazanır. Bu, veritabanı tohumlaması ve e-posta ile sınırlıdır.
+- **Tohum kolon adları `@kurul/shared-types`'ta değil API'de yaşar.** §3 bunu açık bıraktığı
+  için uygulama sırasında karara bağlandı. Bu adlar API'nin kullanıcı adına yazdığı veridir ve
+  web tohumlamayı bıraktığı anda — `POST …/columns/defaults` onun üç istekli döngüsünün yerini
+  aldı — API tek yazıcı hâline geldi. Paylaşılan bir kopya, tarayıcının hiç render etmediği bir
+  liste için her dilin tohum sözcüklerini bundle'a taşırdı. Paylaşılan kalan şey
+  `SUPPORTED_LOCALES`'tir; o gerçekten sınırı geçer: web seçiciyi ondan üretir, API `PATCH /me`'yi
+  ona karşı doğrular. Tohum listesinin yapısal yarısı (position, `ColumnCategory`) adlardan ayrı
+  tutulur, böylece bir çeviri bir kolonu yerinden oynatamaz veya anlamını değiştiremez.
+- **Board şablonları bu kararı bir adım ileri taşır ve bu adım bilinçlidir.**
+  `apps/api/src/common/board-templates.ts`'teki katalog, her şablonun kolonlarını _ve_ etiket ön
+  ayarını aynı `Record<Locale, …>` disiplini altında tutar; §3 bunu zaten kapsıyor, çünkü ikisi
+  de API'nin kullanıcı adına yazdığı satırlardır. Yeni olan şu: bir şablonun **kendi adı ve
+  açıklaması** da var ve bunlar `messages/<tag>.json`'dan render edilmek yerine
+  `GET /workspaces/:workspaceId/board-templates` tarafından yerelleştirilmiş olarak döndürülür.
+  §3'ün yeniden adlandırılabilirlik testine göre bu bir arayüz metnidir ve yine de API'den
+  sunulur, çünkü bir seçici kartı, bir create'in birazdan yazacağı satırlar hakkında verilmiş bir
+  sözdür. Ayırmak, başlığı tarayıcının dilinde, altındaki kolonları ise oluşturanın kayıtlı
+  dilinde render ederdi; bu ikisi her zaman aynı dil değildir. Tek kart, tek dil, tek kaynak.
+  `defaultColumnsFor` bu kataloğa yapılan bir çağrıdır, böylece her istemcinin zaten oluşturduğu
+  board ile seçicinin aynı adla andığı şablon birbirinden ayrışamaz.
+- Bir dil eklemek `SUPPORTED_LOCALES`'e yapılan bir değişiklik, artı ardından kendiliğinden
+  patlayan üç yerdir: API'nin tohum adları `Record<Locale, …>`'ı ve mail metinleri
+  `Record<Locale, …>`'ı derlenmeyi bırakır, `messages/<tag>.json` ise var olup İngilizce ile
+  key key eşleşene kadar katalog parity testini düşürür. Veri migration'ı yok, `User.locale`
+  backfill'i yok — sütun nullable kalır ve null "tarayıcıyı izle" demeye devam eder.
+- `GET /me`, `User.locale`'i session'dan değil veritabanından okur. Better Auth session
+  kullanıcısını 60 saniye boyunca bir çerezde önbelleğe alır ve web'in zinciri `/me`'ye
+  başvurur; session'da taşınan bir locale, kullanıcı dili değiştirdikten sonra arayüzü 60
+  saniyeye kadar eski dilde bırakırdı.
+- **§4'ün koşulu karşılandı: Türkçe geldi.** İngilizce arayüz tamamlandığı için
+  `messages/tr.json` onun karşısına yazıldı — 486 key, aynı key kümesi, aynı ICU argümanları.
+  Tohum kolon adları bir `tr` satırı kazandı (`Yapılacak / Devam Ediyor / Bitti`) ve iki
+  transactional e-posta da artık alıcının dilinde yazılıyor. İngilizce kanonik kalır: yeni bir
+  metnin eklendiği dosya hâlâ `en.json`'dır ve Türkçe katalog ona göre ölçülür.
+- **Rol adları arayüzde çevrilir (`Sahip / Yönetici / Üye / Misafir`), `docs/tr/**` içinde ise
+  İngilizce kalır (`owner'ından`, `admin'e`) — bu bir drift değil, bilinçli bir ayrım.** Doküman
+  `OWNER`/`ADMIN` enum değerlerinden ve `@kurul/auth-access` rol tanımlayıcılarından söz eder
+  ve bunlar hiç çevrilmez; arayüzdeki rozet ise bir insanın okuduğu bir kelimedir.
+- **"%100 çevrildi" bir iddia değil, bir kapıdır.** `apps/web/messages/catalog.test.ts`,
+  `en.json`'da olup başka bir katalogda olmayan bir key'de, başka bir katalogda olup
+  İngilizce'de olmayan bir key'de ve ICU argümanları iki dosya arasında farklılaşan bir mesajda
+  build'i düşürür. Sabit bir `['tr']` yerine `SUPPORTED_LOCALES`'i okur; böylece üçüncü dil,
+  ilan edildiği gün kapının arkasına girer. Bunu başka hiçbir şey yakalayamaz: next-intl eksik
+  bir mesajı çalışma zamanında ham key yoluna çözer, dolayısıyla yarım çevrilmiş bir locale
+  derlenir, tip kontrolünden geçer ve kullanıcıya `app.board.column.deleteAction` gösterir.
+- **Giden e-posta, ortada bir request yokken bir dil çözer ve zinciri arayüzünkinden bir halka
+  uzundur.** §2 yalnızca "ve giden e-posta için" dediği için bu, uygulama sırasında karara
+  bağlandı. Zincir şu: `alıcının User.locale'i → gönderenin User.locale'i → tetikleyen
+request'in Accept-Language'i → 'en'` (`apps/api/src/mail/recipient-locale.ts`). Karar olan
+  halka ortadaki: bir davet, bu instance'ta hiç hesabı olmayan bir adrese gidebilir, dolayısıyla
+  okunacak bir tercihi yoktur. Bu kişileri İngilizce'ye düşürmek yerine davet, onu gönderen
+  kişinin dilinde yazılır — bu alışverişte dili bilinen tek insan odur, o adrese yazmayı o
+  seçmiştir ve davet zaten onun adını vererek dilini ele verir. Doğrulama e-postasında ise
+  eyleyen ile alıcı aynı yeni hesaptır, yani zincir kayıt oldukları tarayıcıya iner. Başarısız
+  bir okuma bir sonraki halkaya düşer ve loglanır; kendisini tetikleyen kaydı ya da daveti asla
+  düşürmez.
+- **Mail metinleri, tohum adlarıyla aynı gerekçeyle API'de bir `Record<Locale, …>`'dır.** Arayüz
+  metni değildir — hiçbir şey onu bir izleyicinin dilinde yeniden render etmez — ve
+  `SUPPORTED_LOCALES`'e eklenen bir dil, e-posta metinleri var olana kadar derlenmez; böylece
+  bir locale, arayüzü çevrilmiş ama e-postası İngilizce halde gelemez. Bunu format string'leri
+  değil fonksiyonlar tablosu yapan şey kelime sırasıdır: Türkçe workspace adını fiilden önce,
+  fiili en sona koyar; ortak bir `{inviter} invited you to {workspace}` şablonu dillerden birini
+  diğerinin gramerine zorlardı.
 
-## Alternatives considered
+## Değerlendirilen alternatifler
 
-| Alternative                                           | Why not                                                                                                                                                                                                         |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[locale]` path segment (next-intl's routed default)  | Its SEO payoff does not apply to an app with no indexable pages; it costs the whole route tree, a rewrite of the existing auth middleware's literal path matching, and permanent link discipline starting today |
-| Workspace-level locale                                | One workspace legitimately has members who read different languages; a shared setting forces someone into the wrong language                                                                                    |
-| Backend i18n (`nestjs-i18n`, `Accept-Language` prose) | Duplicates the catalog the web already owns and lets the two drift; the API already returns codes, which the web maps through `resolveApiMessage`                                                               |
-| Switch to react-i18next or Lingui                     | next-intl is already integrated across 53 files and is the App-Router-native choice; a swap buys nothing and re-does working code                                                                               |
-| Machine translation at request time                   | Unpredictable product vocabulary, per-request latency and cost, and no way to review the wording before users see it                                                                                            |
+| Alternatif                                                      | Neden olmadı                                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[locale]` yol parçası (next-intl'in yönlendirmeli varsayılanı) | SEO getirisi indekslenebilir sayfası olmayan bir uygulamada geçersiz; buna karşılık tüm route ağacına, mevcut auth middleware'inin literal yol eşlemesinin yeniden yazılmasına ve bugünden başlayan kalıcı link disiplinine mal oluyor |
+| Workspace düzeyinde locale                                      | Bir workspace meşru şekilde farklı diller okuyan üyelere sahiptir; ortak bir ayar birini yanlış dile mahkûm eder                                                                                                                       |
+| Backend i18n (`nestjs-i18n`, `Accept-Language` ile düzyazı)     | Web'in zaten sahip olduğu kataloğu ikizler ve ayrışmalarına izin verir; API zaten `resolveApiMessage` ile eşlenen kodlar döndürüyor                                                                                                    |
+| react-i18next veya Lingui'ye geçmek                             | next-intl 53 dosyada zaten entegre ve App Router'ın doğal seçeneği; takas hiçbir şey kazandırmaz, çalışan kodu yeniden yazar                                                                                                           |
+| İstek anında makine çevirisi                                    | Ürün sözlüğü öngörülemez hale gelir, istek başına gecikme ve maliyet doğar, metni kullanıcı görmeden gözden geçirmenin yolu kalmaz                                                                                                     |

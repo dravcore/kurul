@@ -1,148 +1,163 @@
-# 0030. TypeScript Stays on the 5.x Line Until typescript-eslint and ts-jest Support 7
+# 0030. TypeScript, typescript-eslint ve ts-jest 7'yi Destekleyene Kadar 5.x Hattında Kalır
 
-**Status:** Accepted
+**Durum:** Kabul edildi
 
-**Date:** 2026-08-23
+**Tarih:** 2026-08-23
+**Güncellendi:** 2026-10-01 — (1) `typescript` bugün dört değil altı `package.json` dosyasında
+`^5.8.2` taşıyor: kök, `apps/api`, `apps/web`, `packages/auth-access`, `packages/shared-types` ve
+`e2e` (`e2e` paketi bu kayıttan önce eklenmişti); metindeki "dört" sayısı baştan eksikti ve her
+geçtiği yerde, Karar'daki tetikleyici PR adımı dahil, altı dosyayı anlatır. (2) Bekletme geçerliliğini
+koruyor (2026-10-01'de ölçüldü): `typescript-eslint` (lockfile'da 8.70.0, yayınlanmış en son 8.71.0)
+hâlâ `<6.1.0`, `ts-jest` (29.4.12 ve 29.4.14) hâlâ `<7` peer aralığını taşıyor; `typescript@latest`
+7.0.2, 7.1 yalnız `next` etiketinde. Bağlam'daki diğer sürüm numaraları yazıldıkları günün anlık
+görüntüsüdür (lockfile bugün `next` 16.3.6, `vitest` 4.1.11).
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0030-typescript-7-hold.md)
+## Bağlam
 
-## Context
+TypeScript 7.0 (Go'ya yeniden yazılmış, ~10x daha hızlı, önceden `tsgo` diye bilinen derleyici)
+2026-08-20'de `typescript@7.0.2` olarak genel kullanıma açıldı. `typescript`, bu deponun dört
+`package.json` dosyasında (kök, `apps/api`, `apps/web`, `packages/auth-access`,
+`packages/shared-types`) `^5.8.2` olarak sabitlenmiş ve lockfile'da `5.9.3`'e çözümleniyor.
+`.github/dependabot.yml` zaten `typescript`'in majör sürüm atlamalarını reddeden bir `ignore`
+kuralı taşıyor; yorumu iki peer-range tavanını gerekçe gösteriyordu. O yorum, TypeScript
+7.0 çıkmadan önce, yalnızca yayınlanmış peer aralıklarının gücüyle yazılmıştı; bu ADR onu
+gerçekte yayında olanla karşılaştırıyor, bakımcıları doğrudan alıntılıyor ve holde gelecekteki
+bir PR'ın hiçbir şeyi yeniden türetmeden kontrol edebileceği bir tetikleyici veriyor.
 
-TypeScript 7.0 (the Go-rewritten, ~10x-faster compiler previously known as `tsgo`) reached
-general availability on 2026-08-20 as `typescript@7.0.2`. `typescript` is pinned `^5.8.2` in
-this repository's four `package.json` files (root, `apps/api`, `apps/web`,
-`packages/auth-access`, `packages/shared-types`) and resolves to `5.9.3` in the lockfile.
-`.github/dependabot.yml` already carries an `ignore` rule refusing major-version bumps of
-`typescript`, with a comment naming two peer-range ceilings as the reason. That comment was
-written before TypeScript 7.0 shipped, on the strength of the published peer ranges alone; this
-ADR checks it against what actually happened at release, cites the maintainers directly, and
-gives the hold a trigger a future PR can check without re-deriving any of this.
+**Bugün kurulu olana göre doğrulanmış, tahmin edilmemiş, 7'yi engelleyenler:**
 
-**What blocks 7, verified against what is installed today, not guessed:**
-
-- **`typescript-eslint`** (`@typescript-eslint/typescript-estree`, the package actually holding
-  the peer range) declares `"typescript": ">=4.8.4 <6.1.0"` as of `8.67.0`, the version this
-  repo runs. Two compatibility reports —
+- **`typescript-eslint`** (peer aralığını gerçekte taşıyan paket olan
+  `@typescript-eslint/typescript-estree`), bu deponun çalıştırdığı `8.67.0` sürümü itibarıyla
+  `"typescript": ">=4.8.4 <6.1.0"` beyan ediyor. İki uyumluluk raporu —
   [typescript-eslint#12720](https://github.com/typescript-eslint/typescript-eslint/issues/12720)
-  and [#12518](https://github.com/typescript-eslint/typescript-eslint/issues/12518) — were both
-  closed `NOT_PLANNED` on the day of TypeScript 7's release. Maintainer bradzacher, on the
-  project's pinned tracking issue
-  [#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940): "For now -
-  there is nothing we can do to support tsgo / TSv7. As mentioned in the blog post and
-  highlighted above - there is currently no stable JS API." That issue is now locked, waiting on
-  the API.
-- **`ts-jest`** declares `"typescript": ">=4.3 <7"` as of `29.4.12`, the version this repo runs.
-  [kulshekhar/ts-jest#5366](https://github.com/kulshekhar/ts-jest/issues/5366) is open;
-  maintainer kulshekhar, reopening it after a too-broad first close: "TypeScript 7 currently
-  lacks the JavaScript compiler API ts-jest relies on, so proper direct support requires a
-  different integration and not merely widening the peer range... We'll essentially need to wait
-  for 7.1 (assuming the stable programmatic api will land in 7.1)."
-- **The TypeScript team says the same thing about their own release.** From the
+  ve [#12518](https://github.com/typescript-eslint/typescript-eslint/issues/12518) — TypeScript
+  7'nin yayınlandığı gün `NOT_PLANNED` olarak kapatıldı. Bakımcı bradzacher, projenin sabitlenmiş
+  takip issue'sunda [#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940):
+  "Şimdilik - tsgo / TSv7'yi desteklemek için yapabileceğimiz hiçbir şey yok. Blog yazısında
+  belirtildiği ve yukarıda vurgulandığı gibi - şu anda kararlı bir JS API'si yok." O issue artık
+  kilitli, API'yi bekliyor.
+- **`ts-jest`**, bu deponun çalıştırdığı `29.4.12` sürümü itibarıyla
+  `"typescript": ">=4.3 <7"` beyan ediyor.
+  [kulshekhar/ts-jest#5366](https://github.com/kulshekhar/ts-jest/issues/5366) açık; bakımcı
+  kulshekhar, çok geniş kapsamlı ilk kapatmadan sonra issue'yu yeniden açarken: "TypeScript 7
+  şu anda ts-jest'in bağımlı olduğu JavaScript derleyici API'sinden yoksun, bu yüzden gerçek
+  destek yalnızca peer aralığını genişletmekle değil farklı bir entegrasyonla mümkün...
+  Esasen 7.1'i beklememiz gerekecek (kararlı programatik API'nin 7.1'de geleceği varsayımıyla)."
+- **TypeScript ekibi kendi sürümü için aynı şeyi söylüyor.**
   ["Announcing TypeScript 7.0"](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)
-  devblog: "While TypeScript 7.0 is here, it does not ship with an API. We expect TypeScript 7.1
-  to ship with a new (and different) API, but until then we have made it a priority to ensure
-  TypeScript can be run side-by-side with TypeScript 6.0 for utilities that still need some
-  programmatic access to the compiler (such as typescript-eslint)." They ship a
-  `@typescript/typescript6` compatibility package (a `tsc6` binary plus a re-export of the 6.0
-  API) for exactly this transition period. No release date for 7.1 is given; the same post
-  estimates "a fairly similar timeline to releases prior to TypeScript 7.0, with new featureful
-  versions published every 3-4 months" from the 2026-08-20 GA, i.e. some time around
-  late 2026.
+  devblog yazısından: "TypeScript 7.0 burada olsa da bir API ile gelmiyor. TypeScript 7.1'in
+  yeni (ve farklı) bir API ile geleceğini bekliyoruz, ama o zamana kadar derleyiciye hâlâ
+  programatik erişime ihtiyaç duyan araçlar (typescript-eslint gibi) için TypeScript'i
+  TypeScript 6.0 ile yan yana çalıştırabilmeyi öncelik haline getirdik." Tam da bu geçiş dönemi
+  için bir `@typescript/typescript6` uyumluluk paketi (bir `tsc6` ikili dosyası artı 6.0 API'sinin
+  yeniden dışa aktarımı) yayınlıyorlar. 7.1 için bir yayın tarihi verilmiyor; aynı yazı
+  2026-08-20 GA'sından itibaren "TypeScript 7.0'dan önceki sürümlere oldukça benzer bir zaman
+  çizelgesi, her 3-4 ayda bir yeni özellikli sürümler" tahmin ediyor, yani 2026'nın sonlarına
+  doğru bir zaman.
 
-**What does not block 7, checked the same way and worth recording so nobody re-litigates it:**
+**Aynı şekilde kontrol edilmiş ve 7'yi engellemeyenler — kimse yeniden tartışmasın diye
+kayda geçirilmeye değer:**
 
-- **Prisma.** The `prisma` package's `peerDependencies.typescript` is `">=5.4.0"` — open-ended,
-  already satisfied by 7. Nothing in the generator or CLI gates on a TypeScript major version.
-- **`@nestjs/cli`.** No `typescript` `peerDependency` at all. It ships its own `typescript`
-  (pinned `5.9.3`) as a plain `dependency`, used internally for `nest build`'s default
-  tsc-based compilation — so it is not gated by the workspace's installed TypeScript version at
-  install time. (Whether `nest build` type-checks cleanly against a 7.x tsconfig is untested
-  here since 7 cannot be installed anyway with the two blockers above still holding it back.)
-- **Next.js 16 (`16.3.0`).** No `typescript` `peerDependency`. Type-checking during `next build`
-  is optional and reads whatever `typescript` the project resolves; it is not a version gate.
-- **Vitest (`4.1.10`).** No `typescript` `peerDependency` — its peers are `vite`, `jsdom`,
-  `happy-dom`, `@types/node` and its own plugin packages. `apps/web`'s test runner has no
-  TypeScript-version dependency on this axis at all.
+- **Prisma.** `prisma` paketinin `peerDependencies.typescript`'i `">=5.4.0"` — açık uçlu,
+  7 tarafından zaten karşılanıyor. Generator veya CLI'da hiçbir şey bir TypeScript majör
+  sürümüne bağlı değil.
+- **`@nestjs/cli`.** Hiç `typescript` `peerDependency`'si yok. Kendi `typescript`'ini
+  (`5.9.3`'e sabitlenmiş) düz bir `dependency` olarak taşıyor; `nest build`'in varsayılan
+  tsc tabanlı derlemesi için dahili olarak kullanıyor — yani workspace'in kurulu TypeScript
+  sürümü tarafından kurulum anında kısıtlanmıyor. (`nest build`'in 7.x bir tsconfig'e karşı
+  temiz tip kontrolü yapıp yapmadığı burada test edilmedi, çünkü yukarıdaki iki engelleyici
+  hâlâ tuttuğu sürece 7 zaten kurulamıyor.)
+- **Next.js 16 (`16.3.0`).** Hiç `typescript` `peerDependency`'si yok. `next build` sırasındaki
+  tip kontrolü isteğe bağlı ve projenin çözümlediği her ne `typescript` ise onu okuyor; bir
+  sürüm kapısı değil.
+- **Vitest (`4.1.10`).** Hiç `typescript` `peerDependency`'si yok — peer'leri `vite`, `jsdom`,
+  `happy-dom`, `@types/node` ve kendi plugin paketleri. `apps/web`'in test çalıştırıcısının bu
+  eksende hiçbir TypeScript-sürüm bağımlılığı yok.
 
-So the hold is narrower than "the TypeScript ecosystem isn't ready": exactly two packages gate
-it, both for the identical reason (no stable TypeScript 7 compiler API to run against, by both
-their own and Microsoft's account), and both maintainers point at the same unblock.
+Yani hold, "TypeScript ekosistemi hazır değil"den daha dar: tam olarak iki paket engelliyor,
+ikisi de aynı sebeple (hem kendi hem de Microsoft'un kendi ifadesine göre, çalışacak kararlı bir
+TypeScript 7 derleyici API'si yok), ve iki bakımcı da aynı çözüme işaret ediyor.
 
-## Decision
+## Karar
 
-**`typescript` stays `^5.8.2` in all four `package.json` files, and the `dependabot.yml` ignore
-rule for `typescript`'s major-version updates stays, until both of the following are true:**
+**`typescript`, dört `package.json` dosyasının hepsinde `^5.8.2` kalır ve
+`dependabot.yml`'in `typescript` majör sürüm güncellemeleri için ignore kuralı, aşağıdakilerin
+ikisi de doğru olana kadar kalır:**
 
-1. `typescript-eslint` (checked via `@typescript-eslint/typescript-estree`'s published
-   `peerDependencies.typescript`) accepts a `7.x` version in a stable, non-prerelease release.
-2. `ts-jest`'s published `peerDependencies.typescript` accepts a `7.x` version in a stable,
-   non-prerelease release.
+1. `typescript-eslint` (`@typescript-eslint/typescript-estree`'nin yayınlanmış
+   `peerDependencies.typescript`'i üzerinden kontrol edilir) kararlı, prerelease olmayan bir
+   sürümde `7.x`'i kabul ediyor.
+2. `ts-jest`'in yayınlanmış `peerDependencies.typescript`'i kararlı, prerelease olmayan bir
+   sürümde `7.x`'i kabul ediyor.
 
-**Trigger, checked either when Dependabot next proposes a `typescript` major bump (it cannot
-today — the ignore rule filters it out — so this means checking by hand) or by
-2026-12-01, whichever comes first:** read the two peer ranges above off npm
-(`npm view typescript-eslint peerDependencies`, `npm view ts-jest peerDependencies`) or their
-`CHANGELOG.md`s. If both include `7`, open a PR that in one change: bumps `typescript` to `^7.x`
-in all four `package.json` files, removes the `dependabot.yml` ignore rule (and this ADR's
-comment reference, superseding it with a one-line note), and runs `pnpm lint`, `pnpm test`,
-`pnpm typecheck`, `nest build` and `next build` once against 7 before merging — those last two
-are not proven clean today because 7 cannot be installed alongside the two blockers, so the
-first real bump is also the first real test of them. If only one condition holds, log the date
-checked and which package is still blocking in this ADR's changelog and defer three more months
-rather than re-deriving the whole picture.
+**Tetikleyici, ya Dependabot bir sonraki `typescript` majör atlamasını önerdiğinde (bugün
+öneremiyor — ignore kuralı onu filtreliyor — yani bu elle kontrol etmek anlamına geliyor) ya da
+2026-12-01'e kadar, hangisi önce gelirse:** yukarıdaki iki peer aralığını npm'den
+(`npm view typescript-eslint peerDependencies`, `npm view ts-jest peerDependencies`) veya
+`CHANGELOG.md`'lerinden oku. İkisi de `7`'yi içeriyorsa, tek bir değişiklikte: `typescript`'i
+dört `package.json` dosyasının hepsinde `^7.x`'e yükselten, `dependabot.yml` ignore kuralını
+(ve bu ADR'nin yorum referansını, bir satırlık bir notla yerini alarak) kaldıran ve birleştirmeden
+önce `pnpm lint`, `pnpm test`, `pnpm typecheck`, `nest build` ve `next build`'i bir kez 7'ye karşı
+çalıştıran bir PR aç — son ikisi bugün temiz kanıtlanmış değil çünkü iki engelleyici hâlâ tutarken
+7 kurulamıyor, yani ilk gerçek atlama aynı zamanda onların ilk gerçek testi de olacak. Yalnızca
+biri doğruysa, kontrol edilen tarihi ve hangi paketin hâlâ engellediğini bu ADR'nin
+changelog'una kaydet ve tüm resmi yeniden türetmek yerine üç ay daha ertele.
 
-The `.github/dependabot.yml` `ignore` comment is updated in this PR to point at this ADR instead
-of restating the rationale inline.
+`.github/dependabot.yml`'in `ignore` yorumu bu PR'da, gerekçeyi satır içinde tekrarlamak
+yerine bu ADR'ye işaret edecek şekilde güncellendi.
 
-## Rationale
+## Gerekçe
 
-**Why an upper-bound peer range is treated as a hard blocker rather than something to override.**
-`pnpm install` refuses a `typescript@7` install against `typescript-eslint@8.67.0`'s
-`<6.1.0` ceiling outright (`ERESOLVE`/`peer dep` failure), and forcing it past that with
-overrides does not change what actually breaks: `ts-jest`'s own compatibility page (referenced
-from its reopened issue) documents that TypeScript 7 "does not expose the JavaScript compiler
-API required by ts-jest" — the transform crashes at runtime, not at install time, so an
-override would trade a loud failure for a silent one. Neither tool is behind on packaging; both
-maintainers have said in public, on the record, that the API they depend on does not exist yet
-in 7.0. There is nothing this repository can do that unblocks either one sooner.
+**Neden bir üst-sınır peer aralığı geçilebilir bir şey değil de sert bir engelleyici olarak
+ele alınıyor.** `pnpm install`, `typescript-eslint@8.67.0`'ın `<6.1.0` tavanına karşı
+`typescript@7` kurulumunu doğrudan reddediyor (`ERESOLVE`/`peer dep` hatası) ve bunu override'larla
+zorlamak gerçekte neyin bozulduğunu değiştirmiyor: `ts-jest`'in kendi uyumluluk sayfası (yeniden
+açılan issue'sundan referanslanan), TypeScript 7'nin "ts-jest'in gerektirdiği JavaScript derleyici
+API'sini açığa çıkarmadığını" belgeliyor — transform kurulum anında değil, çalışma anında
+çöküyor, yani bir override, yüksek sesli bir hatayı sessiz bir hatayla takas ederdi. Hiçbir araç
+paketlemede geride değil; her iki bakımcı da kamuya açık olarak, kayıtlarda, bağımlı oldukları
+API'nin 7.0'da henüz var olmadığını söyledi. Bu depo, ikisini de daha erken açacak hiçbir şey
+yapamaz.
 
-**Why the trigger is "both peer ranges accept 7" rather than "TypeScript 7.1 ships."** 7.1
-shipping the promised API is necessary but not sufficient — both maintainers still have to cut a
-release against it, and `ts-jest`'s history above (`29.4.12` was published claiming Issue
-resolution and reopened days later once users reported the peer range was unchanged) shows that
-"a release referencing TypeScript 7" and "a release whose peer range actually accepts 7" are not
-the same event. Checking the published range is the only signal that cannot be half-true.
+**Neden tetikleyici "TypeScript 7.1 çıkar" değil de "her iki peer aralığı da 7'yi kabul eder."**
+7.1'in vaat edilen API ile çıkması gerekli ama yeterli değil — her iki bakımcının da ona karşı
+bir sürüm kesmesi gerekiyor, ve yukarıdaki `ts-jest` tarihçesi (`29.4.12`, issue çözümü iddiasıyla
+yayınlandı ve kullanıcılar peer aralığının değişmediğini bildirdikten günler sonra yeniden
+açıldı) "TypeScript 7'ye referans veren bir sürüm" ile "peer aralığı gerçekten 7'yi kabul eden
+bir sürüm"ün aynı olay olmadığını gösteriyor. Yayınlanmış aralığı kontrol etmek, yarı doğru
+olamayacak tek sinyal.
 
-**Why this is a repo-wide pin and not per-package.** All four `package.json` files already carry
-the same `^5.8.2`, and the two blocking peers sit in `apps/api` (`ts-jest`) and at the workspace
-root (`typescript-eslint`, shared by both apps' lint configs). A split version would need every
-consuming package to resolve its own `typescript`, which `pnpm`'s workspace hoisting does not
-give for a peer dependency shared this widely, and would turn one blocked upgrade into a matrix
-of "which typescript does this file see" bugs for a compiler speed win nobody is blocked on
-today.
+**Neden bu depo geneli bir sabitleme, paket başına değil.** Dört `package.json` dosyası zaten
+aynı `^5.8.2`'yi taşıyor, ve iki engelleyici peer `apps/api`'de (`ts-jest`) ve workspace kökünde
+(`typescript-eslint`, her iki uygulamanın lint config'i tarafından paylaşılıyor) oturuyor.
+Bölünmüş bir sürüm, her tüketen paketin kendi `typescript`'ini çözümlemesini gerektirirdi;
+bu kadar geniş paylaşılan bir peer dependency için `pnpm`'in workspace hoisting'i bunu vermiyor,
+ve bugün kimsenin engellenmediği bir derleyici hız kazancı için bir engellenmiş yükseltmeyi
+"bu dosya hangi typescript'i görüyor" hata matrisine çevirirdi.
 
-## Consequences
+## Sonuçlar
 
-- `pnpm install`, `pnpm lint` and `pnpm test` (via `ts-jest` in `apps/api`) keep working exactly
-  as they do today; nothing about this ADR changes current behaviour, only what stops the next
-  routine dependency bump.
-- `.github/dependabot.yml`'s `ignore` rule for `typescript` major updates now cites this ADR by
-  path in its comment instead of restating the two peer ranges inline, so the two documents
-  cannot drift out of sync silently — a change to either range is a reason to reread both.
-- The eventual bump is deliberately bundled with a `nest build` / `next build` check, because
-  those two are the pieces of this toolchain nobody has been able to test against 7 yet (no
-  formal peer gate blocks the _install_, but that also means nobody has proven the _build_
-  clean) — see the "does not block" list above.
-- No code in this repository is written today anticipating TypeScript 7 syntax or API changes;
-  there is nothing to migrate ahead of time, only the version pin and the two upstream releases
-  to wait for.
+- `pnpm install`, `pnpm lint` ve `pnpm test` (`apps/api`'de `ts-jest` üzerinden) tam olarak
+  bugünkü gibi çalışmaya devam ediyor; bu ADR mevcut davranışta hiçbir şeyi değiştirmiyor,
+  yalnızca bir sonraki rutin bağımlılık atlamasını durduran şeyi değiştiriyor.
+- `.github/dependabot.yml`'in `typescript` majör güncellemeleri için `ignore` kuralı artık
+  iki peer aralığını satır içinde tekrarlamak yerine bu ADR'yi yoluyla anıyor, böylece iki
+  belge sessizce birbirinden sapamıyor — aralıklardan birindeki bir değişiklik, ikisini de
+  yeniden okumak için bir sebep.
+- Nihai atlama kasıtlı olarak bir `nest build` / `next build` kontrolüyle paketlendi, çünkü
+  bu ikisi bu toolchain'in henüz kimsenin 7'ye karşı test edemediği parçaları (kuruluma resmi
+  bir peer kapısı engel olmuyor, ama bu aynı zamanda kimsenin _build_'i temiz kanıtlamadığı
+  anlamına da geliyor) — yukarıdaki "engellemeyenler" listesine bakın.
+- Bu depoda bugün TypeScript 7 sözdizimi veya API değişikliklerini öngörerek yazılmış hiçbir
+  kod yok; önceden taşınacak bir şey yok, yalnızca sürüm sabitlemesi ve beklenen iki upstream
+  sürümü var.
 
-## Alternatives considered
+## Değerlendirilen alternatifler
 
-| Alternative                                                                                       | Why not                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Force the bump with pnpm overrides, ignore the peer warning                                       | The warning is not the real failure — `ts-jest` crashes at transform time because the TS7 binary does not expose the compiler API it calls, so this trades a loud `pnpm install` failure for tests failing in CI instead |
-| Alias TypeScript 6 and 7 side by side (`@typescript/typescript6` for lint/test, real 7 for build) | Doubles the installed compiler, needs per-tool aliasing nobody else on the team would expect, and buys a compile-speed win the repo is not currently blocked on — not worth the complexity before 7.1 ships anyway       |
-| Replace `ts-jest` with `@swc/jest` now to remove one blocker early                                | A transform-engine swap unrelated to the TS7 question, changes what `pnpm test` actually type-checks (`@swc/jest` does not type-check), and still leaves `typescript-eslint` as a hard blocker on its own                |
-| No ADR; keep the dependabot comment as the only record                                            | The Hardening roadmap item asked for a citable decision the ignore rule can point to; a comment alone has no room for the maintainers' own statements or a trigger a future PR can check without re-researching this     |
-| Trigger on "TypeScript 7.1 released" instead of the peer ranges                                   | Necessary but not sufficient — `ts-jest`'s own history here shows a release can reference TS7 support without the peer range actually widening; the range is the only claim that can't be half-true                      |
+| Alternatif                                                                                             | Neden olmaz                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Atlamayı pnpm override'larla zorla, peer uyarısını yok say                                             | Uyarı gerçek hata değil — `ts-jest`, TS7 ikilisi çağırdığı derleyici API'sini açığa çıkarmadığı için transform zamanında çöküyor; bu, yüksek sesli bir `pnpm install` hatasını CI'da başarısız testlerle takas eder                                     |
+| TypeScript 6 ve 7'yi yan yana alias'la (lint/test için `@typescript/typescript6`, build için gerçek 7) | Kurulu derleyiciyi ikiye katlar, ekibin geri kalanının beklemeyeceği paket başına alias gerektirir ve deponun şu an engellenmediği bir derleme-hızı kazancı satın alır — 7.1 çıkmadan önce bu karmaşıklığa değmez                                       |
+| Bir engelleyiciyi erken kaldırmak için `ts-jest`'i şimdi `@swc/jest` ile değiştir                      | TS7 sorusuyla ilgisiz bir transform-motoru değişimi, `pnpm test`'in gerçekte tip kontrolü yaptığı şeyi değiştirir (`@swc/jest` tip kontrolü yapmaz) ve `typescript-eslint`'i yine de tek başına sert bir engelleyici olarak bırakır                     |
+| ADR yok; dependabot yorumunu tek kayıt olarak bırak                                                    | Hardening roadmap maddesi, ignore kuralının işaret edebileceği alıntılanabilir bir karar istedi; yalnızca bir yorumda bakımcıların kendi ifadelerine veya gelecekteki bir PR'ın bunu yeniden araştırmadan kontrol edebileceği bir tetikleyiciye yer yok |
+| "TypeScript 7.1 yayınlandı" yerine peer aralıklarını tetikleyici yap                                   | Gerekli ama yeterli değil — yukarıdaki `ts-jest` tarihçesi, bir sürümün peer aralığı gerçekten genişlemeden TS7 desteğine referans verebileceğini gösteriyor; aralık, yarı doğru olamayacak tek iddia                                                   |

@@ -1,88 +1,99 @@
-# 0022. Attachment Storage: Local Disk Behind a Port, Served From the API Origin
+# 0022. Dosya Eki Depolaması: Bir Port Arkasında Yerel Disk, API Origin'inden Servis
 
-**Status:** Accepted
-**Date:** 2026-08-14
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-14
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Bunların hepsinin
+Türkçe aynaları aynı PR'da taşınır" ifadesi kaldırılan İngilizce asıl + Türkçe ayna düzenine
+aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Karar'daki üç ayrıntı koddan sonra değişti. `StorageBackend` artık
+yalnız `write`, `read` ve `remove` taşımıyor: `read` `createReadStream` adını aldı, süpürme için
+`listKeys` ve kapanış için `close` eklendi (`apps/api/src/storage/storage-backend.ts`). Throttle
+dekoratörleri `ThrottleAttachmentUpload()` (dakikada 20) ve `ThrottleAttachmentDownload()`
+(dakikada 300) adını taşıyor (`apps/api/src/common/rate-limit/rate-limit.ts`). Süpürmenin penceresi
+`BACKUP_KEEP × BACKUP_INTERVAL`'ın kendisi değil, `BACKUP_KEEP`'i en az 1 sayan ve sonucu en az 24
+saate yükselten `orphanGraceMs()`'tir; ölçüt dosyanın mtime'ı, yani yükleme anıdır
+(`apps/api/src/retention/cleanup.worker.ts`).
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0022-attachment-storage.md)
+## Bağlam
 
-## Context
+Kurul insanlara bunu yapamadığını, üstelik nedenini de söyleyerek anlatıyor. `README.md`,
+ürünün `v0.1.0`'da olmadığı şeyler arasında "no task attachments" satırını taşıyor ve
+[ROADMAP.md — MVP ötesi](../../ROADMAP.md#mvp-ötesi)'ye işaret ediyor; oradaki kayıt
+`Task attachments — Needs an object-storage decision (ADR)` diyor.
+[tech-stack.md](../tech-stack.md) aynı şeyi öbür taraftan söylüyor: "File attachments are out of
+MVP scope. When added, pick an S3-compatible store." Bu doküman ikisinin de beklediği karardır.
 
-Kurul has been telling people it cannot do this, and telling them why. `README.md` lists "no
-task attachments" among the things the product is not at `v0.1.0` and points at
-[ROADMAP.md — Beyond MVP](../../ROADMAP.md#beyond-mvp), where the entry reads `Task attachments —
-Needs an object-storage decision (ADR)`. [tech-stack.md](../tech-stack.md) says the same thing
-from the other side: "File attachments are out of MVP scope. When added, pick an S3-compatible
-store." This document is the decision both of them are waiting on.
+Bu işi programa alan denetim, attachments'ı üç table-stakes boşluğunun başına — checklist ve
+Trello import'un önüne — en sık istenen eksik özellik olduğu gerekçesiyle koydu. Rakip self-host
+panolar bunu temel kabul ediyor. Geçişi değerlendiren bir takım üç soru soruyor: panolarımı
+getirebilir miyim, kartlara dosya koyabilir miyim, checklist'lerim var mı. Herhangi birine "hayır"
+demek, değerlendirmeyi farklılaştırıcılara hiç sıra gelmeden bitiriyor.
 
-The audit that scheduled this work put attachments first among three table-stakes gaps, ahead of
-checklists and Trello import, as the most frequently asked-for missing feature. Competing
-self-hosted boards treat it as baseline. A team evaluating a migration asks three questions —
-can I bring my boards, can I put files on cards, do I have checklists — and a "no" to any of
-them ends the evaluation before the differentiators are ever reached.
+**Depolama sorusu özellikten daha zor.** Attachments, Kurul'un sakladığı **Postgres satırı
+olmayan ilk şey** ve bugüne kadar verilen her operasyonel söz bir veritabanı hakkında verildi.
+Gecelik yedek tek komut çalıştırıyor, `pg_dump --format=custom`; `backup` servisi kendi script'ini
+ve yedek volume'ünü mount ediyor, başka hiçbir şeyi. Prova edilmiş restore'un başarı tanımı
+tamamen veritabanı şeklinde — 17 tablonun tamamının, her satır sayısının, 59 indeksin yeniden
+üretilmesi. **Yüklenen her dosya kaybolmuşken bir restore provası %100 geçer.**
 
-**The storage question is harder than the feature.** Attachments are the first thing Kurul
-stores that is not a row in Postgres, and every operational promise made so far was made about a
-database. The nightly backup runs one command, `pg_dump --format=custom`; the `backup` service
-mounts its own script and the backup volume and nothing else. The rehearsed restore's definition
-of success is entirely database-shaped — reproducing all 17 tables, every row count, all 59
-indexes. **A restore drill would pass at 100% with every uploaded file gone.**
+[ADR 0020](0020-data-retention.md) bu sorunun bir versiyonunu zaten yanıtladı ve hayır dedi:
+soğuk depolamaya arşivleme, "an archive would be a file on the same disk that nobody reads and
+nobody restores" gerekçesiyle doğrudan reddedildi. Attachments tam olarak o cümlenin yasakladığı
+şeyi getiriyor. Bu itiraz dosyaların kullanıcıya görünür olmasıyla karşılanmıyor — kullanıcı
+dosyayı okur, ama kimse onu _yedek olarak_ okumaz. Yalnızca kopyanın dump'la aynı prova edilmiş
+takvimde okunup restore edilmesiyle karşılanır.
 
-[ADR 0020](0020-data-retention.md) has already answered a version of this question, and answered
-it no: cold-storage archiving was rejected outright because "an archive would be a file on the
-same disk that nobody reads and nobody restores". Attachments bring exactly the thing that
-sentence forbids. That objection is not answered by files being user-visible — a user reads the
-file, but nobody reads it _as a backup_. It is answered only by the copy being read and restored
-on the same rehearsed schedule as the dump.
+Soruyu bir zevk meselesi değil gerçekten açık kılan şey dağıtım hedefi. Kurul tek makinede
+Compose yığını olarak çıkıyor ([ADR 0001](0001-monorepo-modular-monolith.md)) ve hedef kitle beş
+dakikalık kurulum sözü verilmiş bir self-hoster. Bir PDF eklemek için MinIO ya da S3 hesabı
+şart koşmak, çoğunluğun sözünü zaten object storage çalıştıran azınlık için bozar; `fs`'i
+sabitlemek o azınlığı ortada bırakır ve ileride taşınmayı bir yeniden yazıma çevirir.
 
-The deployment target is what keeps the question genuinely open rather than a matter of taste.
-Kurul ships as a Compose stack on one machine ([ADR 0001](0001-monorepo-modular-monolith.md))
-to an audience promised a five-minute install. Requiring MinIO or an S3 account to attach a PDF
-breaks that promise for the majority in order to serve the minority who already run object
-storage; hard-coding `fs` strands that minority and makes the eventual move a rewrite.
+## Karar
 
-## Decision
+**Depolama, tek uygulaması olan bir porttur.** `StorageBackend`, `write`, `read`, `remove`
+metotlarını taşıyan bir interface; yayınlanan tek uygulama `DiskStorageBackend`. Biçim
+`MailSender`'ı birebir kopyalıyor — düz bir interface, `@Injectable()` olmayan düz adapter
+sınıfları, saf bir `createStorageBackend(config)` factory'si, reset kancası olan süreç-geneli bir
+tekil ve modülün dışa açtığı tek şey olarak dar bir `StorageService`. Yetenek biti kimlikten
+ayrı, tıpkı `deliversMail`'in `transport`'tan ayrı olması gibi: kod `persistsFiles` üzerinde
+dallanır, asla `backend === 'disk'` üzerinde değil.
 
-**Storage is a port with one implementation.** `StorageBackend` is an interface with
-`write`, `read`, `remove`; `DiskStorageBackend` is the only implementation that ships. The shape
-copies `MailSender` exactly — a plain interface, plain adapter classes that are not
-`@Injectable()`, a pure `createStorageBackend(config)` factory, a process-wide singleton with a
-reset hook, and a narrow `StorageService` as the only thing the module exports. The capability
-bit is separate from the identity, as `deliversMail` is from `transport`: code branches on
-`persistsFiles`, never on `backend === 'disk'`.
+**Yapılandırma `SMTP_HOST` desenini izler: varlık açar.** `STORAGE_PATH` set ise attachments
+çalışır; set değilse özellik kapalıdır ve `StorageConfig.disk` `undefined`'dır — bir bayrak değil,
+tip düzeyinde bir durum. `ATTACHMENTS_ENABLED` yoktur. Bu kod tabanı `_ENABLED` boolean'larını
+varsayılan-açık kill switch'lere (`CLEANUP_ENABLED`, `RATE_LIMIT_ENABLED`) ve rızaya
+(`TELEMETRY_ENABLED`) ayırıyor; çalışmak için zaten bir değere ihtiyaç duyan varsayılan-kapalı bir
+özellik böyle bir bayrak almaz. `GET /config`, web'in kontrolü gösterip göstermeyeceğini bilmesi
+için `attachmentsEnabled` kazanır.
 
-**Configuration follows the `SMTP_HOST` pattern: presence enables.** `STORAGE_PATH` set means
-attachments work; unset means the feature is off and `StorageConfig.disk` is `undefined` — a
-type-level state, not a flag. There is no `ATTACHMENTS_ENABLED`. This codebase reserves `_ENABLED`
-booleans for default-on kill switches (`CLEANUP_ENABLED`, `RATE_LIMIT_ENABLED`) and for consent
-(`TELEMETRY_ENABLED`); a default-off feature that needs a value to work does not get one.
-`GET /config` grows `attachmentsEnabled` so the web knows whether to render the control.
+**S3 ertelendi, reddedilmedi.** `StorageBackend`, `S3StorageBackend` bir yeniden düzenleme değil
+eklenen bir dosya olacak şekilde tasarlandı ve SDK geldiğinde `await import()` ile yüklenecek —
+`smtp-mail-sender.ts`'in nodemailer'ı tembel yüklemesinin gerekçesi ~10 MB'lık AWS SDK için daha
+da güçlü. **Tetikleyici:** yerel diskin kalıcı olmadığı bir dağıtıma dair ilk operatör bildirimi
+(geçici depolamalı bir konteyner host'u ya da çok replikalı bir kurulum). **Tetiklendiğinde
+maliyet:** bir adapter dosyası, bir config dalı, bir tembel import — uçlarda, modelde ya da
+portta değişiklik değil.
 
-**S3 is deferred, not dismissed.** `StorageBackend` is designed so `S3StorageBackend` is an
-added file rather than a refactor, and the SDK is loaded with `await import()` when it arrives —
-the reason `smtp-mail-sender.ts` lazy-loads nodemailer applies more strongly to a ~10 MB AWS
-SDK. **Trigger:** the first operator report of a deployment where local disk is not durable
-(a container host with ephemeral storage, or a multi-replica install). **Cost when triggered:**
-one adapter file, one config branch, one lazy import — not a change to the endpoints, the model,
-or the port.
+**Yedek ikinci bir iş kazanır.** Attachments volume'ü `backup` servisine salt-okunur mount edilir
+ve aynı koşuda dump'ın yanına arşivlenir, aynı `BACKUP_KEEP` takvimiyle budanır. Restore
+prosedürü eşleşen bir adım, provanın başarı ölçütü de bir dosya sayısı kazanır. Bu olmadan
+`ADR 0020`'nin gerekçesi genişletilmiş değil, çelişilmiş olur.
 
-**The backup grows a second job.** The attachments volume is mounted read-only into the `backup`
-service and archived beside the dump in the same run, pruned on the same `BACKUP_KEEP` schedule.
-The restore procedure grows a matching step and the drill's success criteria grow a file count.
-Without this, `ADR 0020`'s reasoning is contradicted rather than extended.
+**Yetim dosyalar süpürülür; grace period restore edilebilir en eski dump'tan kısa olamaz.**
+`Workspace → Board → Task` zinciri baştan sona `Cascade`, yani tek bir `DELETE FROM "Workspace"`
+hiçbir uygulama kodu devreye girmeden Postgres içinde binlerce attachment satırını siler. Dosya
+silme, silme yolunun bir yan etkisi olamaz; yetim üretimi toplu ve sessizdir. Süpürme mevcut
+gecelik `cleanup.worker`'a katılır, `CleanupCounts`'a raporlar ve `ADR 0020`'nin loglama kuralı
+gereği yalnız sayı yazar — asla yol. Yalnızca mtime'ı `BACKUP_KEEP × BACKUP_INTERVAL`'dan eski
+dosyaları dikkate alır.
 
-**Orphaned files are swept, with a grace period no shorter than the oldest restorable dump.**
-`Workspace → Board → Task` is `Cascade` the whole way down, so one `DELETE FROM "Workspace"`
-removes thousands of attachment rows inside Postgres with no application code involved. File
-deletion cannot be a side effect of the delete path; orphan production is bulk and silent. The
-sweep joins the existing nightly `cleanup.worker`, reports into `CleanupCounts`, and logs counts
-only — never paths, per `ADR 0020`'s logging rule. It only considers files whose mtime is older
-than `BACKUP_KEEP × BACKUP_INTERVAL`.
-
-**Files are served from the API origin, under `/api/*`, with authorization on every request.**
-The proxy contract reserves `/auth/*` for Better Auth, so an attachment endpoint lives under
-`/api/*` by elimination — which is also the safe half of the origin. Endpoints follow the
-resource-naming rule: the collection nests under its task, the single resource is addressed
-shallowly, and the download gets an action segment.
+**Dosyalar API origin'inden, `/api/*` altından ve her istekte yetkilendirmeyle servis edilir.**
+Proxy sözleşmesi `/auth/*`'ı Better Auth'a ayırdığı için bir attachment ucu eleme yoluyla `/api/*`
+altında yaşar — ki bu aynı zamanda origin'in güvenli yarısıdır. Uçlar kaynak adlandırma kuralını
+izler: koleksiyon task'ının altına yuvalanır, tekil kaynak sığ adreslenir ve indirmeye bir aksiyon
+segmenti düşer.
 
 ```
 GET    /workspaces/:workspaceId/tasks/:taskId/attachments
@@ -92,181 +103,188 @@ GET    /workspaces/:workspaceId/attachments/:attachmentId/content
 DELETE /workspaces/:workspaceId/attachments/:attachmentId
 ```
 
-**Signed URLs are deferred.** **Trigger:** the first of an external share link, an image embedded
-in outbound email, or a CDN in front of the proxy. **Cost when triggered:** a second, separate
-endpoint plus a Redis deny-list for revocation — not a change to this one.
+**İmzalı URL'ler ertelendi.** **Tetikleyici:** dış paylaşım linki, giden e-postaya gömülü bir
+görsel ya da proxy'nin önünde bir CDN — hangisi önce gelirse. **Tetiklendiğinde maliyet:** ikinci,
+ayrı bir uç ve iptal için Redis tabanlı bir deny-list — bu ucun değişmesi değil.
 
-**Nothing is written to the response until every check has passed.** Authorization, existence and
-size checks complete before the first byte. Once the stream has started, a failure ends the
-response with `res.destroy()` and never reaches `AllExceptionsFilter`.
+**Her kontrol geçmeden yanıta hiçbir şey yazılmaz.** Yetkilendirme, varlık ve boyut kontrolleri
+ilk byte'tan önce tamamlanır. Stream başladıktan sonra bir hata, yanıtı `res.destroy()` ile
+sonlandırır ve `AllExceptionsFilter`'a hiç ulaşmaz.
 
-**Validation is an allowlist plus content sniffing, and rejection is a 415.** The declared
-`Content-Type` and the extension both come from the caller and neither is evidence; `file-type`
-reads the magic bytes. Rejections throw `UnsupportedMediaTypeException`.
+**Doğrulama bir allowlist artı içerik sniffing'idir ve ret 415'tir.** Beyan edilen `Content-Type`
+da uzantı da çağırandan gelir ve hiçbiri kanıt değildir; `file-type` magic byte'ları okur. Retler
+`UnsupportedMediaTypeException` fırlatır.
 
-**The size limit is set in two layers.** Multer's `limits.fileSize` in the API, and a body-size
-row added to the published proxy contract. `POST` gets a `ThrottleUploads()` decorator modelled
-on `ThrottleInvitations()`; the download endpoint gets a limit _higher_ than the 100/min default.
+**Boyut limiti iki katmanda kurulur.** API'de multer'ın `limits.fileSize`'ı ve yayınlanan proxy
+sözleşmesine eklenen bir gövde-boyutu satırı. `POST`, `ThrottleInvitations()` örnek alınarak bir
+`ThrottleUploads()` dekoratörü alır; indirme ucu 100/dk varsayılanından **daha yüksek** bir limit
+alır.
 
-**Inline preview covers images only.** `frame-src 'none'` and `object-src 'none'` on the web
-origin, plus `frame-ancestors 'none'` and `X-Frame-Options: DENY` on the API, make an in-modal
-document viewer impossible without loosening policy on both sides. **Trigger:** a measured
-request for document preview; the cost is a scoped CSP relaxation, argued separately.
+**Satır içi önizleme yalnız görselleri kapsar.** Web origin'indeki `frame-src 'none'` ve
+`object-src 'none'`, API'deki `frame-ancestors 'none'` ve `X-Frame-Options: DENY` ile birlikte,
+her iki tarafta da politika gevşetmeden modal içi bir doküman görüntüleyiciyi imkânsız kılıyor.
+**Tetikleyici:** doküman önizlemesi için ölçülmüş bir talep; maliyeti kapsamı daraltılmış bir CSP
+gevşetmesi, ayrıca tartışılır.
 
-## Rationale
+## Gerekçe
 
-**Why the API origin and not the web origin.** The web app is a browser surface that executes
-script; the API is not, and that asymmetry is the point. At the time of this decision the web
-CSP carried `script-src 'self' 'unsafe-inline'`, so a markup injection there could already run
-inline script. That has since been tightened to a per-request nonce with no `'unsafe-inline'`,
-which narrows the gap but does not close the argument: the web origin still runs script, still
-carries the session cookie, and `style-src` still allows inline styles — so attacker-supplied
-bytes served from it are worth strictly more to an attacker than the same bytes from an origin
-that renders nothing. The API's CSP is
-`default-src 'none'`, so a user-uploaded HTML file opened as a document from there can load
-nothing at all. `security-headers.ts` names this exact vector in the comment above
-`X-Content-Type-Options` — "a user-uploaded file served as `text/plain` that a browser decides to
-render as HTML". Attachment responses additionally take
-`Cross-Origin-Resource-Policy: same-origin`, overriding the `cross-origin` policy the API sets
-globally, because nothing off-origin should be embedding them.
+**Neden API origin'i, web origin'i değil.** Web uygulaması script çalıştıran bir tarayıcı
+yüzeyi, API değil; mesele tam da bu asimetri. Bu karar alındığında web CSP'si
+`script-src 'self' 'unsafe-inline'` taşıyordu, yani o origin'deki bir markup enjeksiyonu zaten
+inline script çalıştırabiliyordu. O tarihten sonra bu, `'unsafe-inline'` içermeyen istek başına bir
+nonce'a sıkılaştırıldı; bu aradaki farkı daraltıyor ama argümanı kapatmıyor: web origin'i hâlâ
+script çalıştırıyor, hâlâ session cookie'sini taşıyor ve `style-src` hâlâ inline style'lara
+izin veriyor — dolayısıyla oradan servis edilen saldırgan kontrollü baytlar, hiçbir şey render
+etmeyen bir origin'den gelen aynı baytlardan bir saldırgan için kesinlikle daha değerli.
+API'nin CSP'si `default-src 'none'`, yani oradan doküman olarak açılan kullanıcı yüklemesi bir HTML
+dosyası hiçbir şey yükleyemez. `security-headers.ts` bu vektörü `X-Content-Type-Options` üstündeki yorumda
+tam olarak adlandırıyor — "a user-uploaded file served as `text/plain` that a browser decides to
+render as HTML". Attachment yanıtları ayrıca `Cross-Origin-Resource-Policy: same-origin` alır ve
+API'nin global olarak koyduğu `cross-origin` politikasını geçersiz kılar; çünkü origin dışından
+hiçbir şeyin bunları gömüyor olmaması gerekir.
 
-**Why per-request authorization rather than signed URLs.** A signed URL cannot move
-authorization to the proxy here. Caddy is deliberately dumb — three `handle` rules, `admin off`,
-no auth directives — and [self-hosting.md](../self-hosting.md) promises the operator may swap it
-for nginx or Traefik. Signature checking would run inside the API regardless, so the only thing
-a signed URL buys is skipping the guard chain, and the guard chain is where this codebase keeps
-tenant isolation. Skipping it costs specifically: `@Public()` leaves `request.user` unset, which
-makes `WorkspaceGuard` throw before it can check membership, so `@WorkspaceScoped()` becomes
-unusable and the tenant check becomes a hand-written copy of `workspaceMember.findUnique` —
-including the 404-not-403 rule that keeps attachment existence from leaking. It also has no
-revocation: a removed member's session stops working within the 60-second cookie cache, while
-a distributed signed URL stays valid until its TTL expires. In the published image's topology —
-one origin, `/api` path, `SameSite=Lax` — cookies ride along on `<img src="/api/…">` and
-`<a download>` without any of that, so the advantage a signed URL exists to provide is already
-unnecessary.
+**Neden imzalı URL değil de her istekte yetkilendirme.** İmzalı bir URL burada yetkilendirmeyi
+proxy'ye taşıyamaz. Caddy kasıtlı olarak aptaldır — üç `handle` kuralı, `admin off`, hiç auth
+direktifi yok — ve [self-hosting.md](../self-hosting.md) operatöre onu nginx ya da Traefik ile
+değiştirebileceğini vaat ediyor. İmza doğrulaması yine de API içinde koşacaktır, dolayısıyla
+imzalı bir URL'in kazandırdığı tek şey guard zincirini atlamaktır — ve bu kod tabanı tenant
+izolasyonunu tam olarak orada tutuyor. Atlamanın bedeli somuttur: `@Public()`, `request.user`'ı
+set edilmemiş bırakır, bu da `WorkspaceGuard`'ın üyeliği kontrol edemeden fırlamasına yol açar,
+dolayısıyla `@WorkspaceScoped()` kullanılamaz hale gelir ve tenant kontrolü
+`workspaceMember.findUnique`'in el yazımı bir kopyasına dönüşür — attachment varlığının
+sızmasını engelleyen 404-yerine-403 kuralı dahil. Ayrıca iptal mekanizması yoktur: çıkarılmış bir
+üyenin oturumu 60 saniyelik cookie cache'i içinde çalışmayı bırakır, oysa dağıtılmış bir imzalı
+URL TTL'i dolana kadar geçerli kalır. Yayınlanan imajın topolojisinde — tek origin, `/api` yolu,
+`SameSite=Lax` — çerezler `<img src="/api/…">` ve `<a download>` ile birlikte gider, yani imzalı
+URL'in var olma sebebi olan avantaj zaten gereksizdir.
 
-**Why the ordering rule around the stream.** `AllExceptionsFilter` ends with an unconditional
-`response.status(statusCode).json(problem)`, and there is no second error format anywhere in the
-API. If a handler has already written `Content-Disposition` and started streaming when a disk or
-database error arrives, that call raises `ERR_HTTP_HEADERS_SENT`; the client silently receives a
-truncated file while Sentry records a 500. This is the one error class the filter does not cover,
-and it exists only because this is the first endpoint that returns something other than JSON.
+**Stream etrafındaki sıralama kuralı neden.** `AllExceptionsFilter` koşulsuz bir
+`response.status(statusCode).json(problem)` ile biter ve API'nin hiçbir yerinde ikinci bir hata
+formatı yoktur. Bir handler `Content-Disposition` yazmış ve stream'i başlatmışken bir disk ya da
+veritabanı hatası gelirse, o çağrı `ERR_HTTP_HEADERS_SENT` üretir; istemci sessizce kesik bir
+dosya alırken Sentry bir 500 kaydeder. Bu, filtrenin kapsamadığı tek hata sınıfıdır ve yalnızca
+bu, JSON dışında bir şey döndüren ilk uç olduğu için vardır.
 
-**Why MIME rejection must be a 415 specifically.** Nest's `transformException` maps
-`LIMIT_FILE_SIZE` to `PayloadTooLargeException`, so a too-large upload lands in the right envelope
-for free. Its last line, however, returns anything it does not recognise unchanged — so a plain
-`Error` thrown from a `fileFilter` arrives at the exception filter's `instanceof Error` branch and
-becomes a 500 reported to Sentry. A user attaching the wrong file type would be logged as a
-server fault. Throwing `UnsupportedMediaTypeException` is what keeps the user's mistake the
-user's.
+**MIME reddinin neden özellikle 415 olması gerekiyor.** Nest'in `transformException`'ı
+`LIMIT_FILE_SIZE`'ı `PayloadTooLargeException`'a eşler, yani fazla büyük bir yükleme bedavaya
+doğru zarfa düşer. Ama son satırı, tanımadığı her şeyi olduğu gibi döndürür — dolayısıyla bir
+`fileFilter`'dan fırlatılan düz bir `Error`, exception filtresinin `instanceof Error` dalına
+ulaşır ve Sentry'ye raporlanan bir 500'e dönüşür. Yanlış dosya tipi ekleyen bir kullanıcı sunucu
+arızası olarak loglanırdı. `UnsupportedMediaTypeException` fırlatmak, kullanıcının hatasını
+kullanıcının hatası olarak tutan şeydir.
 
-That rule is mechanically guaranteed rather than hopeful, and the guarantee is worth naming:
-`transformException` opens with `if (!error || error instanceof HttpException) return error`, so
-any Nest HTTP exception passes through untouched. The rule does not depend on multer recognising
-anything.
+Bu kural umut değil, mekanik olarak garantilidir ve garantiyi adlandırmaya değer:
+`transformException`, `if (!error || error instanceof HttpException) return error` ile başlar,
+yani herhangi bir Nest HTTP exception'ı dokunulmadan geçer. Kural, multer'ın bir şeyi tanımasına
+bağlı değildir.
 
-**One hazard in the same function, which no type checker can catch.** Its `switch` matches on
-`error.message`, not on a type — so an error whose message happens to equal one of multer's
-string constants is silently converted. A hand-written storage error reading `File too large`
-would arrive at the client as a 413 it never chose. Nothing in the compiler notices a string
-collision, so the storage module's own error messages are written to avoid multer's constants
-deliberately, and this paragraph is the only place that rule is recorded.
+**Aynı fonksiyonda, hiçbir tip denetleyicisinin yakalayamayacağı bir tehlike.** `switch`'i tip
+üzerinde değil `error.message` üzerinde eşleşiyor — yani mesajı multer'ın string sabitlerinden
+birine denk gelen bir hata sessizce dönüştürülür. `File too large` yazan el yazımı bir depolama
+hatası, istemciye hiç seçmediği bir 413 olarak varır. Derleyicide bir string çakışmasını fark
+eden hiçbir şey yoktur, bu yüzden `storage/` modülünün kendi hata mesajları multer'ın
+sabitlerinden bilinçli olarak kaçınacak şekilde yazılır ve bu paragraf o kuralın kayıtlı olduğu
+tek yerdir.
 
-**Why the proxy contract needs a body-size row.** The contract is published as non-negotiable
-and lists nginx equivalents so the operator can replace Caddy. It says nothing about request body
-size, and that silence is not neutral: Caddy sets no limit, so uploads work, while nginx defaults
-`client_max_body_size` to 1 MB, so the same upload fails with a `413` the operator cannot trace to
-anything written down. The operator who followed the documentation most carefully is the one who
-gets the broken install. Multer's own `limits.fileSize` default is unlimited — the same kind of
-unwritten decision, and it is set explicitly for the same reason.
+**Proxy sözleşmesinin neden bir gövde-boyutu satırına ihtiyacı var.** Sözleşme pazarlığa kapalı
+olarak yayınlanıyor ve operatör Caddy'yi değiştirebilsin diye nginx karşılıklarını listeliyor.
+İstek gövdesi boyutu hakkında hiçbir şey söylemiyor ve bu sessizlik yansız değil: Caddy limit
+koymaz, yükleme çalışır; nginx ise `client_max_body_size`'ı varsayılan **1 MB** yapar, aynı
+yükleme operatörün hiçbir yazılı şeye bağlayamayacağı bir `413` ile düşer. Dokümantasyonu en
+dikkatli izleyen operatör, bozuk kurulumu alan kişi olur. Multer'ın kendi `limits.fileSize`
+varsayılanı sınırsızdır — aynı sınıf yazılmamış bir karar, ve aynı sebeple açıkça set edilir.
 
-**Why the grace period is tied to the backup window.** "On disk and not in the database" is a
-correct predicate only while the database is authoritative. After a restore it is not:
-`DROP DATABASE` and `pg_restore` rewind the rows while the disk stays where it was. Files
-uploaded after the dump was taken exist with no row to match, and a sweep run that night would
-delete them permanently — the restore and the sweep are each safe alone and destructive together.
-Tying the grace period to `BACKUP_KEEP × BACKUP_INTERVAL` means no file can be swept while a dump
-old enough to disown it is still restorable. The same window covers the smaller race with an
-in-flight upload whose row has not committed.
+**Grace period'un neden yedek penceresine bağlandığı.** "Diskte var, veritabanında yok" ancak
+veritabanı otoriterken doğru bir predicate'tir. Restore'dan sonra değildir: `DROP DATABASE` ve
+`pg_restore` satırları geri sararken disk olduğu yerde kalır. Dump alındıktan sonra yüklenen
+dosyalar eşleşecek satır olmadan var olur ve o gece koşan bir süpürme onları kalıcı olarak siler
+— restore ve süpürme tek başlarına güvenli, birlikte yıkıcıdır. Grace period'u
+`BACKUP_KEEP × BACKUP_INTERVAL`'a bağlamak, bir dosyayı sahiplenmeyen bir dump hâlâ restore
+edilebilirken hiçbir dosyanın süpürülememesi demektir. Aynı pencere, satırı henüz commit edilmemiş
+bir yüklemeyle olan daha küçük yarışı da kapsar.
 
-The constant is borrowed rather than invented, which is the point: that rotation is not a
-documented intention but a rehearsed behaviour — the Phase 0 backup work exercised it and
-demonstrated the 9-to-7 prune. The sweep is therefore keyed to something that has been observed
-to hold, not to a number chosen because it sounded safe.
+Sabit icat edilmiş değil ödünç alınmıştır ve mesele budur: o rotasyon dokümante edilmiş bir niyet
+değil **prova edilmiş bir davranıştır** — Faz 0'ın yedekleme işi onu koşturdu ve 9'dan 7'ye
+budamayı gösterdi. Süpürme böylece güvenli göründüğü için seçilmiş bir sayıya değil, tuttuğu
+gözlenmiş bir davranışa bağlanıyor.
 
-**Why `MailSender`'s skeleton is copied but its policy is not.** `sendWith` contains delivery
-failures deliberately: "transactional mail is a side effect of a request, never its result: a
-signup must not fail because the relay refused the connection." Storage inverts that. A failed
-write must fail the request, or the database keeps an attachment row whose bytes do not exist.
-The most characteristic decision in the module being imitated is the one decision not to imitate,
-which is worth writing down precisely because someone reading the precedent would copy it.
+**`MailSender`'ın iskeleti neden kopyalanıp politikası kopyalanmıyor.** `sendWith` teslimat
+hatalarını bilinçli olarak içeride tutuyor: "transactional mail is a side effect of a request,
+never its result: a signup must not fail because the relay refused the connection." Depolama
+bunu tersine çevirir. Başarısız bir yazma isteği düşürmek zorundadır, yoksa veritabanında
+baytları var olmayan bir attachment satırı kalır. Taklit edilen modülün en karakteristik kararı,
+taklit edilmemesi gereken tek karardır — ve tam da emsale bakan birinin onu kopyalayacak olması
+nedeniyle yazılmaya değer.
 
-## Consequences
+## Sonuçlar
 
-**Documentation this falsifies on the day it ships.** `development.md`'s "all 17 tables" — the
-schema has exactly 17 models today and `Attachment` makes it 18. Its restore verification, which
-checks `\dt` and three row counts and nothing on disk. Its paragraph naming Redis as the one
-thing deliberately not backed up "because it is all rebuildable", which now needs a second entry
-with the opposite reasoning. `.env.example`'s "Scheduled **database** backups". `backup.sh`'s
-header comment scoping itself to "the Kurul database". `configure-app.ts`'s CSP comment,
-"This service only ever answers with JSON". `api-conventions.md`'s requirement of
-`Content-Type: application/json; charset=utf-8` on every response with a body, which gains a
-documented exception, and its status-code table, which lists neither 413 nor 415. The Turkish
-mirrors of all of the above move in the same PR.
+**Yayınlandığı gün yanlışlanacak dokümantasyon.** `development.md`'nin "all 17 tables" ifadesi —
+şemada bugün tam 17 model var ve `Attachment` onu 18 yapıyor. `\dt` ile üç satır sayısını kontrol
+edip diskte hiçbir şeye bakmayan restore doğrulaması. Redis'i bilinçli olarak yedeklenmeyen tek
+şey diye adlandıran ve gerekçesini "because it is all rebuildable" diye veren paragrafı — ki artık
+karşıt gerekçeli ikinci bir kayda ihtiyacı var. `.env.example`'ın "Scheduled **database** backups"
+ifadesi. `backup.sh`'nin kendini "the Kurul database" ile sınırlayan başlık yorumu.
+`configure-app.ts`'in "This service only ever answers with JSON" diyen CSP yorumu.
+`api-conventions.md`'nin gövdesi olan her yanıtta `Content-Type: application/json; charset=utf-8`
+şartı — ki dokümante bir istisna kazanıyor — ve ne 413 ne 415 içeren durum kodu tablosu.
+Bunların hepsinin Türkçe aynaları aynı PR'da taşınır.
 
-**The API becomes stateful.** The `api` service has no `volumes:` key today. This adds the first
-one, and with it the first deployment constraint naming which host a replica may run on. The
-service runs as `USER node` under `cap_drop: [ALL]` and `no-new-privileges`, and the compose
-comment claims it "never chowns" — so the upload directory is created in the image already owned
-by `node` rather than fixed at runtime, and that claim stays true.
+**API durum tutar hale gelir.** `api` servisinin bugün hiç `volumes:` anahtarı yok. Bu ilkini
+ekliyor ve onunla birlikte bir replikanın hangi host'ta koşabileceğini adlandıran ilk dağıtım
+kısıtını getiriyor. Servis `cap_drop: [ALL]` ve `no-new-privileges` altında `USER node` olarak
+koşuyor ve compose yorumu servisin "never chowns" olduğunu iddia ediyor — dolayısıyla yükleme
+dizini çalışma anında düzeltilmek yerine imajda zaten `node` sahipliğinde oluşturulur ve o iddia
+doğru kalır.
 
-**The sweep breaks the retention module's shape, and says so.** All five existing sweeps are
-`$executeRaw` batched deletes: pure SQL, implicit per-batch transaction, idempotent, no side
-effects, fitting `deleteInBatches`'s `() => Promise<number>` signature. Unlinking a file is none
-of those things — not transactional, not reversible. The orphan sweep lives in the same worker
-and reports into the same counts, but does not reuse that helper.
+**Süpürme, saklama modülünün biçimini kırar ve bunu söyler.** Mevcut beş süpürmenin hepsi
+`$executeRaw` batch silmeleridir: saf SQL, batch başına implicit transaction, idempotent, yan
+etkisiz ve `deleteInBatches`'in `() => Promise<number>` imzasına oturuyorlar. Bir dosyayı unlink
+etmek bunların hiçbiri değil — ne transactional ne geri alınabilir. Yetim süpürmesi aynı worker'da
+yaşar ve aynı sayaçlara raporlar, ama o yardımcıyı yeniden kullanmaz.
 
-**A new test convention, because there is no precedent.** Nothing in `apps/api` touches the
-filesystem for anything but reading committed files; `docs/testing.md` has no rule for it and the
-e2e suite has never uploaded a file. Following the same philosophy that forbids mocking Prisma in
-integration tests, storage is tested against a real temporary directory, with a
-`test/helpers/storage.ts` cleanup helper beside the existing `db.ts`. A memory backend is
-rejected: it would be a class that exists only for tests, and this codebase has no such precedent.
+**Emsali olmadığı için yeni bir test konvansiyonu.** `apps/api`'de hiçbir şey dosya sistemine
+commit'lenmiş dosyaları okumak dışında dokunmuyor; `docs/testing.md`'de buna dair kural yok ve
+e2e suite'i hiç dosya yüklemedi. Entegrasyon testlerinde Prisma'yı mock'lamayı yasaklayan aynı
+felsefeyi izleyerek depolama **gerçek bir geçici dizine** karşı test edilir; mevcut `db.ts`'in
+yanında bir `test/helpers/storage.ts` temizleme yardımcısıyla. Bellek tabanlı bir backend
+reddedildi: yalnızca testler için var olan bir sınıf olurdu ve bu kod tabanında böyle bir emsal
+yok.
 
-**Coverage is a real risk, in the opposite direction from the usual one.** The API's Jest config
-has a single global threshold and `collectCoverageFrom: ['**/*.(t|j)s']`, so a new module is
-counted automatically and drags the average down. Headroom over the floor is roughly 2.6 to 3.3
-points. An under-tested storage module can turn CI red without anyone deleting a test. No new
-floor is needed; coverage is.
+**Kapsam, alışılmışın tersi yönde gerçek bir risk.** API'nin Jest yapılandırmasında tek bir global
+eşik ve `collectCoverageFrom: ['**/*.(t|j)s']` var, yani yeni bir modül otomatik olarak sayılır ve
+ortalamayı aşağı çeker. Eşiğin üstündeki pay kabaca 2,6-3,3 puan. Yetersiz test edilmiş bir
+depolama modülü, kimse test silmeden CI'ı kırmızıya çevirebilir. Yeni bir floor gerekmiyor;
+kapsam gerekiyor.
 
-**Dependencies barely move.** `multer` is already a direct dependency of
-`@nestjs/platform-express`, and `file-type` of `@nestjs/common`, so neither is a new install.
-`@types/multer` is added as a devDependency — or the file shape is typed structurally the way
-`smtp-mail-sender.ts` already types its transporter, for the same reason. `file-type` v21 is
-ESM-only and the API compiles to CommonJS, so it is reached with `await import()` and added to
-the Jest `transformIgnorePatterns` allowlist.
+**Bağımlılıklar neredeyse hiç kıpırdamıyor.** `multer` zaten `@nestjs/platform-express`'in,
+`file-type` ise `@nestjs/common`'ın doğrudan bağımlılığı, yani ikisi de yeni kurulum değil.
+`@types/multer` devDependency olarak eklenir — ya da dosya şekli, `smtp-mail-sender.ts`'in kendi
+transporter'ını zaten tiplediği gibi ve aynı sebeple yapısal olarak tiplenir. `file-type` v21 saf
+ESM ve API CommonJS'e derleniyor, dolayısıyla `await import()` ile erişilir ve Jest'in
+`transformIgnorePatterns` beyaz listesine eklenir.
 
-**Rate limiting is named as insufficient rather than pretended to be enough.** The throttler
-counts requests per IP per route. That is the wrong unit twice for uploads: twenty 100 MB
-requests and twenty 10 kB requests spend the same budget, and an office behind one NAT shares a
-bucket. The real ceiling is `limits.fileSize` plus a per-workspace storage quota. Per-IP tracking
-stays as an accepted limitation; overriding `ThrottlerGuard.getTracker` is not attempted here.
+**Rate limit, yeterliymiş gibi yapılmak yerine yetersiz olarak adlandırılıyor.** Throttler
+istekleri IP ve route başına sayar. Bu, yüklemeler için iki kez yanlış birimdir: yirmi adet 100 MB
+istek ile yirmi adet 10 kB istek aynı bütçeyi harcar ve tek NAT arkasındaki bir ofis tek kovayı
+paylaşır. Asıl tavan `limits.fileSize` artı workspace başına bir depolama kotasıdır. IP başına
+izleme kabul edilmiş bir kısıt olarak kalır; `ThrottlerGuard.getTracker`'ı geçersiz kılmaya burada
+girişilmez.
 
-**Split-domain deployments preview images through `fetch` and `blob:`, not `<img src>`.** The web
-CSP's `img-src 'self'` is not widened by an absolute API URL — `connectSources` adds that origin
-to `connect-src` only. The same-origin default is unaffected.
+**Ayrık alan adı kullanan dağıtımlar görselleri `<img src>` ile değil `fetch` ve `blob:` ile
+önizler.** Web CSP'sindeki `img-src 'self'`, mutlak bir API URL'iyle genişlemiyor —
+`connectSources` o origin'i yalnızca `connect-src`'e ekliyor. Aynı-origin varsayılanı etkilenmiyor.
 
-## Alternatives considered
+## Değerlendirilen alternatifler
 
-| Alternative                                        | Why not                                                                                                                                                                                                             |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Store bytes in Postgres as `bytea`                 | Solves backup, retention, cascade and orphans in one move — and destroys the thing it is protecting: dumps grow by the size of every file, and the stated RTO of ≤2 hours does not survive a multi-gigabyte restore |
-| Require S3/MinIO from the start                    | Breaks the five-minute Compose install for the majority to serve the minority who already run object storage                                                                                                        |
-| Ship disk and S3 together in the first release     | Two code paths and two test matrices for a backend no reported deployment needs yet; the port makes it an added file later                                                                                          |
-| Signed URLs for download                           | Cannot move authorization to a proxy the operator is invited to replace, so it buys only the loss of the guard chain, plus a revocation problem the cookie does not have                                            |
-| Serve files from the web origin                    | That origin executes script and carries the session cookie; the API's `default-src 'none'` is strictly stronger for attacker-supplied content                                                                       |
-| Delete files inline on the delete path             | `Workspace → Board → Task` cascades inside Postgres without calling application code, so the path would miss every bulk delete                                                                                      |
-| Sweep orphans with no grace period                 | Deletes every file uploaded after the most recent dump the first night following a restore                                                                                                                          |
-| Trust the declared `Content-Type` or the extension | Both are caller-supplied; neither is evidence of anything                                                                                                                                                           |
-| A memory storage backend for tests                 | Would exist only for tests, unlike `LogMailSender` which is also a production fallback                                                                                                                              |
-| Add an `ATTACHMENTS_ENABLED` flag                  | This codebase reserves `_ENABLED` for default-on kill switches and for consent; a default-off feature that needs a path to work is enabled by that path being set                                                   |
+| Alternatif                                         | Neden olmadı                                                                                                                                                                                                     |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baytları Postgres'te `bytea` olarak sakla          | Yedeklemeyi, saklamayı, cascade'i ve yetimleri tek hamlede çözüyor — ve koruduğu şeyi yok ediyor: dump'lar her dosyanın boyutu kadar büyür ve ilan edilmiş ≤2 saatlik RTO çok gigabaytlık bir restore'da yaşamaz |
+| Baştan S3/MinIO şart koş                           | Zaten object storage çalıştıran azınlık için çoğunluğun beş dakikalık Compose kurulumunu bozar                                                                                                                   |
+| İlk sürümde disk ve S3'ü birlikte yayınla          | Bildirilmiş hiçbir dağıtımın henüz ihtiyaç duymadığı bir backend için iki kod yolu ve iki test matrisi; port bunu ileride eklenen bir dosya yapıyor                                                              |
+| İndirme için imzalı URL                            | Yetkilendirmeyi, operatörün değiştirmeye davet edildiği bir proxy'ye taşıyamıyor, dolayısıyla yalnız guard zincirinin kaybını ve çerezde olmayan bir iptal problemini satın alıyor                               |
+| Dosyaları web origin'inden servis et               | O origin script çalıştırıyor ve session cookie'sini taşıyor; API'nin `default-src 'none'`'ı saldırgan kontrollü içerik için kesinlikle daha güçlü                                                                |
+| Silme yolunda dosyaları satır içinde sil           | `Workspace → Board → Task` uygulama kodunu çağırmadan Postgres içinde cascade ediyor, dolayısıyla bu yol her toplu silmeyi kaçırırdı                                                                             |
+| Yetimleri grace period'suz süpür                   | Bir restore'un ardından ilk gece, en son dump'tan sonra yüklenen her dosyayı siler                                                                                                                               |
+| Beyan edilen `Content-Type`'a ya da uzantıya güven | İkisi de çağıran tarafından verilir; hiçbiri bir şeyin kanıtı değildir                                                                                                                                           |
+| Testler için bellek tabanlı bir depolama backend'i | Yalnızca testler için var olurdu; oysa `LogMailSender` aynı zamanda bir üretim fallback'i                                                                                                                        |
+| Bir `ATTACHMENTS_ENABLED` bayrağı ekle             | Bu kod tabanı `_ENABLED`'ı varsayılan-açık kill switch'lere ve rızaya ayırıyor; çalışmak için bir yola ihtiyaç duyan varsayılan-kapalı bir özellik, o yol set edilerek açılır                                    |

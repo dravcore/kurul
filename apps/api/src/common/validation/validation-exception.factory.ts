@@ -3,7 +3,7 @@ import type { ValidationError } from 'class-validator';
 import { echoedName } from '../echoed-name';
 
 /**
- * A single per-field problem, as documented in `docs/api-conventions.md#errors`.
+ * A single per-field problem, as documented in `docs/api-conventions.md#hatalar`.
  *
  * `constraint` is the class-validator rule that failed (`isNotEmpty`, `min`, …), which is
  * what clients branch on; `message` is the human-readable rendering of the same rule.

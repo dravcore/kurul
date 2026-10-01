@@ -40,7 +40,7 @@ export const TASK_SEARCH_RATE_LIMIT = 30;
  * `ATTACHMENT_MAX_BYTES`, so it sits well below the default.
  *
  * No ADR carries this number; this constant is its source. ADR 0022 asks for a decorator
- * "modelled on `ThrottleInvitations()`" and stops there. Left off, the global 100/min applies
+ * modelled on `ThrottleInvitations()` and stops there. Left off, the global 100/min applies
  * and one IP can spend 25 MiB × 100 = 2.5 GiB of disk a minute.
  *
  * This ceiling is named as insufficient rather than pretended to be enough (ADR 0022): the

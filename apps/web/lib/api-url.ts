@@ -34,7 +34,7 @@
 
 /**
  * The API address assumed when nothing is configured: the port `apps/api` listens on in the
- * dev loop (`pnpm dev`, docs/development.md#run-modes), where the two apps really are separate
+ * dev loop (`pnpm dev`, docs/development.md#çalışma-modları), where the two apps really are separate
  * origins and there is no proxy in front of either.
  */
 export const DEV_API_BASE_URL = 'http://localhost:4000';

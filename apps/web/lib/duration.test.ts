@@ -10,7 +10,7 @@ const t = createTranslator({
 });
 
 describe('formatEstimate', () => {
-  // docs/design.md §7: "`estimatedMinutes` renders "2h 30m", never "150"."
+  // docs/design.md §7: `estimatedMinutes` renders as "2h 30m", never "150".
   it.each([
     // input   expected      why
     [0, '0m', 'zero is a duration, not an absence — the caller decides whether to render it'],

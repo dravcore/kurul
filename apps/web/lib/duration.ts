@@ -8,9 +8,9 @@
  *
  * The three keys are whole phrases, not fragments joined here. `${hours}h ${minutes}m` would
  * hardcode English word order and separator into the code, where no translator can reach it —
- * exactly what ADR 0018 rules out ("Never concatenate sentence fragments — word order differs
- * per language"). Splitting on which parts are non-zero is a formatting decision; arranging
- * them is a language decision, so it lives in the catalogue.
+ * exactly what docs/design.md §7 rules out (no concatenated sentence fragments: word order differs
+ * per language). Splitting on which parts are non-zero is a formatting decision; arranging them is
+ * a language decision, so it lives in the catalogue.
  */
 /**
  * The three keys this helper may reach for, named rather than left as `string`. That keeps a

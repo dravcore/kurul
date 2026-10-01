@@ -767,9 +767,9 @@ describe('globals.css cascade layers', () => {
   // `@theme inline` gives those size steps) does not blend the two: Tailwind's compiled order
   // always places `.font-strong` after both title utilities in the same `utilities` layer, so at
   // equal specificity `font-strong`'s direct value wins and silently drops the heading to 550 --
-  // `body-strong`'s weight, one step below what docs/design.md:160 specifies for a title. Page
-  // and panel headings must pair `text-title`/`text-title-lg` with `font-semibold` instead (or no
-  // weight utility at all) to keep the 600 the type-scale table calls for.
+  // `body-strong`'s weight, one step below what docs/design.md ("Tipografi") specifies for a
+  // title. Page and panel headings must pair `text-title`/`text-title-lg` with `font-semibold`
+  // instead (or no weight utility at all) to keep the 600 the type-scale table calls for.
   it('drops text-title(-lg) to 550 when paired with font-strong, and documents why', () => {
     expect(winningValueAmong(sheet, ['text-title', 'font-strong'], 'font-weight')).toBe('550');
     expect(winningValueAmong(sheet, ['text-title-lg', 'font-strong'], 'font-weight')).toBe('550');

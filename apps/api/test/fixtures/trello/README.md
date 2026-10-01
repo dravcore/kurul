@@ -1,154 +1,156 @@
-# Trello export fixtures
+# Trello export fixture'ları
 
-**The files directly in this directory are synthetic; the files under `real/` are not.** The
-top-level fixtures were hand-written in this repository on 2026-08-15, from memory of Trello's
-export format, and checked against nothing on that date. `real/` holds two anonymised **real**
-Trello exports, dated 2026-08-22 — see [Real exports](#real-exports) below and
-[`real/README.md`](real/README.md). Do not read a passing test against the synthetic files as
-evidence that the importer handles Trello's actual output; that evidence is what `real/` and its
-e2e spec are for.
+**Bu dizinin doğrudan altındaki dosyalar sentetiktir; `real/` altındakiler değildir.** Üst düzey
+fixture'lar bu repository'de 2026-08-15 tarihinde, Trello'nun export biçimine dair hafızadan elle
+yazıldı ve o tarihte hiçbir şeye karşı doğrulanmadı. `real/` dizini, 2026-08-22 tarihli,
+anonimleştirilmiş iki **gerçek** Trello export'u tutar — aşağıdaki
+[Gerçek export'lar](#gerçek-exportlar) bölümüne ve [`real/README.md`](real/README.md) dosyasına
+bakın. Sentetik dosyalara karşı geçen bir testi, importer'ın Trello'nun gerçek çıktısını
+işleyebildiğinin kanıtı saymayın; o kanıt `real/` ile onun e2e spec'inin işidir.
 
-That distinction is the whole reason this file opens with it. Trello's export schema carries no
-version field and no changelog, so "the Trello importer works" is a claim about a date and about
-the files that were on hand on that date. On 2026-08-15, no real export was on hand: the person
-running this project had no Trello data to export, and an agent cannot open a Trello account.
-Calling an invented JSON file `real-1.json` would have made the fixtures measure our own
-imagination and then labelled the result "validated" — which is why the synthetic fixtures below
-stay named as edge cases and a full board, never as `real-*`.
+Bu ayrım, bu dosyanın onunla başlamasının tek sebebidir. Trello'nun export şemasında sürüm alanı da
+yok, değişiklik kaydı da; dolayısıyla "Trello importer'ı çalışıyor" bir tarih hakkında ve o tarihte
+elde olan dosyalar hakkında bir iddiadır. 2026-08-15'te elde gerçek bir export yoktu: bu projeyi
+yürüten kişinin o sırada export edecek Trello verisi yoktu. Uydurma bir JSON dosyasına
+`real-1.json` demek, fixture'ların kendi hayal gücümüzü ölçmesine ve sonucun
+"doğrulandı" diye etiketlenmesine yol açardı — aşağıdaki sentetik fixture'lar bu yüzden uç durumlar
+ve tam bir board olarak adlandırılmış kalır, asla `real-*` olarak değil.
 
-The roadmap metric that asked for validation against two real Trello exports closed on
-2026-08-22, when the two files under `real/` went in and passed
-`trello-import-real.e2e-spec.ts` end to end. It reopens, in the sense that the field-mapping
-diffs below get another row, the next time a real export shows a shape this repository did not
-anticipate — from the maintainer or from a community bug report — at which point **the export
-wins, not this repository**.
+İki gerçek Trello export'una karşı doğrulama isteyen roadmap metriği, `real/` altındaki iki dosya
+girip `trello-import-real.e2e-spec.ts` testinden uçtan uca geçtiği 2026-08-22'de kapandı. Aşağıdaki
+alan eşleme farklarına bir satır daha eklenmesi anlamında, gerçek bir export bu repository'nin
+öngörmediği bir şekil gösterdiği bir sonraki sefer — maintainer'dan ya da bir topluluk bug
+raporundan — yeniden açılır; o noktada **kazanan export'tur, bu repository değil**.
 
-## What the importer does about that
+## Importer bu konuda ne yapıyor
 
-Because no field name was verified against a real export until 2026-08-22, the reader's contract
-is not "I know Trello's schema" — it is **"I report what I do not know"**
+Hiçbir alan adı 2026-08-22'ye kadar gerçek bir export'a karşı doğrulanmadığı için okuyucunun
+sözleşmesi "Trello şemasını biliyorum" değil, **"bilmediğimi bildiririm"**
 (`apps/api/src/import/trello-export.ts`,
-[ADR 0025](../../../../../docs/decisions/0025-trello-import-mapping.md)). A missing field, a field
-of an unexpected type, or an entry the reader cannot represent is dropped into the import's
-`(scope, reason)` report and reading continues. Only two things are errors: a body that is not
-JSON at all, and a root object that does not look like a board export.
+[ADR 0025](../../../../../docs/decisions/0025-trello-import-mapping.md)). Eksik bir alan, beklenmedik
+tipte bir alan ya da okuyucunun temsil edemediği bir girdi, import'un `(scope, reason)` raporuna
+düşer ve okuma devam eder. Yalnızca iki şey hatadır: hiç JSON olmayan bir gövde ve bir board
+export'una benzemeyen bir kök nesne.
 
-`edge-unknown-shape.json` exists to hold that contract still. It is the fixture a schema drift
-would look like, and the tests that read it assert both halves: the readable rows come across,
-_and_ the unreadable ones are reported rather than thrown.
+`edge-unknown-shape.json`, bu sözleşmeyi sabit tutmak için vardır. Bir şema kaymasının neye
+benzeyeceğini gösteren fixture odur ve onu okuyan testler iki yarıyı da doğrular: okunabilen satırlar
+aktarılır, _ve_ okunamayanlar hata olarak fırlatılmak yerine raporlanır.
 
-## The fixtures
+## Fixture'lar
 
-| Fixture                     | Written    | What it is                                                                                                                                                                                                                                                          | Real? |
-| --------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `synthetic-full-board.json` | 2026-08-15 | Four lists (one archived), six cards (one archived, one unnamed), five labels (one unnamed, one uncoloured, one unknown colour), three checklists across two cards, three attachments (http, https, `file:`), two comments plus one non-comment action, two members | no    |
-| `edge-empty-board.json`     | 2026-08-15 | A board with no lists and no cards                                                                                                                                                                                                                                  | no    |
-| `edge-empty-list.json`      | 2026-08-15 | One list, no cards in it                                                                                                                                                                                                                                            | no    |
-| `edge-unknown-color.json`   | 2026-08-15 | Labels coloured `tangerine`, `null` and `sky_light`                                                                                                                                                                                                                 | no    |
-| `edge-unknown-shape.json`   | 2026-08-15 | Right root, wrong everything else — see the list below                                                                                                                                                                                                              | no    |
-| `edge-card-export.json`     | 2026-08-15 | Trello's _card_ export — valid JSON, has a `name`, is not a board                                                                                                                                                                                                   | no    |
-| `edge-truncated.json`       | 2026-08-15 | A valid export cut off mid-object; **deliberately not valid JSON**                                                                                                                                                                                                  | no    |
+| Fixture                     | Yazıldı    | Nedir                                                                                                                                                                                                                                                    | Gerçek mi? |
+| --------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `synthetic-full-board.json` | 2026-08-15 | Dört liste (biri arşivlenmiş), altı kart (biri arşivlenmiş, biri isimsiz), beş label (biri isimsiz, biri renksiz, biri bilinmeyen renkte), iki karta yayılmış üç checklist, üç ek (http, https, `file:`), iki yorum ve yorum olmayan bir action, iki üye | hayır      |
+| `edge-empty-board.json`     | 2026-08-15 | Hiç listesi ve hiç kartı olmayan bir board                                                                                                                                                                                                               | hayır      |
+| `edge-empty-list.json`      | 2026-08-15 | Bir liste, içinde hiç kart yok                                                                                                                                                                                                                           | hayır      |
+| `edge-unknown-color.json`   | 2026-08-15 | `tangerine`, `null` ve `sky_light` renkli label'lar                                                                                                                                                                                                      | hayır      |
+| `edge-unknown-shape.json`   | 2026-08-15 | Doğru kök, geri kalan her şey yanlış — aşağıdaki listeye bakın                                                                                                                                                                                           | hayır      |
+| `edge-card-export.json`     | 2026-08-15 | Trello'nun _kart_ export'u — geçerli JSON, bir `name` taşıyor, board değil                                                                                                                                                                               | hayır      |
+| `edge-truncated.json`       | 2026-08-15 | Nesnenin ortasında kesilmiş geçerli bir export; **bilerek geçerli JSON değil**                                                                                                                                                                           | hayır      |
 
-`synthetic-full-board.json` is not an edge case and is not named like one. It is the only
-synthetic fixture describing an ordinary board, so the mapping tests run against it — which means
-its shortcomings are the mapping tests' shortcomings, and they are the shortcomings the opening
-paragraphs describe: hand-written, and checked against nothing until `real/` existed.
+`synthetic-full-board.json` bir uç durum değildir ve öyle adlandırılmamıştır. Sıradan bir board'u
+anlatan tek sentetik fixture odur; bu yüzden eşleme testleri onun üzerinde koşar — bu da onun
+kusurlarının eşleme testlerinin kusurları olduğu anlamına gelir ve bunlar açılış paragraflarının
+anlattığı kusurlardır: elle yazılmış olması ve `real/` var olana kadar hiçbir şeye karşı
+doğrulanmamış olması.
 
-A few things in it are deliberate rather than incidental, because a test depends on each:
+İçindeki birkaç şey tesadüfi değil bilinçlidir, çünkü her birine bir test bağlıdır:
 
-- **The lists are not in `pos` order in the file.** `Backlog` (16384) is written after
-  `In Progress` (32768). A reader that returned the array untouched and a reader that sorted it
-  would otherwise be indistinguishable.
-- **`pos` values are Trello-sized** (16384, 32768, 65535) and nowhere near this repository's
-  `POSITION_GAP` of 1000, so a test can tell a re-issued position from a carried-over one by
-  looking at the number.
-- **One attachment URL is `file:`.** It must never become an `Attachment` row.
-- **One action is not a `commentCard`.** The comment count has to be a count of comments, not a
-  count of actions.
-- **One label has an empty name and one has no colour**, which are the two cases ADR 0025 has to
-  invent a name and a colour for.
+- **Listeler dosyada `pos` sırasında değildir.** `Backlog` (16384), `In Progress` (32768)
+  listesinden sonra yazılmıştır. Aksi halde diziyi olduğu gibi döndüren bir okuyucu ile onu sıralayan
+  bir okuyucu birbirinden ayırt edilemezdi.
+- **`pos` değerleri Trello ölçeğindedir** (16384, 32768, 65535) ve bu repository'nin 1000 olan
+  `POSITION_GAP` değerine hiç yakın değildir; böylece bir test, yeniden atanmış bir pozisyonu
+  taşınmış olandan sayıya bakarak ayırt edebilir.
+- **Ek URL'lerinden biri `file:` şemalıdır.** Asla bir `Attachment` satırına dönüşmemelidir.
+- **Action'lardan biri `commentCard` değildir.** Yorum sayısı, action sayısı değil yorum sayısı
+  olmalıdır.
+- **Bir label'ın adı boş, bir başkasının rengi yoktur**; ADR 0025'in sırasıyla bir ad ve bir renk
+  uydurmak zorunda kaldığı iki durum bunlardır.
 
-## What is wrong inside `edge-unknown-shape.json`
+## `edge-unknown-shape.json` içinde neyin yanlış olduğu
 
-Every entry in it exists because a mutation of the reader survived without it — that is, because
-the reader could be broken in that specific way and every test stayed green. The fixture grew
-during that exercise rather than being designed up front, and it is worth keeping in that order:
-each row below is a bug the suite could not previously see.
+İçindeki her girdi, okuyucuya uygulanan bir mutasyon onsuz hayatta kaldığı için vardır — yani
+okuyucu tam o belirli biçimde bozulabiliyordu ve bütün testler yeşil kalıyordu. Fixture baştan
+tasarlanmak yerine o çalışma sırasında büyüdü ve o sırayla tutulmaya değer: aşağıdaki her madde,
+suite'in daha önce göremediği bir bug'dır.
 
-- A bare number where a list should be, and a list with no `id` at all.
-- A list whose `name` is an array **and** whose `closed` is a string — the entry that proves the
-  reader counts unreadable _entries_ and not unreadable _fields_.
-- A list whose only problem is `closed: "true"`. Without it, a `closed` check that silently
-  coerced went unnoticed, and an archived list arriving as a live column is a wrong import rather
-  than an incomplete one.
-- `pos: "bottom"` on a list that is otherwise fine, which must **not** be reported: ADR 0025
-  already decided that a non-numeric `pos` falls back to id order.
-- `labels` as an object, `members` as a string, `actions` as an object — three whole sections
-  disappearing, one report row each.
-- A card whose `idLabels` is a string, a card carrying an attachment with no usable `url`, a card
-  whose `due` is an epoch number rather than an ISO string, and an entry that is a bare string.
-  The `due` one is there because a nullable field that swallows a wrong type is the quietest
-  failure in the reader: the user loses a due date and hears nothing.
-- A checklist with one unreadable item (reported as an item, so the readable items survive) and a
-  checklist whose `checkItems` is a string (reported as a checklist).
+- Bir liste olması gereken yerde çıplak bir sayı ve hiç `id` alanı olmayan bir liste.
+- `name` alanı bir dizi **ve** `closed` alanı bir string olan bir liste — okuyucunun okunamayan
+  _alanları_ değil okunamayan _girdileri_ saydığını kanıtlayan girdi.
+- Tek sorunu `closed: "true"` olan bir liste. O olmadan, sessizce tip dönüştüren bir `closed`
+  kontrolü fark edilmeden kalıyordu ve arşivlenmiş bir listenin canlı bir sütun olarak gelmesi eksik
+  değil yanlış bir import'tur.
+- Aksi halde sorunsuz bir listede `pos: "bottom"`; bu **raporlanmamalıdır**: ADR 0025, sayısal
+  olmayan bir `pos` değerinin id sırasına düştüğüne zaten karar verdi.
+- Nesne olarak `labels`, string olarak `members`, nesne olarak `actions` — üç bölümün tamamı
+  kayboluyor, her biri için birer rapor satırı.
+- `idLabels` alanı bir string olan bir kart, kullanılabilir bir `url` alanı olmayan bir ek taşıyan
+  bir kart, `due` alanı bir ISO string yerine epoch sayısı olan bir kart ve çıplak bir string olan
+  bir girdi. `due` olanı oradadır, çünkü yanlış bir tipi yutan nullable bir alan okuyucudaki en
+  sessiz arızadır: kullanıcı bir bitiş tarihini kaybeder ve hiçbir şey duymaz.
+- Okunamayan bir öğesi olan bir checklist (öğe olarak raporlanır, böylece okunabilen öğeler kalır)
+  ve `checkItems` alanı bir string olan bir checklist (checklist olarak raporlanır).
 
-`edge-truncated.json` is listed in the repository's `.prettierignore`, because it is invalid JSON
-on purpose and `prettier --check` would otherwise fail on it. That entry is load-bearing: if
-someone "fixes" the file so the formatter is happy, the test that proves a half-downloaded export
-answers 400 instead of crashing starts passing for the wrong reason.
+`edge-truncated.json`, repository'nin `.prettierignore` dosyasında listelidir, çünkü bilerek geçersiz
+bir JSON'dur ve aksi halde `prettier --check` onda başarısız olurdu. O girdi yük taşır: biri
+formatter mutlu olsun diye dosyayı "düzeltirse", yarım inmiş bir export'a çökmek yerine 400 cevabı
+verildiğini kanıtlayan test yanlış sebeple geçmeye başlar.
 
-## Real exports
+## Gerçek export'lar
 
-The `v0.3.0` gate asked for at least two anonymised real exports importing end to end
-(`ROADMAP.md`, now the Import from Trello / Jira row under
-[Beyond MVP](../../../../../ROADMAP.md#beyond-mvp)), and it closed on 2026-08-22: `real/` holds
-`starter-guide-board.json` (Trello's own default "Starter Guide" board) and
-`eleven-list-board.json` (an eleven-list board exported the same day), and both import cleanly
-through `trello-import-real.e2e-spec.ts`.
+`v0.3.0` kapısı, uçtan uca import edilen en az iki anonimleştirilmiş gerçek export istiyordu
+(`ROADMAP.md`, şimdi [MVP ötesi](../../../../../ROADMAP.md#mvp-ötesi) altındaki
+Trello / Jira'dan import satırı) ve 2026-08-22'de kapandı: `real/` dizini
+`starter-guide-board.json` (Trello'nun kendi varsayılan "Starter Guide" board'u) ve
+`eleven-list-board.json` (aynı gün export edilmiş on bir listeli bir board) dosyalarını tutar ve
+ikisi de `trello-import-real.e2e-spec.ts` üzerinden temiz şekilde import edilir.
 
-**Where they are.** [`real/`](real/README.md). `trello-import-real.e2e-spec.ts` reads every
-`*.json` in that directory at module load and imports each one through
-`POST /workspaces/:id/imports/trello` as an admin, deriving the expected counts from the file by
-ADR 0025's rules and comparing them with the report and with the database. If the directory were
-ever empty again the spec would report exactly one skipped test,
-`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`; with two files in
-it, it instead runs one test per file.
+**Neredeler.** [`real/`](real/README.md). `trello-import-real.e2e-spec.ts`, o dizindeki her `*.json`
+dosyasını modül yüklenirken okur ve her birini bir admin olarak `POST /workspaces/:id/imports/trello`
+üzerinden import eder; beklenen sayıları dosyadan ADR 0025'in kurallarıyla türetir ve bunları hem
+raporla hem de veritabanıyla karşılaştırır. Dizin bir gün yeniden boşalırsa spec tam olarak bir
+atlanmış test bildirir, `no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`;
+içinde iki dosya varken ise dosya başına bir test koşar.
 
-**How to add another one.**
+**Bir tane daha nasıl eklenir.**
 
-1. In Trello, open the board menu: **More**, **Print and export**, **Export as JSON**.
+1. Trello'da board menüsünü açın: **More**, **Print and export**, **Export as JSON**.
 2. `node scripts/anonymise-trello-export.mjs ~/Downloads/board.json apps/api/test/fixtures/trello/real/<name>.json --seed <anything>`.
-   The script keeps the export's structure byte for byte (keys, order, lengths, nulls, numbers,
-   dates, colours, `closed` flags, id relationships) and replaces every piece of text with a
-   deterministic pseudonym of the same length and shape. Trello ids keep their eight-character
-   timestamp prefix and their sort order, because the planner ties on them.
-3. Read the summary it prints: unrecognised top-level keys and strings replaced under keys the
-   script did not know to carry text were anonymised as text, which is safe but may have changed a
-   non-text value's shape. Skim the file once before pushing it; it is public from then on.
-4. Run `pnpm --filter @kurul/api test:e2e`, read what fails, and add a row below.
+   Betik, export'un yapısını bayt bayt korur (anahtarlar, sıra, uzunluklar, null'lar, sayılar,
+   tarihler, renkler, `closed` bayrakları, id ilişkileri) ve her metin parçasını aynı uzunlukta ve
+   şekilde deterministik bir takma adla değiştirir. Trello id'leri sekiz karakterlik zaman damgası
+   ön eklerini ve sıralama düzenlerini korur, çünkü planner eşitlik durumunda onlara düşer.
+3. Yazdırdığı özeti okuyun: tanınmayan üst düzey anahtarlar ve betiğin metin taşıdığını bilmediği
+   anahtarlar altında değiştirilen string'ler metin olarak anonimleştirildi; bu güvenlidir ama metin
+   olmayan bir değerin şeklini değiştirmiş olabilir. Dosyayı push etmeden önce bir kez göz gezdirin;
+   o andan itibaren herkese açıktır.
+4. `pnpm --filter @kurul/api test:e2e` komutunu çalıştırın, neyin başarısız olduğunu okuyun ve
+   aşağıya bir satır ekleyin.
 
-`real/*.json` is listed in `.prettierignore` on purpose: those files are the script's output, byte
-for byte, and reformatting them would make "the file the script wrote" and "the file in the repo"
-two different things.
+`real/*.json` bilerek `.prettierignore` içinde listelenmiştir: o dosyalar betiğin bayt bayt çıktısıdır
+ve onları yeniden biçimlendirirsek "betiğin yazdığı dosya" ile "repo'daki dosya" iki ayrı şey olurdu.
 
-The guard that the anonymiser changes nothing the importer reads runs on every CI run regardless:
-the same spec anonymises `synthetic-full-board.json` through the CLI and asserts the two imports
-produce the same report and the same board, shape for shape.
+Anonimleştiricinin importer'ın okuduğu hiçbir şeyi değiştirmediğini güvence altına alan koruma, ne
+olursa olsun her CI koşusunda çalışır: aynı spec, `synthetic-full-board.json` dosyasını CLI üzerinden
+anonimleştirir ve iki import'un şekil bakımından birebir aynı raporu ve aynı board'u ürettiğini
+doğrular.
 
-### Field-mapping diffs
+### Alan eşleme farkları
 
-One row per place where a real export disagreed with what the synthetic fixtures assume. Both
-files under `real/` were checked against every field `apps/api/src/import/trello-export.ts` reads.
+Gerçek bir export'un sentetik fixture'ların varsaydığıyla uyuşmadığı her yer için bir satır. `real/`
+altındaki iki dosya da `apps/api/src/import/trello-export.ts` dosyasının okuduğu her alana karşı
+denetlendi.
 
-| Field                                                                                                                                                                                                                                                           | Synthetic fixture assumption                                                                                                                                                                              | What the real export showed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Importer change needed |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| Every field the reader touches: `lists[].{id,name,pos,closed}`, `cards[].{id,name,desc,idList,pos,closed,due,idLabels,idMembers,attachments[].{id,name,url}}`, `labels[].{id,name,color}`, `checklists[].{id,idCard,name,pos,checkItems[].{id,name,state,pos}}` | The types and shapes `trello-export.ts` and ADR 0025 already assume (string ids, numeric `pos`, boolean `closed`, nullable `desc`/`due`/`color`, a `_dark`/`_light` colour suffix stripped before lookup) | Matched on both files, with two shapes worth naming because they exercise assumptions the synthetic fixture does not: `lists[].pos` is sometimes fractional (`32767.5`, `49151.25`, not just Trello's classic powers of two), and `labels[].color` carries `purple_light` — the `_light` suffix, alongside the `_dark` one the synthetic fixture already covers. `labels[].name` is `""` on Trello's own unnamed default labels, `cards[].due` is `null` on every card in both files, and `checklists[].checkItems[].state` is the string `"incomplete"` (neither file happens to contain a completed item). Neither export contains an archived list or card (`closed` is `false` throughout), so the archived path is still exercised only by the synthetic fixture. | none                   |
+| Alan                                                                                                                                                                                                                                                           | Sentetik fixture varsayımı                                                                                                                                                                                   | Gerçek export'un gösterdiği                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Gereken importer değişikliği |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| Okuyucunun dokunduğu her alan: `lists[].{id,name,pos,closed}`, `cards[].{id,name,desc,idList,pos,closed,due,idLabels,idMembers,attachments[].{id,name,url}}`, `labels[].{id,name,color}`, `checklists[].{id,idCard,name,pos,checkItems[].{id,name,state,pos}}` | `trello-export.ts` ve ADR 0025'in zaten varsaydığı tipler ve şekiller (string id'ler, sayısal `pos`, boolean `closed`, nullable `desc`/`due`/`color`, aramadan önce atılan bir `_dark`/`_light` renk soneki) | İki dosyada da eşleşti; adı anılmaya değer iki şekil var, çünkü sentetik fixture'ın sınamadığı varsayımları sınıyorlar: `lists[].pos` bazen kesirlidir (`32767.5`, `49151.25`; yalnızca Trello'nun klasik ikinin kuvvetleri değil) ve `labels[].color`, `purple_light` taşır — sentetik fixture'ın zaten kapsadığı `_dark` sonekinin yanında `_light` soneki. `labels[].name`, Trello'nun kendi isimsiz varsayılan label'larında `""` değerini taşır, `cards[].due` iki dosyadaki her kartta `null`'dır ve `checklists[].checkItems[].state` `"incomplete"` string'idir (iki dosyada da tamamlanmış bir öğe bulunmuyor). İki export de arşivlenmiş bir liste ya da kart içermez (`closed` baştan sona `false`'tur), bu yüzden arşiv yolu hâlâ yalnızca sentetik fixture ile sınanır. | yok                          |
 
-No field the importer reads needed a code change. Both exports carry well over a hundred fields
-the reader never looks at — `nodeId`, `creationMethod`/`creationMethodError`/
-`creationMethodLoadingPhase`/`creationMethodLoadingStartedAt`, `premiumFeatures`, `pluginData[]`
-(and its `access`/`scope` sub-fields), `cards[].badges` (including `badges.fogbugz`, always `""`
-in both files), and `cards[].originalName`/`originalDesc` among them. These are exactly the sort
-of field ADR 0025 says is out of scope by design, and the anonymiser's summary flags the ones it
-does not know to carry text so a maintainer can skim them before a file is pushed; none of them
-changes what a board looks like after import.
+Importer'ın okuduğu hiçbir alan kod değişikliği gerektirmedi. İki export de okuyucunun hiç bakmadığı
+yüzün çok üzerinde alan taşıyor — aralarında `nodeId`,
+`creationMethod`/`creationMethodError`/`creationMethodLoadingPhase`/`creationMethodLoadingStartedAt`,
+`premiumFeatures`, `pluginData[]` (ve `access`/`scope` alt alanları), `cards[].badges` (iki dosyada
+da daima `""` olan `badges.fogbugz` dahil) ve `cards[].originalName`/`originalDesc` da var. Bunlar
+tam olarak ADR 0025'in tasarım gereği kapsam dışı dediği türden alanlardır ve anonimleştiricinin
+özeti, metin taşıdığını bilmediği alanları işaretler; böylece bir maintainer dosya push edilmeden
+önce onlara göz gezdirebilir; hiçbiri import'tan sonra bir board'un nasıl göründüğünü değiştirmez.

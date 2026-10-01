@@ -24,7 +24,8 @@ export interface AttachmentDownload {
  * other than JSON (ADR 0022).
  *
  * Knows no `Request` and no `Response`: it returns a descriptor, and the controller writes it.
- * That keeps `docs/coding-standards.md:106` true for a handler that genuinely has to stream.
+ * That keeps the layer table in `docs/coding-standards.md` ("Modül iskeleti") true for a handler
+ * that genuinely has to stream.
  */
 @Injectable()
 export class AttachmentDownloadService {

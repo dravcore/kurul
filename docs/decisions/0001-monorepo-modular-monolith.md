@@ -1,66 +1,44 @@
-# 0001. Monorepo + Modular Monolith
+# 0001. Monorepo + Modüler Monolit
 
-**Status:** Accepted
-**Date:** 2026-08-08
+**Durum:** Kabul edildi
+**Tarih:** 2026-08-08
 
-> 🌐 English (canonical) | [Türkçe](../tr/decisions/0001-monorepo-modular-monolith.md)
+## Bağlam
 
-## Context
+Kurul henüz iskelet öncesi aşamada: henüz hiç kod yok, dolayısıyla ilk satır yazılmadan önce hem kod organizasyonu ekseni (monorepo vs. polyrepo) hem de runtime ekseni (monolit vs. mikroservis) karara bağlanmalı. Bu iki eksen birbirinden bağımsız — kodun _nasıl saklandığı_, _nasıl çalıştığı_ değildir — ve ikisi de açık bir cevap gerektiriyor.
 
-Kurul is pre-skeleton: no code exists yet, so both the code-organization axis
-(monorepo vs. polyrepo) and the runtime axis (monolith vs. microservices) must be
-decided before the first line is written. The two axes are independent — how code
-is _stored_ is not how it _runs_ — and both need an explicit answer.
+## Karar
 
-## Decision
+Kod organizasyonu için **monorepo** (pnpm workspace: `apps/api`, `apps/web`,
+`packages/shared-types`, ve sonradan Better Auth organization AC için
+`packages/auth-access`), runtime için **modüler monolit**: temiz modül sınırlarına
+(auth, workspace, board, task, dashboard, notification, …) sahip tek bir NestJS
+process'i. Bu aşamada mikroservis yok.
 
-**Monorepo** (pnpm workspace: `apps/api`, `apps/web`, `packages/shared-types`, and
-later `packages/auth-access` for Better Auth organization AC) for
-code organization, and a **modular monolith** for runtime: one NestJS process with
-clean module boundaries (auth, workspace, board, task, dashboard, notification, …).
-No microservices at this stage.
+## Gerekçe
 
-## Rationale
+- Frontend ve backend TypeScript'i paylaşıyor, bu yüzden `packages/shared-types` task/board tiplerini sınır boyunca taşıyor — veri modeli değişikliği tek yerde güncellenir.
+- Solo/küçük ekip hızı: iki repo, henüz hiçbir faydası olmayan, yinelenen PR'lar ve versiyon senkronizasyon yükü getirir.
+- Daha düşük OSS katkı bariyeri: tek clone, tek `docker compose up`.
+- Referans projelerin çoğu monorepo olarak yayınlanıyor (Plane, Huly).
+- Mikroservis reddedildi: MVP'nin ihtiyacı olmayan bağımsız ölçeklendirme karşılığında dağıtık sistem karmaşıklığı ekliyor (servisler arası çağrılar, dağıtık transaction'lar, ayrı deploy pipeline'ları, observability).
+- Kanban sıkı sıkıya bağlı: bir task'ı taşımak task satırına, aktivite loguna, bildirimlere ve dashboard toplamlarına aynı anda dokunuyor — bunu servislere bölmek tek bir transaction'ı dağıtık bir transaction'a dönüştürür.
+- Veri modeli henüz oturmadı. Servis sınırlarını çok erken çizmek yanlış yerden bölme riski taşır, bu da şekil netleştikten sonra bir monoliti bölmekten çok daha pahalıya mal olur.
 
-- Frontend and backend share TypeScript, so `packages/shared-types` carries
-  task/board types across the boundary — a data model change updates in one place.
-- Solo/small-team velocity: two repos means duplicate PRs and version-sync overhead
-  for no benefit yet.
-- Lower OSS contribution barrier: one clone, one `docker compose up`.
-- Reference projects mostly ship as monorepos (Plane, Huly).
-- Microservices were rejected: they add distributed-system complexity (inter-service
-  calls, distributed transactions, separate deploy pipelines, observability) in
-  exchange for independent scaling the MVP doesn't need.
-- Kanban is tightly coupled: moving a task touches the task row, activity log,
-  notifications, and dashboard aggregates together — splitting this across services
-  turns one transaction into a distributed one.
-- The data model isn't settled yet. Drawing service boundaries too early risks
-  cutting in the wrong place, which is far more expensive to fix than splitting a
-  monolith later once the shape is known.
+**Kademeli evrim yolu:** MVP'de tek NestJS process'i → trafik gerektirdiğinde aynı kod tabanının aynı image'dan çalışan `api` / `ws` (Socket.io) / `worker` (kuyruk) rollerine bölünmesi → o gün gelirse yalnızca kanıtlanmış bir darboğazın kendi servisine çıkarılması.
 
-**Staged evolution path:** single NestJS process at MVP → same codebase split into
-`api` / `ws` (Socket.io) / `worker` (queue) roles running from the same image once
-traffic demands it → extract only a proven bottleneck into its own service if that
-day ever comes.
+**Referans projeler:** Plane (monolit + iki destek servisi — bir DB-proxy Gateway ve bir entegrasyon Pilot'u), Linear (tek kod tabanı, farklı workload rolleri — WebSocket sunucuları, GraphQL API, job runner'ları — her biri bağımsız ölçeklenebiliyor), Huly (monorepo + çoklu servis, ama bunu yönetmek için kendi build sistemini, Rush'ı, kurmak zorunda kalmış).
 
-**Reference projects:** Plane (monolith + two support services — a DB-proxy
-Gateway and an integration Pilot), Linear (single codebase, different workload
-roles — WebSocket servers, GraphQL API, job runners — each independently
-scalable), Huly (monorepo + multi-service, but had to build its own build
-system, Rush, to manage it).
+## Sonuçlar
 
-## Consequences
+- Tek deploy artifact'ı, daha basit onboarding, tek kod stili, paketler arası versiyon kayması yok.
+- Modül sınırları ilk günden temiz kalmalı — bu disiplin sonraki bölünmeyi ucuzlaştıran şey; özensiz sınırlar onu tekrar pahalı hale getirir.
+- Roller ayrılana kadar tüm uygulama tek birim olarak ölçeklenir.
+- Bir modüldeki bir hata, tüm process'in kullanılabilirliğini etkileyebilir.
 
-- Single deploy artifact, simpler onboarding, one code style, no cross-package
-  version skew.
-- Module boundaries must stay clean from day one — this discipline is what makes
-  the later split cheap; sloppy boundaries make it expensive again.
-- The whole app scales as one unit until roles are split out.
-- A defect in one module can affect the availability of the whole process.
+## Değerlendirilen Alternatifler
 
-## Alternatives considered
-
-| Alternative                       | Why not                                                                                                                                               |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Polyrepo (separate api/web repos) | Duplicate PR/version-sync overhead for a solo/small team; harder for OSS contributors to run locally                                                  |
-| Microservices from day one        | Distributed complexity with no scaling need yet; kanban's transactions are tightly coupled; data model unsettled, so boundaries would likely be wrong |
+| Alternatif                       | Neden değil                                                                                                                                                             |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Polyrepo (ayrı api/web repoları) | Solo/küçük ekip için yinelenen PR/versiyon senkronizasyon yükü; OSS katkıda bulunanların yerel olarak çalıştırması daha zor                                             |
+| Baştan itibaren mikroservis      | Henüz ölçekleme ihtiyacı yokken dağıtık karmaşıklık; kanban'ın transaction'ları sıkı sıkıya bağlı; veri modeli oturmamış, dolayısıyla sınırlar muhtemelen yanlış olurdu |
