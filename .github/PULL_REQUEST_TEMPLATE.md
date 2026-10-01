@@ -1,24 +1,23 @@
-<!-- Keep it small: single responsibility, ~500 LOC guideline. See CONTRIBUTING.md. -->
+<!-- Küçük tutun: tek sorumluluk, ~500 LOC yönergesi. Bkz. CONTRIBUTING.md. -->
 
-## What
+## Ne
 
-<!-- What does this PR change? -->
+<!-- Bu PR neyi değiştiriyor? -->
 
-## Why
+## Neden
 
-<!-- Why is this change needed? -->
+<!-- Bu değişiklik neden gerekli? -->
 
-## Linked issue
+## Bağlı issue
 
 Fixes #
 
-## Checklist
+## Kontrol listesi
 
-- [ ] Targets `develop` (or `main` for release/hotfix only)
-- [ ] Title follows Conventional Commits (`feat:`, `fix:`, `docs:`, ...)
-- [ ] Relevant docs updated (`docs/`, README, etc.)
-- [ ] `docs/` changes update the `docs/tr/` mirror in the same PR
-- [ ] User-visible changes add a `CHANGELOG.md` entry under `[Unreleased]`
-- [ ] Lint / typecheck / tests pass (CI green)
-- [ ] I read [CONTRIBUTING.md](https://github.com/dravcore/kurul/blob/develop/CONTRIBUTING.md)
-      and this change was discussed in an issue first (or is trivial)
+- [ ] `develop`'u hedefliyor (ya da yalnızca release/hotfix için `main`)
+- [ ] Başlık İngilizce ve Conventional Commits'e uygun (`feat:`, `fix:`, `docs:`, ...)
+- [ ] İlgili dokümanlar güncellendi (`docs/`, README, vb.)
+- [ ] Kullanıcıya görünen değişiklikler `[Unreleased]` altına Türkçe bir `CHANGELOG.md` kaydı ekliyor
+- [ ] Lint / typecheck / testler geçiyor (CI yeşil)
+- [ ] [CONTRIBUTING.md](https://github.com/dravcore/kurul/blob/develop/CONTRIBUTING.md) dosyasını okudum
+      ve bu değişiklik önce bir issue'da tartışıldı (ya da önemsiz)

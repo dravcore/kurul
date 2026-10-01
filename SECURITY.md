@@ -1,38 +1,38 @@
-# Security Policy
+# Güvenlik Politikası
 
-How to report a vulnerability in Kurul.
+Kurul'daki bir güvenlik açığının nasıl bildirileceği.
 
-## Supported versions
+## Desteklenen sürümler
 
-Kurul is pre-1.0: only the latest `0.y` release receives security fixes. There is no
-support matrix beyond that — upgrade to the latest release to stay covered. A fix for an
-already-released version ships as a `hotfix/*` branch merged into `main` and back-merged into
-`develop`; a fix for something not yet released goes to `develop` as an ordinary `fix/*`
-branch and rides the next release. Neither is a direct commit: `main` and `develop` are
-protected and every change arrives through a pull request, security fixes included. See
-[docs/git-strategy.md](docs/git-strategy.md).
+Kurul 1.0 öncesi aşamadadır: güvenlik düzeltmelerini yalnızca en son `0.y` release alır. Bunun
+ötesinde bir destek matrisi yoktur — kapsam içinde kalmak için en son release'e yükseltin.
+Halihazırda yayımlanmış bir sürüm için düzeltme, `main`'e merge edilen ve `develop`'a geri-merge
+edilen bir `hotfix/*` branch'i olarak çıkar; henüz yayımlanmamış bir şey için düzeltme `develop`'a
+sıradan bir `fix/*` branch'i olarak girer ve bir sonraki release ile birlikte çıkar. İkisi de
+doğrudan commit değildir: `main` ve `develop` korumalıdır ve güvenlik düzeltmeleri dahil her
+değişiklik bir pull request üzerinden gelir. Bkz. [docs/git-strategy.md](docs/git-strategy.md).
 
-## Reporting a vulnerability
+## Güvenlik açığı bildirme
 
-Please **do not** open a public GitHub issue for security vulnerabilities.
+Lütfen güvenlik açıkları için herkese açık bir GitHub issue'su **açmayın**.
 
-Report privately using one of:
+Aşağıdakilerden biriyle özel olarak bildirin:
 
 1. **[GitHub Security Advisories](https://github.com/dravcore/kurul/security/advisories/new)**
-   (preferred) — private by default, keeps discussion and any fix in one place.
-2. **Email**: developer@dogancanyildiz.com
+   (tercih edilen) — varsayılan olarak özeldir, tartışmayı ve varsa düzeltmeyi tek bir yerde tutar.
+2. **E-posta**: developer@dogancanyildiz.com
 
-Include what you can: affected component, reproduction steps, impact, and any suggested
-fix.
+Elinizden geleni ekleyin: etkilenen bileşen, yeniden üretme adımları, etki ve varsa önerdiğiniz
+düzeltme.
 
-## Response expectations
+## Yanıt beklentileri
 
-Kurul is currently maintained by a single maintainer. There is no guaranteed SLA yet —
-expect an initial acknowledgment within a few days, and be patient on timelines for a fix.
-Severity and reachability of the issue will determine how it's prioritized.
+Kurul şu anda tek bir maintainer tarafından sürdürülüyor. Henüz garanti edilen bir SLA yok — birkaç
+gün içinde ilk bir teyit bekleyin ve düzeltme süreleri konusunda sabırlı olun. Sorunun ciddiyeti ve
+ulaşılabilirliği, nasıl önceliklendirileceğini belirler.
 
-## Disclosure
+## İfşa
 
-Please give the maintainer a reasonable window to investigate and ship a fix before any
-public disclosure. Coordinated disclosure will be worked out together once a report is
-acknowledged.
+Herkese açık herhangi bir ifşadan önce, maintainer'a inceleme yapması ve bir düzeltme yayımlaması
+için makul bir süre tanıyın. Koordineli ifşa, bir bildirim teyit edildikten sonra birlikte
+kararlaştırılır.

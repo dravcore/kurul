@@ -1,129 +1,133 @@
-# Contributor Covenant Code of Conduct
+# Contributor Covenant Davranış Kuralları
 
-## Our Pledge
+## Taahhüdümüz
 
-We as members, contributors, and leaders pledge to make participation in our
-community a harassment-free experience for everyone, regardless of age, body
-size, visible or invisible disability, ethnicity, sex characteristics, gender
-identity and expression, level of experience, education, socio-economic status,
-nationality, personal appearance, race, caste, color, religion, or sexual
-identity and orientation.
+Biz üyeler, katkıda bulunanlar ve liderler olarak, topluluğumuza katılımı; yaş,
+beden ölçüsü, görünür veya görünmez engellilik, etnik köken, cinsiyet
+özellikleri, cinsiyet kimliği ve ifadesi, deneyim düzeyi, eğitim, sosyo-ekonomik
+durum, milliyet, kişisel görünüm, ırk, kast, renk, din veya cinsel kimlik ve
+yönelim ne olursa olsun, herkes için tacizden arınmış bir deneyim haline
+getirmeyi taahhüt ediyoruz.
 
-We pledge to act and interact in ways that contribute to an open, welcoming,
-diverse, inclusive, and healthy community.
+Açık, misafirperver, çeşitlilik içeren, kapsayıcı ve sağlıklı bir topluluğa
+katkıda bulunacak biçimde davranmayı ve etkileşim kurmayı taahhüt ediyoruz.
 
-## Our Standards
+## Standartlarımız
 
-Examples of behavior that contributes to a positive environment for our
-community include:
+Topluluğumuz için olumlu bir ortama katkıda bulunan davranış örnekleri
+şunları içerir:
 
-- Demonstrating empathy and kindness toward other people
-- Being respectful of differing opinions, viewpoints, and experiences
-- Giving and gracefully accepting constructive feedback
-- Accepting responsibility and apologizing to those affected by our mistakes,
-  and learning from the experience
-- Focusing on what is best not just for us as individuals, but for the overall
-  community
+- Diğer insanlara karşı empati ve nezaket göstermek
+- Farklı görüşlere, bakış açılarına ve deneyimlere saygılı olmak
+- Yapıcı geri bildirim vermek ve bunu zarafetle kabul etmek
+- Sorumluluğu kabul etmek, hatalarımızdan etkilenenlerden özür dilemek ve bu
+  deneyimden ders çıkarmak
+- Yalnızca bireyler olarak bizim için değil, topluluğun bütünü için en iyi
+  olana odaklanmak
 
-Examples of unacceptable behavior include:
+Kabul edilemez davranış örnekleri şunları içerir:
 
-- The use of sexualized language or imagery, and sexual attention or advances of
-  any kind
-- Trolling, insulting or derogatory comments, and personal or political attacks
-- Public or private harassment
-- Publishing others' private information, such as a physical or email address,
-  without their explicit permission
-- Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+- Cinselleştirilmiş dil veya görsellerin kullanılması ve her türlü cinsel ilgi
+  ya da yakınlaşma girişimi
+- Trollük, hakaret içeren veya aşağılayıcı yorumlar ve kişisel ya da siyasi
+  saldırılar
+- Herkese açık veya özel taciz
+- Başkalarının fiziksel adres veya e-posta adresi gibi özel bilgilerini açık
+  izinleri olmadan yayımlamak
+- Profesyonel bir ortamda makul olarak uygunsuz sayılabilecek diğer davranışlar
 
-## Enforcement Responsibilities
+## Uygulama Sorumlulukları
 
-Community leaders are responsible for clarifying and enforcing our standards of
-acceptable behavior and will take appropriate and fair corrective action in
-response to any behavior that they deem inappropriate, threatening, offensive,
-or harmful.
+Topluluk liderleri, kabul edilebilir davranış standartlarımızı netleştirmekten
+ve uygulamaktan sorumludur; uygunsuz, tehdit edici, saldırgan veya zararlı
+olarak değerlendirdikleri her davranışa karşı uygun ve adil düzeltici önlemler
+alır.
 
-Community leaders have the right and responsibility to remove, edit, or reject
-comments, commits, code, wiki edits, issues, and other contributions that are
-not aligned to this Code of Conduct, and will communicate reasons for
-moderation decisions when appropriate.
+Topluluk liderleri, bu Davranış Kuralları ile uyumlu olmayan yorumları,
+commit'leri, kodu, wiki düzenlemelerini, issue'ları ve diğer katkıları
+kaldırma, düzenleme veya reddetme hakkına ve sorumluluğuna sahiptir; uygun
+olduğunda moderasyon kararlarının gerekçelerini iletir.
 
-## Scope
+## Kapsam
 
-This Code of Conduct applies within all community spaces, and also applies when
-an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official e-mail
-address, posting via an official social media account, or acting as an
-appointed representative at an online or offline event.
+Bu Davranış Kuralları tüm topluluk alanlarında geçerlidir; ayrıca bir kişi
+topluluğu herkese açık alanlarda resmen temsil ettiğinde de geçerlidir.
+Topluluğumuzu temsil etme örnekleri arasında resmi bir e-posta adresi
+kullanmak, resmi bir sosyal medya hesabı üzerinden paylaşım yapmak veya
+çevrimiçi ya da çevrimdışı bir etkinlikte atanmış bir temsilci olarak hareket
+etmek yer alır.
 
-## Enforcement
+## Uygulama
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-developer@dogancanyildiz.com.
-All complaints will be reviewed and investigated promptly and fairly.
+İstismarcı, taciz edici veya başka bir şekilde kabul edilemez davranış
+örnekleri, uygulamadan sorumlu topluluk liderlerine
+developer@dogancanyildiz.com adresi üzerinden bildirilebilir.
+Tüm şikâyetler hızla ve adil bir şekilde incelenecek ve araştırılacaktır.
 
-All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+Tüm topluluk liderleri, herhangi bir olayı bildiren kişinin gizliliğine ve
+güvenliğine saygı göstermekle yükümlüdür.
 
-## Enforcement Guidelines
+## Uygulama Yönergeleri
 
-Community leaders will follow these Community Impact Guidelines in determining
-the consequences for any action they deem in violation of this Code of Conduct:
+Topluluk liderleri, bu Davranış Kuralları'nı ihlal ettiğini değerlendirdikleri
+herhangi bir eylemin sonuçlarını belirlerken şu Topluluk Etki Yönergeleri'ni
+izler:
 
-### 1. Correction
+### 1. Düzeltme
 
-**Community Impact**: Use of inappropriate language or other behavior deemed
-unprofessional or unwelcome in the community.
+**Topluluk Etkisi**: Uygunsuz dil kullanımı veya toplulukta profesyonellikten
+uzak ya da hoş karşılanmayan olarak değerlendirilen diğer davranışlar.
 
-**Consequence**: A private, written warning from community leaders, providing
-clarity around the nature of the violation and an explanation of why the
-behavior was inappropriate. A public apology may be requested.
+**Sonuç**: Topluluk liderlerinden, ihlalin niteliğine açıklık getiren ve
+davranışın neden uygunsuz olduğunu açıklayan özel, yazılı bir uyarı. Herkese
+açık bir özür talep edilebilir.
 
-### 2. Warning
+### 2. Uyarı
 
-**Community Impact**: A violation through a single incident or series of
-actions.
+**Topluluk Etkisi**: Tek bir olay veya bir dizi eylem yoluyla gerçekleşen bir
+ihlal.
 
-**Consequence**: A warning with consequences for continued behavior. No
-interaction with the people involved, including unsolicited interaction with
-those enforcing the Code of Conduct, for a specified period of time. This
-includes avoiding interactions in community spaces as well as external channels
-like social media. Violating these terms may lead to a temporary or permanent
-ban.
+**Sonuç**: Davranışın sürmesi durumunda sonuçları olan bir uyarı. Belirli bir
+süre boyunca, Davranış Kuralları'nı uygulayanlarla istenmeyen etkileşim dahil,
+ilgili kişilerle hiçbir etkileşime girilmez. Bu, topluluk alanlarındaki
+etkileşimlerden olduğu kadar sosyal medya gibi dış kanallardaki etkileşimlerden
+de kaçınmayı içerir. Bu koşulların ihlali geçici veya kalıcı bir yasağa yol
+açabilir.
 
-### 3. Temporary Ban
+### 3. Geçici Yasak
 
-**Community Impact**: A serious violation of community standards, including
-sustained inappropriate behavior.
+**Topluluk Etkisi**: Süregelen uygunsuz davranış dahil, topluluk standartlarının
+ciddi bir ihlali.
 
-**Consequence**: A temporary ban from any sort of interaction or public
-communication with the community for a specified period of time. No public or
-private interaction with the people involved, including unsolicited interaction
-with those enforcing the Code of Conduct, is allowed during this period.
-Violating these terms may lead to a permanent ban.
+**Sonuç**: Belirli bir süre boyunca, toplulukla her türlü etkileşimden veya
+herkese açık iletişimden geçici olarak yasaklanma. Bu süre boyunca, Davranış
+Kuralları'nı uygulayanlarla istenmeyen etkileşim dahil, ilgili kişilerle
+herkese açık ya da özel hiçbir etkileşime izin verilmez. Bu koşulların ihlali
+kalıcı bir yasağa yol açabilir.
 
-### 4. Permanent Ban
+### 4. Kalıcı Yasak
 
-**Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior, harassment of an
-individual, or aggression toward or disparagement of classes of individuals.
+**Topluluk Etkisi**: Süregelen uygunsuz davranış, bir bireyin taciz edilmesi
+veya kişi gruplarına yönelik saldırganlık ya da aşağılama dahil, topluluk
+standartlarını ihlal etme örüntüsü sergilemek.
 
-**Consequence**: A permanent ban from any sort of public interaction within the
-community.
+**Sonuç**: Topluluk içinde herkese açık her türlü etkileşimden kalıcı yasak.
 
-## Attribution
+## Atıf
 
-This Code of Conduct is adapted from the [Contributor Covenant][homepage],
-version 2.1, available at
-[https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].
+Bu Davranış Kuralları, [Contributor Covenant][homepage]'ın 2.1 sürümünden
+uyarlanmıştır; sürüme
+[https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1]
+adresinden ulaşılabilir.
 
-Community Impact Guidelines were inspired by
-[Mozilla's code of conduct enforcement ladder][Mozilla CoC].
+Topluluk Etki Yönergeleri,
+[Mozilla'nın davranış kuralları uygulama merdiveninden][Mozilla CoC]
+esinlenmiştir.
 
-For answers to common questions about this code of conduct, see the FAQ at
-[https://www.contributor-covenant.org/faq][FAQ]. Translations are available at
-[https://www.contributor-covenant.org/translations][translations].
+Bu davranış kuralları hakkında sık sorulan soruların yanıtları için
+[https://www.contributor-covenant.org/faq][FAQ] adresindeki SSS bölümüne bakın.
+Çeviriler [https://www.contributor-covenant.org/translations][translations]
+adresinde mevcuttur.
 
 [homepage]: https://www.contributor-covenant.org
 [v2.1]: https://www.contributor-covenant.org/version/2/1/code_of_conduct.html

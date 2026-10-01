@@ -1,110 +1,113 @@
-# Contributing to Kurul
+# Kurul'a Katkıda Bulunma
 
-How to propose, build, and submit changes.
+Değişikliklerin nasıl önerileceği, geliştirileceği ve gönderileceği.
 
-Kurul is AGPL-3.0 (see [LICENSE](LICENSE)) and it is open to contributions: code, documentation
-and translations are all welcome, as are bug reports, feature ideas and design feedback. The
-project refused outside pull requests until 2026-08-21; that was reversed in
-[ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md), which records the history
-and the reasoning.
+Kurul AGPL-3.0 lisanslıdır ([LICENSE](LICENSE) dosyasına bakın) ve katkıya açıktır: kod, doküman
+ve çeviri hoş karşılanır; hata bildirimleri, özellik fikirleri ve tasarım geri bildirimi de öyle.
+Proje 2026-08-21'e kadar dışarıdan gelen pull request'leri reddediyordu; bu karar, geçmişi ve
+gerekçeyi kaydeden [ADR 0028](docs/decisions/0028-open-contributions-hosted-service.md) ile tersine
+çevrildi.
 
-## Code of conduct
+## Davranış kuralları
 
-Participation is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Read it before
-opening an issue or PR.
+Katılım [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) ile yönetilir. Bir issue ya da PR açmadan önce
+okuyun.
 
-## License of contributions
+## Katkıların lisansı
 
-**Inbound equals outbound.** By opening a pull request you license your contribution under
-AGPL-3.0: the terms the rest of the codebase already carries, and the same terms every user
-already has. Nothing broader is asked of you.
+**Inbound = outbound.** Bir pull request açtığınızda katkınızı AGPL-3.0 altında lisanslamış
+olursunuz: kod tabanının geri kalanının zaten taşıdığı ve her kullanıcının zaten sahip olduğu aynı
+koşullar. Sizden bundan daha geniş hiçbir şey istenmez.
 
-**You keep your copyright.** The project takes no ownership of your work and cannot relicense
-it. It stays yours; what you grant is the project's own license, nothing more.
+**Telif hakkınız sizde kalır.** Proje çalışmanızın sahipliğini almaz ve onu yeniden lisanslayamaz.
+Çalışmanız sizin kalır; verdiğiniz şey projenin kendi lisansıdır, fazlası değil.
 
-**There is no CLA and no DCO.** Nothing to sign, no bot commenting on your pull request, no
-employer approval form. A `Signed-off-by` requirement may be adopted later if the project grows
-into needing one; it would be written into this file before it applied to anyone, and it would
-never reach back to work already merged.
+**CLA yok, DCO da yok.** İmzalanacak bir şey yok, pull request'inize yorum yapan bir bot yok,
+işveren onay formu yok. Proje büyüyüp gerek duyarsa ileride bir `Signed-off-by` zorunluluğu
+getirilebilir; bu, kimseye uygulanmadan önce bu dosyaya yazılır ve merge edilmiş işe asla geriye
+dönük uygulanmaz.
 
-**What you confirm by opening a PR** is that you have the right to submit the work: you wrote
-it, or whoever owns it (an employer, an upstream project) allows you to contribute it under
-AGPL-3.0. If you are working on company time or company equipment and are not certain, say so
-on the pull request before it is reviewed.
+**Bir PR açarak teyit ettiğiniz şey**, işi gönderme hakkınıza sahip olduğunuzdur: ya onu kendiniz
+yazdınız ya da sahibi (bir işveren, bir upstream proje) onu AGPL-3.0 altında katkı olarak vermenize
+izin veriyor. Şirket mesaisinde ya da şirket ekipmanıyla çalışıyorsanız ve emin değilseniz, pull
+request review edilmeden önce bunu pull request'te belirtin.
 
-## Ways to contribute
+## Katkıda bulunma yolları
 
-| Type             | How                                                                        |
-| ---------------- | -------------------------------------------------------------------------- |
-| Bug report       | [Open a bug report issue](.github/ISSUE_TEMPLATE/bug_report.yml)           |
-| Feature idea     | [Open a feature request issue](.github/ISSUE_TEMPLATE/feature_request.yml) |
-| Design feedback  | Comment on an issue, or open a discussion                                  |
-| Code             | Find or open an issue first, then a PR against `develop`                   |
-| Docs             | Same, and update the `docs/tr/` mirror in the same PR                      |
-| Translation      | Same; the locale catalogs stay key-for-key with English                    |
-| Typo / dead link | A one-line PR is fine, no issue needed                                     |
+| Tür                           | Nasıl                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| Hata bildirimi                | [Bir hata bildirimi issue'su açın](.github/ISSUE_TEMPLATE/bug_report.yml)      |
+| Özellik fikri                 | [Bir özellik isteği issue'su açın](.github/ISSUE_TEMPLATE/feature_request.yml) |
+| Tasarım geri bildirimi        | Bir issue'ya yorum yazın ya da bir discussion açın                             |
+| Kod                           | Önce bir issue bulun ya da açın, ardından `develop`'a karşı bir PR açın        |
+| Doküman                       | Aynı; doküman Türkçe yazılır                                                   |
+| Çeviri                        | Aynı; locale katalogları İngilizce ile key key eşleşmeye devam eder            |
+| Yazım hatası / kırık bağlantı | Tek satırlık bir PR yeterli, issue gerekmez                                    |
 
-English is canonical. A PR that changes a file under `docs/` updates its Turkish mirror under
-`docs/tr/` in the same PR, and a change to `README.md` updates `README.tr.md`. If you can write
-only one of the two, say so on the issue rather than leaving the mirror to drift silently.
+Dokümantasyon yalnız Türkçedir ([ADR 0036](docs/decisions/0036-turkish-only-documentation.md)):
+`docs/` altındaki dosyalar ve `README.md` Türkçe yazılır; güncellenecek bir İngilizce asıl ya da
+ayna yoktur. Kod, kod yorumları, commit mesajları, dal adları ve PR başlıkları İngilizcedir. Bir
+doküman başlığını değiştiren PR, o başlığın çapasına verilen bağlantıları da günceller (çapalar
+Türkçe başlıktan türer; kod yorumlarından, compose dosyalarından ve `.env.example`'dan bu çapalara
+bağlantı vardır).
 
-## Issue-first rule
+## Issue-first kuralı
 
-Propose before you implement. Open or find an issue and get it acknowledged before
-starting non-trivial work — this avoids duplicate effort and wasted review time on changes
-that won't be accepted. Trivial fixes (typos, broken links) can skip straight to a PR.
+Uygulamadan önce önerin. Önemsiz olmayan bir işe başlamadan önce bir issue açın ya da mevcut olanı
+bulun ve onaylanmasını bekleyin — bu, aynı işin iki kez yapılmasını ve kabul edilmeyecek
+değişikliklere boşa harcanan review zamanını önler. Önemsiz düzeltmeler (yazım hataları, kırık
+bağlantılar) doğrudan bir PR'a geçebilir.
 
-## Development setup
+## Geliştirme ortamı kurulumu
 
-Clone, install, and run the monorepo (`apps/api`, `apps/web`, Postgres, Redis) using
-[docs/development.md](docs/development.md) — start there for environment variables,
-Compose, migrations, and the day-to-day loop. Quick start is also in the root
-[README.md](README.md).
+Monorepo'yu (`apps/api`, `apps/web`, Postgres, Redis) [docs/development.md](docs/development.md)
+ile klonlayın, kurun ve çalıştırın — ortam değişkenleri, Compose, migration'lar ve günlük döngü için
+oradan başlayın. Hızlı başlangıç ayrıca kökteki [README.md](README.md) içinde de yer alır.
 
-## Branching and commits
+## Branch'ler ve commit'ler
 
-- Branch off `develop`, named `<type>/<short-description>` (e.g. `feature/board-dnd`,
+- `develop`'tan dallanın, `<type>/<short-description>` biçiminde adlandırın (ör. `feature/board-dnd`,
   `fix/task-position-rounding`)
-- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
-  (`feat:`, `fix:`, `docs:`, ...), in English
+- Commit mesajları [Conventional Commits](https://www.conventionalcommits.org/) kurallarını
+  (`feat:`, `fix:`, `docs:`, ...) izler ve İngilizce yazılır
 
-Full branch model (Git Flow: `main` / `develop` / `feature/*` / `fix/*` / `docs/*` /
-`chore/*` / `release/*` / `hotfix/*`) and commit conventions:
+Tam branch modeli (Git Flow: `main` / `develop` / `feature/*` / `fix/*` / `docs/*` /
+`chore/*` / `release/*` / `hotfix/*`) ve commit konvansiyonları:
 [docs/git-strategy.md](docs/git-strategy.md).
 
-## Coding guidelines
+## Kodlama yönergeleri
 
-Conventions for TypeScript/NestJS/Next.js code: [docs/coding-standards.md](docs/coding-standards.md).
-Test expectations: [docs/testing.md](docs/testing.md).
+TypeScript/NestJS/Next.js kodu için konvansiyonlar: [docs/coding-standards.md](docs/coding-standards.md).
+Test beklentileri: [docs/testing.md](docs/testing.md).
 
-## Making a pull request
+## Pull request açma
 
-- **Target `develop`** (except `release/*` / `hotfix/*`, which follow
-  [docs/git-strategy.md](docs/git-strategy.md)).
-- **Keep PRs small and focused.** Aim for under 500 lines changed and a single
-  responsibility per PR (excluding docs/lockfiles). Split schema changes from logic
-  changes, and frontend from backend, where possible.
-- Link the issue the PR addresses.
-- Fill in the PR template checklist (conventional title, docs updated where relevant,
-  lint/typecheck/tests — CI must be green).
-- CI on a pull request from a fork runs without repository secrets, so a job that needs one
-  runs after merge instead. If a check is skipped on your PR, that is why.
-- Expect **one approving review** before merge. This is a norm, not a setting: branch
-  protection on `develop` and `main` requires zero approvals today, precisely because Kurul
-  has a single maintainer and there would be nobody to review _their_ pull requests. What
-  protection does enforce on both branches, for everyone including the maintainer, is a pull
-  request, a branch up to date with its base, no force push, no deletion, and two green
-  contexts: `ci-ok` and `CodeQL`. So
-  maintainer-authored PRs are self-reviewed and self-merged once CI is green; your PRs are
-  reviewed as normal; and the approval count goes back up the moment a second maintainer
-  exists. Prefer a merge commit into `develop` (`--no-ff`) so multi-commit history stays
-  readable; squash into `develop` is allowed for Dependabot / single-commit noise. Squash
-  into `main` is never allowed — see
-  [docs/git-strategy.md](docs/git-strategy.md#merge-stratejisi).
-- Clean up noisy fixup commits (interactive rebase or amend) before requesting review — they
-  land in `develop` as-is.
+- **`develop`'u hedefleyin** (`release/*` / `hotfix/*` hariç; bunlar
+  [docs/git-strategy.md](docs/git-strategy.md) dosyasını izler).
+- **PR'ları küçük ve odaklı tutun.** PR başına 500 satırın altında değişiklik ve tek bir sorumluluk
+  hedefleyin (lockfile'lar ve üretilen çıktı hariç). Mümkün olduğunda şema değişikliklerini logic
+  değişikliklerinden, frontend'i backend'den ayırın.
+- PR'ın ele aldığı issue'yu linkleyin.
+- PR şablonundaki kontrol listesini doldurun (conventional başlık, ilgili yerlerde güncellenmiş
+  doküman, lint/typecheck/test — CI yeşil olmalı).
+- Bir fork'tan gelen pull request üzerindeki CI repository secret'ları olmadan çalışır; bu yüzden
+  secret gerektiren bir job onun yerine merge sonrasında çalışır. PR'ınızda bir kontrol atlandıysa
+  sebebi budur.
+- Merge öncesinde **bir onaylayıcı review** olmasını bekleyin. Bu bir ayar değil, bir norm:
+  `develop` ve `main` üzerindeki branch protection bugün sıfır onay gerektiriyor, tam da Kurul'un
+  tek bir maintainer'ı olduğu ve _onun_ pull request'lerini review edecek kimse bulunmayacağı için.
+  Protection'ın her iki branch'te, maintainer dahil herkes için gerçekten zorunlu kıldığı şeyler
+  ise bir pull request, tabanıyla güncel bir branch, force push yok, silme yok ve iki yeşil
+  context: `ci-ok` ve `CodeQL`. Dolayısıyla maintainer'ın açtığı PR'lar CI yeşile döndüğünde kendi
+  kendine review edilir ve kendi kendine merge edilir; sizin PR'larınız her zamanki gibi review
+  edilir; ve onay sayısı, ikinci bir maintainer var olduğu anda yeniden yükselir. `develop`'a merge
+  commit (`--no-ff`) tercih edin, böylece çok commit'li history okunabilir kalır; `develop`'a
+  squash, Dependabot / tek commit'lik gürültü için serbesttir. `main`'e squash asla serbest
+  değildir — bkz. [docs/git-strategy.md](docs/git-strategy.md#merge-stratejisi).
+- Review istemeden önce gürültülü fixup commit'lerini temizleyin (interactive rebase veya amend) —
+  bunlar `develop`'a olduğu gibi iner.
 
-## Need help?
+## Yardıma mı ihtiyacınız var?
 
-Open a [GitHub Discussion](https://github.com/dravcore/kurul/discussions) or comment on
-the relevant issue.
+Bir [GitHub Discussion](https://github.com/dravcore/kurul/discussions) açın ya da ilgili issue'ya
+yorum yazın.
