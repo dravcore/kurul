@@ -2,6 +2,13 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-10
+**Güncellendi:** 2026-10-01 — Karar uygulandı: `requireEmailVerificationOnInvitation: true` artık
+`apps/api/src/auth/organization-options.ts` içinde açıkça set ediliyor ve `auth.ts`'te `false`
+override'ı yok; her yeni hesaba doğrulama e-postası gider (`sendOnSignUp`) ve doğrulama bağlantısı
+oturum çerezini tazeler (`autoSignInAfterVerification`; `apps/api/src/auth/auth.ts`). Bağlam'daki
+"`requireEmailVerificationOnInvitation: false`'ı açıkça set ediyor" ve Sonuçlar'daki "bu flag bugün
+yalnızca … var" cümleleri karar öncesini anlatır; atama, mention ve due-soon e-postaları ile parola
+sıfırlama da bugün aynı `mail` modülünü kullanıyor (`apps/api/src/mail/mail-templates.ts`).
 
 ## Bağlam
 
@@ -28,7 +35,7 @@ yoksa düzeltme bir bozuk durumu bir başkasıyla takas eder.
 
 ## Karar
 
-SMTP tabanlı e-posta gönderimi gönder (`apps/api/src/mail/`, `nodemailer`, yalnızca
+SMTP tabanlı e-posta gönderimini devreye al (`apps/api/src/mail/`, `nodemailer`, yalnızca
 `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_SECURE` / `MAIL_FROM` ortam
 değişkenleri üzerinden yapılandırılır — sağlayıcıya özel bir API değil, böylece self-hosted bir
 deployment hiçbir zaman bir vendor'a bağımlı olmaz) ve bunu başlangıçta tek bir amaç için
@@ -39,8 +46,8 @@ doğrulanmış bir e-posta adresi gerektirir.
 
 ## Gerekçe
 
-- Açık özellikle _davet_ kabulünde yaşıyor — gerçek davet edileni önce kayıt olmaya zorlayan
-  bir saldırgan yarışı. Kayıt ve girişte eşdeğer bir yarış yok: bir hesap kendi e-postasını
+- Açık özellikle _davet_ kabulünde yaşıyor — gerçek davet edilenden önce kayıt olmak için onunla
+  yarışan bir saldırgan. Kayıt ve girişte eşdeğer bir yarış yok: bir hesap kendi e-postasını
   oluşturulduğu andan itibaren sahiplenir, onu iddia etmeye çalışan başka bir şey yok. Yalnızca
   açık olan yolu düzeltmek, tehdit modelinin gerektirmediği alakasız, daha yüksek sürtünmeli
   bir değişiklikten (her kayıtta zorunlu doğrulama) kaçınır.
@@ -62,7 +69,7 @@ doğrulanmış bir e-posta adresi gerektirir.
   `.env.example`, `SMTP_*` değişkenlerini ve onları boş bırakmanın sonucunu belgeler;
   `docker-compose.yml`, onları `api` servisine varsayılan bir host olmadan geçirir, yani
   production bilinçli olarak opt-in yapmalıdır; `docker-compose.dev.yml` bir Mailpit
-  container'ı gönderir, böylece lokal geliştirme hiçbir zaman kendisi engellenmez (bkz.
+  container'ı içerir, böylece lokal geliştirme hiçbir zaman kendisi engellenmez (bkz.
   [development.md](../development.md#smtp-ve-mailpit)).
 - GHSA-fmh4-wcc4-5jm3'ü kapatmak, `apps/api/src/auth/auth.ts` içindeki
   `requireEmailVerificationOnInvitation: false`'ın mail modülü çıktığında kaldırılması demek —
@@ -72,7 +79,7 @@ doğrulanmış bir e-posta adresi gerektirir.
   haline geliyor; bozuk bir SMTP yapılandırması "API çalışmıyor" yerine "davetler başarısız
   oluyor"a düşer — başlangıçta ona dokunan tek kod yolları davet gönderme ve davet kabuldür.
 - Gelecekteki bildirim e-postaları (mention'lar, due-soon hatırlatmaları — bkz.
-  [ROADMAP.md — MVP ötesi](../../ROADMAP.md#beyond-mvp)) aynı modülü ve aynı ortam değişkenlerini
+  [ROADMAP.md — MVP ötesi](../../ROADMAP.md#mvp-ötesi)) aynı modülü ve aynı ortam değişkenlerini
   yeniden kullanabilir, ileride ikinci bir mail yolu eklemek yerine.
 
 ## Değerlendirilen Alternatifler

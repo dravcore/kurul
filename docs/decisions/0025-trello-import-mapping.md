@@ -2,6 +2,21 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-15
+**Güncellendi:** 2026-10-01 — (1) Bağlam ve Sonuçlar'daki "elde tek bir gerçek export yoktu" ve
+"hiçbiri gerçek bir export değil" cümleleri tarihsel: 2026-08-22'den beri iki anonimleştirilmiş
+gerçek export `apps/api/test/fixtures/trello/real/` altında, uçtan uca import ediliyor ve okunan
+alan adlarında fark çıkmadı; ROADMAP'teki gerçek-export metriği o gün kapandı
+(`apps/api/test/fixtures/trello/README.md`). (2) Gövdedeki `dosya:satır` atıfları yazıldıkları günkü
+dosyaları gösterir ve kaymıştır; ilgili öğeyi adıyla arayın: `globals.css`'te `--label-slot-1…8`
+blokları; 0019'da "Metrikler `category`'ye bakar", `lower(name) = 'done'` migration'ı,
+`column-settings-dialog.tsx` maddeleri ve "Konumdan türetmek" satırı; 0023'te Gerekçe'deki "Neden
+tek düzey yerine çoklu liste" paragrafı. (3) Değişiklik bölümündeki "hatalı bir değer bir sonraki
+import'ta bir `500`'dür" yalnız kart ve liste tavanları için doğru: bayt tavanı
+`MulterModule.registerAsync` fabrikasında modül örneklenirken okunduğundan bozuk
+`TRELLO_IMPORT_MAX_BYTES` açılışı reddeder (`apps/api/src/import/import.module.ts`). (4) Kodda bu
+kayıtta adı geçmeyen örtük kurallar da var: adı boş öğeler `malformed` sayılır, boş adlı etiket
+ayrıca bir `(label, defaulted)` satırı üretir, adsız board `Imported board` adını alır,
+ayrıştırılamayan `due` raporlanmadan `null` olur (`apps/api/src/import/trello-import-planner.ts`).
 
 ## Bağlam
 

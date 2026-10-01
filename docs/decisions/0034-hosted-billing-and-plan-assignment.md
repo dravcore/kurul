@@ -2,25 +2,36 @@
 
 **Durum:** Önerildi
 **Tarih:** 2026-08-26
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe
+aynasıyla" ve "Türkçe aynaları" ifadeleri kaldırılan İngilizce asıl + Türkçe ayna düzenine
+aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Bağlam'daki "`Workspace.planLimits`'in `PlanLimitsService`,
+`BoardService`, `AttachmentService`, `InstanceConfigController` ve `mount-better-auth.ts`'teki
+kayıt reddinde okuyucuları var" ifadesi kodla birebir örtüşmüyor: kolonu doğrudan okuyan tek kod
+`PlanLimitsService.forWorkspace`'tir (`apps/api/src/plan/plan-limits.service.ts`); board ve ek
+servisleri ona dayanır, `InstanceConfigController` ile kayıt reddi ise kolona bakmadan instance
+ortamındaki tavanları (`PLAN_MAX_*`, bayt kotaları) kullanır. Kolonun hiçbir yerde yazılmadığı kısmı
+hâlâ doğrudur.
 
 ## Bağlam
 
 [ADR 0028](0028-open-contributions-hosted-service.md) paranın nereden geleceğine karar verdi:
-"Dravcore'un işlettiği barındırılan bir servis. Sunucularımızda bir hesap, yayımlanmış bir limit
-kümesi içinde ücretsiz, üzerinde ücretli", burada limitler "operasyonel nicelikler (koltuk, board,
-depolama ve benzeri), özellik değil" ve "barındırılan servis, ihtiyaç duyduğu plan limiti ve
-faturalandırma kodu dahil, bu depodaki aynı AGPL kodunu çalıştırır".
+"Dravcore'un işlettiği barındırılan bir servis. Bizim sunucularımızda bir hesap; yayınlanmış bir
+limit kümesinin içinde ücretsiz, üzerinde ücretli", burada limitler "özellik değil, operasyonel
+büyüklüklerdir (koltuk, board, depolama ve benzeri)" ve "barındırılan servis, ihtiyaç duyduğu
+plan-limiti ve faturalama kodu dahil, bu depodaki aynı AGPL kodunu çalıştırıyor".
 
 [ADR 0032](0032-plan-limits.md) bunun ilk yarısını inşa etti. Tek bir çözümleyici her tavan sorusunu
 cevaplıyor ve nullable bir JSON kolonu olan `Workspace.planLimits`, bir workspace'in migration
 olmadan kendi tavanlarını taşımasına izin veriyor. O ADR neyi açık bıraktığını tam da bu sözcüklerle
-adlandırmıştı: "Faturalandırmanın tavanların ötesinde ihtiyaç duyduğu şey (plan adı, sağlayıcı
-id'leri, dönem sonu) 0028'in kendi gerekçeleriyle ekleyeceği bir tablodur."
+adlandırmıştı: "Billing'in tavanların ötesinde ihtiyaç duyduğu şey (plan adı, sağlayıcı id'leri,
+dönem sonu), 0028'in kendi sebepleriyle ekleyeceği bir tablo."
 
 Bu ek yeri tamamlanmış ve kullanılmamış durumda. `Workspace.planLimits`'in `PlanLimitsService`,
 `BoardService`, `AttachmentService`, `InstanceConfigController` ve `mount-better-auth.ts`'teki kayıt
 reddinde okuyucuları var ve **`apps/api/src` içinde hiçbir yerde yazıcısı yok**;
-[self-hosting.md](../self-hosting.md) açıkça "uygulama onu kendisi hiç yazmaz" diyor. `Subscription`
+[self-hosting.md](../self-hosting.md) açıkça "uygulama onu asla kendisi yazmaz" diyor. `Subscription`
 modeli yok, sağlayıcı entegrasyonu yok (`stripe`, `paddle` ve `billing` plan limiti dosyalarının
 dışında hiçbir şeyle eşleşmiyor), alıcı route'u yok ve plan kataloğu yok. `ROADMAP.md`'nin
 faturalandırma satırında tek bir kabul kriteri var, sağlayıcı entegrasyonunun yapılandırmanın
@@ -128,11 +139,11 @@ kendi kendine barındırılan her workspace de böyle görünür, dolayısıyla 
 bir kod yolunu paylaşır.
 
 İkinci bir tablo, `BillingEvent`, 4. bölümün idempotency defteridir: bu şemadaki her satır gibi
-`id String @id @default(uuid(7))`, ardından `provider`, `eventId` ve `receivedAt`, `(provider,
-eventId)` üzerinde tekil bir indeksle. Tablonun var olma nedeni ve **okunduğu** anahtar o tekil
-çifttir; id ise isteğe bağlı bir süs değildir, çünkü [CLAUDE.md](../../CLAUDE.md) her satırın
-id'sini UUIDv7 yapıyor ve bu tablonun aşağıda girdiği saklama süpürmesi, API'deki her cursor gibi `id`
-üzerinden sayfalıyor.
+`id String @id @default(uuid(7))`, ardından `provider`, `eventId` ve `receivedAt`,
+`(provider, eventId)` üzerinde tekil bir indeksle. Tablonun var olma nedeni ve **okunduğu** anahtar
+o tekil çifttir; id ise isteğe bağlı bir süs değildir, çünkü [CLAUDE.md](../../CLAUDE.md) her
+satırın id'sini UUIDv7 yapıyor ve bu tablonun aşağıda girdiği saklama süpürmesi, API'deki her
+cursor gibi `id` üzerinden sayfalıyor.
 
 ### 3. Plan kataloğu satır değil kod
 
@@ -282,17 +293,17 @@ değerdir, çünkü bir faturalandırma hesabına giden bir bağlantıdır; diğ
 
 [ADR 0027](0027-attachment-quotas.md) workspace başına bir `pg_advisory_xact_lock`'u değerlendirip
 yazılı olarak reddetti ve [ADR 0032](0032-plan-limits.md) aynı takası sayımlar için yineledi:
-oku-sonra-yaz, eşzamanlılıkla sınırlı aşım, "**Tetik:** bir tavanın kasten yarıştırıldığına dair bir
-rapor". `BoardService` o reddi işaret eden bir yorum taşıyor.
+oku-sonra-yaz, eşzamanlılıkla sınırlı aşım, "**Tetikleyici:** bir tavanın kasten yarıştırıldığına
+dair bir rapor". `BoardService` o reddi işaret eden bir yorum taşıyor.
 
 Her iki ret de operatör korkuluğu olan bir tavan için doğruydu. **Hiçbiri gelir sınırı olan bir tavanda
 ayakta kalmıyor**: bir müşterinin aynı anda on istek göndererek aşabildiği bir limit bir plan
 değildir.
 
 Bu yeni bir tetiktir, o kayıtların adlandırdığı tetiklerden biri değil ve farkı net söylemeye değer.
-ADR 0027'ninkiler "eşzamanlı aşımın bir `ATTACHMENT_MAX_BYTES`'ı belirgin biçimde aştığı ölçülmüş bir
-deployment ya da kotanın kasten yarıştırıldığına dair bir operatör raporu"dur ve ADR 0032 aynı çifti
-sayımlar için yineler. Hiçbiri ateşlenmedi ve bu kayıt aksini iddia etmiyor. Değişen şey, tavanın ne
+ADR 0027'ninkiler "eşzamanlı aşımın tek bir `ATTACHMENT_MAX_BYTES`'ı kayda değer biçimde aştığı
+ölçülmüş bir kurulum ya da kotanın kasten yarıştırıldığına dair operatör raporu"dur ve ADR 0032 aynı
+çifti sayımlar için yineler. Hiçbiri ateşlenmedi ve bu kayıt aksini iddia etmiyor. Değişen şey, tavanın ne
 **anlama geldiği**; o kayıtların tartamayacağı bir gerekçe bu, çünkü yazıldıklarında bir tavanın
 arkasında gelir yoktu. Dolayısıyla zemin burada yazılıyor ve önceki kayıtlar bu zemin üzerinde yeniden
 ele alınıyor, bunu önceden görmüş gibi okunmuyorlar. Dolayısıyla, **faturalandırma diliminin parçası
@@ -303,7 +314,7 @@ etrafında tek bir sabit anahtar. `GET .../plan` mevcut kilitsiz okumalarını k
 ve bayat olabilir.
 
 Sıra önemli: kilit faturalandırmayla iner, böylece hiç plan atamayan bir instance serileştirmenin
-bedelini hiç ödemez ve ADR 0027'nin "bir workspace'in yüklemelerini serileştirir" argümanı tam olarak
+bedelini hiç ödemez ve ADR 0027'nin "bir workspace'in tüm yüklemelerini serileştirir" argümanı tam olarak
 hakkında yazıldığı deployment'lar için doğru kalır.
 
 ### 10. Token tavanları plan niceliğidir, kataloğa ertelenir

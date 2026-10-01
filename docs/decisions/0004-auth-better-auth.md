@@ -5,6 +5,11 @@
 **Güncellendi:** 2026-08-09 — Faz 2 kalite sertleştirmesi: yalnızca Nest üzerinden org
 mutation'ları, Better Auth organization yazıları için HTTP firewall, paylaşılan
 `@kurul/auth-access` rolleri.
+**Güncellendi:** 2026-10-01 — Faz 2 kararındaki "Public API yanıtları "organization" kelimesini asla
+göstermez" ifadesi yalnız Nest `/workspaces/*` yanıtları için geçerlidir: kelime, firewall'un açık bıraktığı
+Better Auth okuma uçlarının yolunda (`/auth/organization/*`) ve firewall'un 403 mesajında ("Organization
+mutations must use the Nest workspace API (/workspaces).") geçer
+(`apps/api/src/auth/organization-http-firewall.ts`, `apps/api/src/auth/mount-better-auth.ts`).
 
 ## Bağlam
 

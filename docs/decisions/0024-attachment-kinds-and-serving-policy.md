@@ -11,12 +11,26 @@ sayıyor, dolayısıyla eski eşit-sayı yapılandırmasında yayınlanan limiti
 API'nin kontrolünü geçip proxy'de ölüyordu — gerçek istek şekli üzerinde ölçüldü ve #216'da
 düzeltildi. İki katmanın şimdi tuttuğu değişmez bir eşitlik değil bir sıralama —
 **proxy, API'nin kabul edeceği bir şeyi asla reddetmemeli** — `apps/api/src/storage/two-layer-limit.spec.ts`
-tarafından korunuyor ve [self-hosting.md](../self-hosting.md)'de belgeleniyor.
+tarafından korunuyor ve
+[self-hosting.md](../self-hosting.md#proxynin-sayısı-neden-26-mib-apininki-neden-25)'de belgeleniyor.
 **Güncellendi:** 2026-08-18 — `audit/phase-3-plan.md` ve `audit/ROADMAP.md`'ye satır numarasıyla
 yapılan atıflar, gitignore'lu `audit/` ağacı olmayan hiç kimse için çözülemez. Her biri, aşağıda
 (çevredeki metnin zaten taşıdığı yerde alıntılanarak, taşımadığı yerde ise açıklanarak) yerine
 getirdiği içeriği doğrudan taşıyacak şekilde yeniden yazıldı, bir kopyası olmayan bir dosyaya
 işaret etmek yerine.
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki
+"`self-hosting.md`'nin Türkçe kopyası, aynı PR'da" ifadesi kaldırılan İngilizce asıl + Türkçe ayna
+düzenine aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Gerekçe'deki bağımlılık paragrafı artık geçerli değil: `file-type`
+22.1.0'a yükseltildi ve `multer` (2.4.0) `apps/api/package.json`'a doğrudan bağımlılık olarak girdi;
+`attachment.module.ts` `memoryStorage`'ı ondan import ediyor, yani "`multer` transitive kalır — onu
+hiç import etmiyoruz" bugün yanlış (`file-type@21.3.4` ölçümü o sürüm için tarihsel olarak doğru).
+Gövdedeki `dosya:satır` atıfları yazıldıkları günkü kodu gösterir ve birçoğu kaymıştır (ör.
+`configure-app.ts`, `docker-compose.yml`, `task.service.ts`, `board.service.ts`,
+`comment.service.ts`, `cleanup.worker.ts`, `activity.ts`); ilgili sembolü adıyla arayın. `D3`, `D5`,
+`D7`, `D11`, "§7 karar 4" ve "satır 917-920" kaldırılan Faz-3 planının numaralarıdır ve bu depoda
+çözülemez.
 
 ## Bağlam
 
@@ -107,10 +121,11 @@ onları açık açık yazar.
 `image/png`, `image/jpeg`, `image/gif` ve `image/webp` `inline` servis edilir, çünkü 0022 zaten
 "inline preview covers images only" demişti ve görev panelindeki önizleme bunu gerektiriyor. Geri
 kalan her şey — PDF'ler dahil — `attachment` olarak servis edilir. Tipten ve disposition'dan
-bağımsız olarak **her** dosya eki cevabında üç başlık yolculuk eder: `X-Content-Type-Options:
-nosniff`, `Cross-Origin-Resource-Policy: same-origin` (API'nin `apps/api/src/common/configure-app.ts:46`
-satırında global olarak kurduğu `cross-origin` politikasını override ederek) ve istemcinin beyan
-ettiğinden değil **koklanmış** tipten alınan bir `Content-Type`.
+bağımsız olarak **her** dosya eki cevabında üç başlık yolculuk eder:
+`X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: same-origin` (API'nin
+`apps/api/src/common/configure-app.ts:46` satırında global olarak kurduğu `cross-origin`
+politikasını override ederek) ve istemcinin beyan ettiğinden değil **koklanmış** tipten alınan bir
+`Content-Type`.
 
 **Yeni socket event yok. ADR 0023'ün kararı yeniden verilmez, miras alınır.** Bir dosya eki
 mutasyonu kendini `{ workspaceId, boardId, actorId, taskId }` taşıyan bir
@@ -220,10 +235,10 @@ kalacağı biçimde yanlış yapılamaz.
 
 ## Gerekçe
 
-**`kind` neden bir kolon, bir çıkarım değil.** Alternatif bir enum kadar ucuz: `storageKey`,
+**`kind` neden bir kolon, bir çıkarım değil.** Alternatif bir enum eksiğiyle daha ucuz: `storageKey`,
 `mimeType` ve `size` null'lanabilir olur, `url` null'lanabilir olur ve "bu bir link mi" sorusu
 `mimeType === null` ile cevaplanır. Reddedildi, çünkü veritabanının zorlayabileceği bir değişmezi
-yalnızca uygulamanın hatırladığı bir değişmeze çevirir. Hem URL'i hem depolama anahtarı olan ya da
+yalnızca uygulamanın hatırladığı bir değişmeze çevirir. Hem `url`'i hem `storageKey`'i olan ya da
 ikisi de olmayan bir satırı hiçbir şey engellemez ve böyle bir satırı ilk oluşturan, gecenin
 üçünde toplu insert koşan bir importer olur. Faz planı tam bu başarısızlığı 917-920 satırlarında
 öngörmüştü — tip olmadan "P3-3 modeli zorlayarak taşır", yani her içe aktarılan satırda 0 boyut,
@@ -264,8 +279,9 @@ eklemeyi denemekten vazgeçtiği bir araçtır ve denetim, dosya eklerini bir de
 eksikler arasında birinci sıraya koydu. Bu yüzden varsayılan genişliktir. SVG, dışarıda tutulan tek
 görsel tipidir ve tam da bir üstündeki karar yüzünden dışarıdadır: SVG işaretlemedir, `<script>`
 taşıyabilir ve görseller bu ADR'ın `inline` servis ettiği tek ailedir. `image/svg+xml`'e izin
-vermek bir dosya tipi daha eklemek olmazdı — inline önizleme kararını, 0022'nin `default-src
-'none'` gücü için seçtiği API origin'inde saklanan bir cross-site scripting vektörüne çevirirdi.
+vermek bir dosya tipi daha eklemek olmazdı — inline önizleme kararını, 0022'nin
+`default-src 'none'` gücü için seçtiği API origin'inde saklanan bir cross-site scripting
+vektörüne çevirirdi.
 `text/html` aynı nedenle ve daha kısa bir mesafeden dışarıdadır; `security-headers.ts` onu zaten
 adlandırıyor ve 0022'nin Gerekçe'si o yorumu alıntılıyor. İçerik koklama iki durumu da kurtarmaz,
 çünkü iki dosya da gerçekten iddia ettikleri şeydir.

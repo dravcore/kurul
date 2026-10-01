@@ -3,6 +3,14 @@
 **Durum:** Kabul edildi
 
 **Tarih:** 2026-08-23
+**Güncellendi:** 2026-10-01 — (1) `typescript` bugün dört değil altı `package.json` dosyasında
+`^5.8.2` taşıyor: kök, `apps/api`, `apps/web`, `packages/auth-access`, `packages/shared-types` ve
+`e2e` (`e2e` paketi bu kayıttan önce eklenmişti); metindeki "dört" sayısı baştan eksikti ve her
+geçtiği yerde, Karar'daki tetikleyici PR adımı dahil, altı dosyayı anlatır. (2) Bekletme geçerliliğini
+koruyor (2026-10-01'de ölçüldü): `typescript-eslint` (lockfile'da 8.70.0, yayınlanmış en son 8.71.0)
+hâlâ `<6.1.0`, `ts-jest` (29.4.12 ve 29.4.14) hâlâ `<7` peer aralığını taşıyor; `typescript@latest`
+7.0.2, 7.1 yalnız `next` etiketinde. Bağlam'daki diğer sürüm numaraları yazıldıkları günün anlık
+görüntüsüdür (lockfile bugün `next` 16.3.6, `vitest` 4.1.11).
 
 ## Bağlam
 
@@ -102,7 +110,7 @@ yerine bu ADR'ye işaret edecek şekilde güncellendi.
 
 **Neden bir üst-sınır peer aralığı geçilebilir bir şey değil de sert bir engelleyici olarak
 ele alınıyor.** `pnpm install`, `typescript-eslint@8.67.0`'ın `<6.1.0` tavanına karşı
-`typescript@7` kurulumunu doğrudan reddediyor (`ERESOLVE`/peer dep hatası) ve bunu override'larla
+`typescript@7` kurulumunu doğrudan reddediyor (`ERESOLVE`/`peer dep` hatası) ve bunu override'larla
 zorlamak gerçekte neyin bozulduğunu değiştirmiyor: `ts-jest`'in kendi uyumluluk sayfası (yeniden
 açılan issue'sundan referanslanan), TypeScript 7'nin "ts-jest'in gerektirdiği JavaScript derleyici
 API'sini açığa çıkarmadığını" belgeliyor — transform kurulum anında değil, çalışma anında
@@ -115,8 +123,8 @@ yapamaz.
 7.1'in vaat edilen API ile çıkması gerekli ama yeterli değil — her iki bakımcının da ona karşı
 bir sürüm kesmesi gerekiyor, ve yukarıdaki `ts-jest` tarihçesi (`29.4.12`, issue çözümü iddiasıyla
 yayınlandı ve kullanıcılar peer aralığının değişmediğini bildirdikten günler sonra yeniden
-açıldı) "TypeScript 7'ye referans veren bir sürüm" ile "peer aralığı gerçekten genişleyen bir
-sürüm"ün aynı olay olmadığını gösteriyor. Yayınlanmış aralığı kontrol etmek, yarı doğru
+açıldı) "TypeScript 7'ye referans veren bir sürüm" ile "peer aralığı gerçekten 7'yi kabul eden
+bir sürüm"ün aynı olay olmadığını gösteriyor. Yayınlanmış aralığı kontrol etmek, yarı doğru
 olamayacak tek sinyal.
 
 **Neden bu depo geneli bir sabitleme, paket başına değil.** Dört `package.json` dosyası zaten

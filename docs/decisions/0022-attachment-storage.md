@@ -2,12 +2,24 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-14
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Bunların hepsinin
+Türkçe aynaları aynı PR'da taşınır" ifadesi kaldırılan İngilizce asıl + Türkçe ayna düzenine
+aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Karar'daki üç ayrıntı koddan sonra değişti. `StorageBackend` artık
+yalnız `write`, `read` ve `remove` taşımıyor: `read` `createReadStream` adını aldı, süpürme için
+`listKeys` ve kapanış için `close` eklendi (`apps/api/src/storage/storage-backend.ts`). Throttle
+dekoratörleri `ThrottleAttachmentUpload()` (dakikada 20) ve `ThrottleAttachmentDownload()`
+(dakikada 300) adını taşıyor (`apps/api/src/common/rate-limit/rate-limit.ts`). Süpürmenin penceresi
+`BACKUP_KEEP × BACKUP_INTERVAL`'ın kendisi değil, `BACKUP_KEEP`'i en az 1 sayan ve sonucu en az 24
+saate yükselten `orphanGraceMs()`'tir; ölçüt dosyanın mtime'ı, yani yükleme anıdır
+(`apps/api/src/retention/cleanup.worker.ts`).
 
 ## Bağlam
 
 Kurul insanlara bunu yapamadığını, üstelik nedenini de söyleyerek anlatıyor. `README.md`,
 ürünün `v0.1.0`'da olmadığı şeyler arasında "no task attachments" satırını taşıyor ve
-[ROADMAP.md — Beyond MVP](../../ROADMAP.md#beyond-mvp)'ye işaret ediyor; oradaki kayıt
+[ROADMAP.md — MVP ötesi](../../ROADMAP.md#mvp-ötesi)'ye işaret ediyor; oradaki kayıt
 `Task attachments — Needs an object-storage decision (ADR)` diyor.
 [tech-stack.md](../tech-stack.md) aynı şeyi öbür taraftan söylüyor: "File attachments are out of
 MVP scope. When added, pick an S3-compatible store." Bu doküman ikisinin de beklediği karardır.
@@ -117,16 +129,15 @@ gevşetmesi, ayrıca tartışılır.
 ## Gerekçe
 
 **Neden API origin'i, web origin'i değil.** Web uygulaması script çalıştıran bir tarayıcı
-yüzeyi, API değil; mesele tam da bu asimetri. Bu karar alındığında web CSP'si `script-src
-'self' 'unsafe-inline'` taşıyordu, yani o origin'deki bir markup enjeksiyonu zaten inline
-script çalıştırabiliyordu. O tarihten sonra bu, `'unsafe-inline'` içermeyen istek başına bir
+yüzeyi, API değil; mesele tam da bu asimetri. Bu karar alındığında web CSP'si
+`script-src 'self' 'unsafe-inline'` taşıyordu, yani o origin'deki bir markup enjeksiyonu zaten
+inline script çalıştırabiliyordu. O tarihten sonra bu, `'unsafe-inline'` içermeyen istek başına bir
 nonce'a sıkılaştırıldı; bu aradaki farkı daraltıyor ama argümanı kapatmıyor: web origin'i hâlâ
 script çalıştırıyor, hâlâ session cookie'sini taşıyor ve `style-src` hâlâ inline style'lara
 izin veriyor — dolayısıyla oradan servis edilen saldırgan kontrollü baytlar, hiçbir şey render
 etmeyen bir origin'den gelen aynı baytlardan bir saldırgan için kesinlikle daha değerli.
-API'nin
-CSP'si `default-src 'none'`, yani oradan doküman olarak açılan kullanıcı yüklemesi bir HTML dosyası
-hiçbir şey yükleyemez. `security-headers.ts` bu vektörü `X-Content-Type-Options` üstündeki yorumda
+API'nin CSP'si `default-src 'none'`, yani oradan doküman olarak açılan kullanıcı yüklemesi bir HTML
+dosyası hiçbir şey yükleyemez. `security-headers.ts` bu vektörü `X-Content-Type-Options` üstündeki yorumda
 tam olarak adlandırıyor — "a user-uploaded file served as `text/plain` that a browser decides to
 render as HTML". Attachment yanıtları ayrıca `Cross-Origin-Resource-Policy: same-origin` alır ve
 API'nin global olarak koyduğu `cross-origin` politikasını geçersiz kılar; çünkü origin dışından

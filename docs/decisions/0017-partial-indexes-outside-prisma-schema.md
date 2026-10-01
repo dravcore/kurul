@@ -2,6 +2,15 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-12
+**Güncellendi:** 2026-10-01 — Gerekçe'deki "beş testten üçünü anında kırmızıya çevirir" sayımı artık
+geçerli değil: `apps/api/test/due-soon-index.e2e-spec.ts` bir `pg_index` katalog testi kazandı ve altı test
+taşır; indeks düşerse dördü kırmızıya döner. Bağlam'daki "`prisma migrate dev`'in tam olarak drift dediği
+şey budur" ve Sonuçlar'daki "`prisma migrate dev` bu indeksi drift olarak bildirmeye devam edecek"
+anlatımı da bugünkü ölçümle örtüşmüyor: CI'daki drift kapısı (`pnpm db:drift`, altında
+`prisma migrate diff --exit-code`) bu kısmi indeks yerindeyken geçiyor, yani Prisma'nın drift denetimi onu
+fark olarak görmüyor (`.github/workflows/ci.yml`,
+`apps/api/prisma/migrations/20260818120000_attachment_kind_check/migration.sql`). Koruma testi, indeksi
+düşürecek elle yazılmış ya da yeniden üretilmiş bir migration'a karşı tek mekanik güvence olarak kalıyor.
 
 ## Bağlam
 

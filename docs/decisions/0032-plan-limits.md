@@ -2,13 +2,20 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-23
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe aynaları"
+ifadesi kaldırılan İngilizce asıl + Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir
+kopyası var; bkz. [ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — Karar'daki "`planLimit`, hata zarfının `details`'ten sonraki ikinci
+opsiyonel üyesi" ifadesi artık geçerli değil: hata zarfına 2026-09-24'te opsiyonel `detailsOmitted`
+üyesi eklendi (`apps/api/src/common/filters/all-exceptions.filter.ts`); `planLimit`'in kodu ve şekli
+değişmedi.
 
 ## Bağlam
 
 [ADR 0028](0028-open-contributions-hosted-service.md) gelirin nereden geldiğini karara bağladı:
-hosted bir hizmet, yayınlanan limitler içinde ücretsiz, üzerinde ücretli, ve limitler
-"operasyonel miktarlar (seat, board, storage, benzerleri), özellikler değil" diye tanımlandı. Bu
-ADR ayrıca bu repo için sonucu tek cümleyle adlandırdı: ürünün, açık kodda, bir self-hoster'ın
+hosted bir hizmet, yayınlanan limitler içinde ücretsiz, üzerinde ücretli, ve limitler "özellik
+değil, operasyonel büyüklüklerdir (koltuk, board, depolama ve benzeri)" diye tanımlandı. O ADR
+ayrıca bu repo için sonucu tek cümleyle adlandırdı: ürünün, açık kodda, bir self-hoster'ın
 istediği her şeye ayarlayabileceği ya da tamamen kapalı bırakabileceği bir plan-limit katmanı
 büyütmesi gerekiyor.
 

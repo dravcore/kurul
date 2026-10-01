@@ -19,6 +19,18 @@ indekse ulaşıyor, yani aşağıdaki takas o ikisi için hâlâ geçerli. Bu, A
 süpürmenin penceresini aştığı gözlemlenirse yeniden gözden geçir" şartının tam olarak tasarlandığı
 gibi işlemesi: karar, varsayımla değil ölçümle ve yalnızca ölçümün istediği yerde yeniden gözden
 geçirildi.
+**Güncellendi:** 2026-10-01 — Sonuçlar'ın son maddesindeki "Hesabının silinmesini isteyen bir kullanıcının
+hâlâ bir yolu yok" artık geçerli değil: talep üzerine silme [ADR 0026](0026-account-deletion-anonymisation.md)
+ile geldi (`DELETE /me`, `apps/api/src/account/account.controller.ts`; `DELETE /instance/users/:userId`,
+`apps/api/src/account/instance-account.controller.ts`).
+Karar'daki "Başka hiçbir şey silinmez" eksik: aynı gecelik koşu [ADR 0022](0022-attachment-storage.md)'nin
+yetim dosya taramasını da yapar (hiçbir `Attachment` satırının sahiplenmediği eski dosyalar diskten silinir)
+ve `UsagePing` satırları `ACTIVITY_RETENTION_DAYS` penceresini paylaşır; ikinci 2026-08-18 notundaki
+"telemetri-ping tablosu" terimi de yanıltıcıdır, `UsagePing` dışarı gönderilen telemetriyle değil aktivasyon
+hunisinin instance içi görüntüleme ping'iyle ilgilidir
+([ADR 0021](0021-activation-funnel-and-opt-in-telemetry.md); `apps/api/src/activation/activation.module.ts`).
+Süpürme bir BullMQ zamanlayıcısıyla koşar: `REDIS_URL` tanımsızsa hiç başlamaz
+(`apps/api/src/retention/cleanup.worker.ts`).
 
 ## Bağlam
 

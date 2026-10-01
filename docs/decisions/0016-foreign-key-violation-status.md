@@ -2,6 +2,12 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-12
+**Güncellendi:** 2026-10-01 — Gerekçe'deki "`WorkspaceMember.user`, `Task.createdBy`, `TaskAssignee.user`,
+`Comment.user` ve `Activity.user` alanlarının hepsi `onDelete: Restrict` taşır" sayımı bugün eksik:
+`User`'a giden `Restrict` FK'ler yedi tanedir, `WorkspaceInvitation.inviter` ve `Attachment.uploadedBy` de
+dahil (`apps/api/prisma/schema.prisma`). [ADR 0026](0026-account-deletion-anonymisation.md)'dan beri hesap
+silme `User` satırını silmez, anonimleştirir (`apps/api/src/account/account-deletion.service.ts`); bu
+yüzden "engellenmiş silme" biçimi API'den erişilemez ve `P2003`'ün gerçekçi kaynağı kaybedilmiş yarıştır.
 
 ## Bağlam
 

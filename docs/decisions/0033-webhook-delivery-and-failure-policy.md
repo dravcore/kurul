@@ -2,13 +2,17 @@
 
 **Durum:** Önerildi
 **Tarih:** 2026-08-26
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe
+aynasıyla", "Türkçe aynasına", "Türkçe aynası" ve "Türkçe aynaları" ifadeleri kaldırılan İngilizce
+asıl + Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md).
 
 ## Bağlam
 
 [ADR 0031](0031-api-versioning.md), webhook'ları 1.0 sıralamasının sonuna koydu, çünkü "imzalı
-teslim ve bir hata politikası kendi ADR'lerini ve işaret edecekleri bir kontratı hak ediyor". Bu, o
-ADR. Henüz hiçbir şema, route ve queue yokken yazıldı; böylece aşağıdaki sorular bir kez, burada
-karara bağlanıyor, onları hayata geçiren pull request'te yeniden tartışılmıyor.
+teslimat ve bir başarısızlık politikası kendi ADR'lerini ve işaret edecekleri bir kontratı hak
+eder". Bu, o ADR. Henüz hiçbir şema, route ve queue yokken yazıldı; böylece aşağıdaki sorular bir
+kez, burada karara bağlanıyor, onları hayata geçiren pull request'te yeniden tartışılmıyor.
 
 [ROADMAP.md](../../ROADMAP.md)'nin "API 1.0" bölümü bugünkü şartnamenin tamamı: tam olarak üç
 event (`task.created`, `task.moved`, `task.completed`), "workspace başına, operatörün yapılandırdığı
@@ -81,8 +85,8 @@ yazılmamış bir sonucu. Tek takımla çalışan kendi kendine barındırılan 
 takım aynı insanlar, dolayısıyla (a) onlara kusursuz hizmet eder. Barındırılan instance'ta operatör
 Dravcore'dur; yani (a) altında ödeme yapan her workspace bize ait tek bir URL ve tek bir sırrı
 paylaşır ve müşteri kullanılabilir hiçbir webhook alamaz. Bariz kaçış yolu aynı ADR'de kapalı:
-ücretli farklar "operasyonel nicelikler (koltuk, board, depolama ve benzeri), özellik değil", yani
-webhook'lar bir katman olarak satılamaz. O hâlde (a) altında webhook'lar **yalnızca kendi kendine
+ücretli farklar "özellik değil, operasyonel büyüklüklerdir (koltuk, board, depolama ve benzeri)",
+yani webhook'lar bir katman olarak satılamaz. O hâlde (a) altında webhook'lar **yalnızca kendi kendine
 barındıranlara ait bir özelliktir** ve daha azına sahip olan, barındırılan üründür. Bu, barındırılan
 servisin ne için var olduğunu tersine çevirir: müşterinin satın aldığı şey sunucu işletmek zorunda
 olmamaktır, bunun karşılığında daha küçük bir ürün almak değil.
@@ -114,9 +118,9 @@ yine payload'da yolculuk eder; o veridir, tetikleyici değil. Saklanan satıra b
 `DashboardService.countCompletedMovesByDay`) ve satırın anlamını değiştirmek onların sayılarını
 değiştirirdi. Filtre event tanımında yaşar.
 
-`task.completed`'ın **activity satırı yoktur, türetilir**, tam bir kez, `fromColumnCategory !=
-COMPLETED` ve `toColumnCategory == COMPLETED` olan bir `task.moved` geçişinden. Dördü de bilinçli
-olan dört doğal sonuç:
+`task.completed`'ın **activity satırı yoktur, türetilir**, tam bir kez,
+`fromColumnCategory != COMPLETED` ve `toColumnCategory == COMPLETED` olan bir `task.moved`
+geçişinden. Dördü de bilinçli olan dört doğal sonuç:
 
 - **`CANCELED` tamamlanmış değildir.** [ADR 0019](0019-column-category.md) iki kategoriyi ayrı
   tutuyor ve "Yapmayacağız"a bırakılmış bir kart bitirilmiş değildir.
@@ -211,7 +215,7 @@ ilk pod yeniden başlatmasında yanlış hâle getirirdi.
 
 **Yalnızca `2xx` başarıdır.** `3xx` bir hatadır ve **takip edilmez**: bir yönlendirme, doğrulanmış
 genel bir hostname'in `169.254.169.254`'e bir isteğe dönüşme yoludur. `4xx` ve `5xx` ikisi de hatadır
-ve ikisi de yeniden denenir, çünkü "payload'ın yanlış" ile "ben ayaktayım değilim" ayrımı, alıcının
+ve ikisi de yeniden denenir, çünkü "payload'ın yanlış" ile "ben ayakta değilim" ayrımı, alıcının
 bir kesinti sırasında güvenilir biçimde yapabildiği bir ayrım değildir.
 
 **Redis yoksa webhook da yok.** `REDIS_URL` API process'i için opsiyoneldir ve mevcut iki worker
@@ -290,9 +294,9 @@ ve söylenmemiş hiçbir şeyi süpürmeyen `retentionSettings()`'ine eklenir.
 İki indeks, şimdi kararlaştırılıyor çünkü sonradan eklemek şemadaki en büyük tabloya karşı bir
 migration demek: cursor'lu liste için `(endpointId, id)`
 ([api-conventions.md](../api-conventions.md#pagination) cursor'ları her zaman `id` üzerinden
-anahtarlar, asla bir sıralama kolonu üzerinden değil) ve bekleyen süpürme için `(status,
-nextAttemptAt)` üzerinde kısmi bir indeks. Bu, [ADR 0020](0020-data-retention.md)'nin saklama
-indekslerindeki önce-ölç duruşuna bilinçli bir istisnadır ve ölçüm
+anahtarlar, asla bir sıralama kolonu üzerinden değil) ve bekleyen süpürme için
+`(status, nextAttemptAt)` üzerinde kısmi bir indeks. Bu, [ADR 0020](0020-data-retention.md)'nin
+saklama indekslerindeki önce-ölç duruşuna bilinçli bir istisnadır ve ölçüm
 [#187](https://github.com/dravcore/kurul/issues/187)'dir: mevcut indekssiz süpürmeler çok daha küçük
 tablolarda bilinen bir maliyettir.
 
@@ -444,7 +448,7 @@ hacimli tabloda daha kısa bir pencere, gecelik süpürmenin maliyetini de orant
 
 | Alternatif                                                                                       | Neden değil                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (a) Instance için operatörün yapılandırdığı `WEBHOOK_URL`                                        | M'e karşı L kadar ucuz, ama barındırılan her workspace Dravcore'un URL'ini paylaşırdı ve ADR 0028 çözümü bir özellik olarak satmayı yasaklıyor. Webhook'ları yalnızca kendi kendine barındıranlara ait kılar                    |
+| (a) Instance için operatörün yapılandırdığı `WEBHOOK_URL`                                        | L yerine M, yani daha ucuz, ama barındırılan her workspace Dravcore'un URL'ini paylaşırdı ve ADR 0028 çözümü bir özellik olarak satmayı yasaklıyor. Webhook'ları yalnızca kendi kendine barındıranlara ait kılar                |
 | (c) Önce operatör, sonra workspace endpoint'leri                                                 | Yalnızca zarf ve imzayı kurtarır, ki bu kayıt onları zaten sabitliyor; iki yapılandırma yolunu ya sonsuza kadar yaşatır ya da bir self-host `.env`'ini kırar                                                                    |
 | Operatör yapılandırmasında workspace başına hedefler                                             | Bir `InstanceSetting` tablosu ve instance-admin yazma route'ları gerektirir; kaçınmaya çalıştığı workspace tablosundan daha büyük bir yeni yüzeydir                                                                             |
 | Mailer gibi commit sonrası ateşle-ve-unut                                                        | Tasarım gereği en-fazla-bir-kere; roadmap'in "en-az-bir-kere" iddiası ilk yeniden başlatmada yanlış olurdu ve commit ile gönderim arasındaki bir çökme event'i kayıtsız kaybeder                                                |

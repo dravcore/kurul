@@ -20,6 +20,19 @@
 > [self-hosting.md](../self-hosting.md#attachment-kotalarının-artık-varsayılanı-var)'de.
 > Aşağıdaki gövde yazıldığı gibi bırakıldı.
 
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "Türkçe aynalar aynı
+PR'da" ifadesi kaldırılan İngilizce asıl + Türkçe ayna düzenine aittir, anılan dokümanların artık
+tek bir kopyası var; bkz. [ADR 0036](0036-turkish-only-documentation.md).
+**Güncellendi:** 2026-10-01 — (1) Workspace başına kota artık plan katmanı üzerinden çözülüyor
+([ADR 0032](0032-plan-limits.md)): `Workspace.planLimits` içinde `storageBytes` olan workspace o
+sayıyı, diğerleri `ATTACHMENT_WORKSPACE_QUOTA_BYTES`'ı kullanır; ret, hata zarfı ve `0` = sınırsız
+aynı kaldı. (2) Karar'daki "İki kota da `0` iken hiç sorgu atılmaz" cümlesi artık yalnız toplam
+sorguları için doğru: her yükleme plan çözümlemesi için `Workspace.planLimits`'i bir kez okur.
+(3) Ertelenenlerden "Kullanım okuması"nın endpoint yarısı var: `GET /workspaces/{workspaceId}/plan`
+canlı `usage.storageBytes`'ı, `GET /config` instance tavanlarını yayınlıyor
+(`apps/api/src/plan/plan-limits.service.ts`); arayüz depolama kullanımını göstermiyor.
+(4) Sonuçlar'daki `rate-limit.ts` satır atfı kaymıştır; atıf yapılan yorum aynı dosyada duruyor.
+
 ## Bağlam
 
 Attachment yükleme yolunun dosya başına bir tavanı (`ATTACHMENT_MAX_BYTES`,
@@ -80,8 +93,8 @@ Dosya başına limitin 413'ü ise standart `"Payload Too Large"` taşır. İstem
 ([api-conventions.md](../api-conventions.md#hatalar)); ve bu, tek route üzerinde durum kodunun
 hangi çözümü önereceğini tek başına söyleyemediği ilk hata çiftidir: daha küçük bir dosya, dolu
 bir workspace'i düzeltmez. `507 Insufficient Storage` reddedildi: `AllExceptionsFilter` her
-5xx'i tasarım gereği hata izlemeye raporlar; kota reddi, yapılandırmanın çalışmasıdır, sunucunun
-bozulması değil.
+5xx'i tasarım gereği hata izlemeye raporlar; kota reddi, API'nin yapılandırıldığı gibi
+çalışmasıdır, sunucunun bozulması değil.
 
 **Ertelenenler, her biri tetikleyicisiyle:**
 

@@ -29,7 +29,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0017](0017-partial-indexes-outside-prisma-schema.md)  | Kısmi İndeksler Migration'larda Yaşar, Testlerle Korunur                                                                             | Kabul edildi                                          | 2026-08-12 |
 | [0018](0018-localization-strategy.md)                  | Yerelleştirme Stratejisi: URL Yönlendirmesi Olmadan next-intl                                                                        | Kabul edildi                                          | 2026-08-12 |
 | [0019](0019-column-category.md)                        | Kolon Tamamlanmışlığı Bir Kategoridir, Ad Değil                                                                                      | Kabul edildi                                          | 2026-08-12 |
-| [0020](0020-data-retention.md)                         | Veri Saklama: Tablo Başına Pencereler, Gecelik Bir Süpürme ile                                                                       | Kabul edildi                                          | 2026-08-14 |
+| [0020](0020-data-retention.md)                         | Veri Saklama: Tablo Başına Pencereler, Gecelik Bir Süpürme ile Uygulanır                                                             | Kabul edildi                                          | 2026-08-14 |
 | [0021](0021-activation-funnel-and-opt-in-telemetry.md) | Aktivasyon Hunisi Instance İçinde, Telemetri Opt-In ve Varsayılan Kapalı                                                             | Kabul edildi                                          | 2026-08-14 |
 | [0022](0022-attachment-storage.md)                     | Dosya Eki Depolaması: Bir Port Arkasında Yerel Disk, API Origin'inden Servis                                                         | Kabul edildi (tip ve limit kararları 0024'te verildi) | 2026-08-14 |
 | [0023](0023-checklist-data-model.md)                   | Checklist Veri Modeli: Kart Başına Çoklu Liste, Türetilmiş İlerleme, Yeni Realtime Event Yok                                         | Kabul edildi                                          | 2026-08-14 |
@@ -45,6 +45,7 @@ Kurul, aktif geliştirme öncesinde ve sırasında küçük bir ekip (çoğunluk
 | [0033](0033-webhook-delivery-and-failure-policy.md)    | Webhook Teslimi ve Hata Politikası: Workspace'e Ait Endpoint'ler, Bir Outbox Satırı ve İmzalı Bir Zarf                               | Önerildi                                              | 2026-08-26 |
 | [0034](0034-hosted-billing-and-plan-assignment.md)     | Barındırılan Faturalandırma ve Plan Ataması: Bir Merchant of Record, Tek Bir Subscription Satırı ve Yapılandırılmadığında Hiçbir Şey | Önerildi                                              | 2026-08-26 |
 | [0035](0035-inline-task-composer.md)                   | Satır İçi Task Composer: Column'un Dibinde Tek Bir Oluşturma Yolu ve Bir Başlık İçin Dialog Yok                                      | Kabul edildi                                          | 2026-08-26 |
+| [0036](0036-turkish-only-documentation.md)             | Dokümantasyon Yalnız Türkçe                                                                                                          | Kabul edildi                                          | 2026-10-01 |
 
 Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Superseded** (yerini aldı) olarak değişebilir (örn. `**Durum:** [0012](0012-....md) tarafından yerini aldı`).
 
@@ -53,7 +54,7 @@ Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Supersede
 1. Aşağıdaki şablonu yeni bir dosyaya kopyala: `docs/decisions/NNNN-kebab-title.md`, burada `NNNN` sıradaki bir sonraki sıfırla-doldurulmuş dört haneli sayı.
 2. Her bölümü doldur, hiçbir yeri placeholder olarak bırakma.
 3. Yukarıdaki dizin tablosuna bir satır ekle.
-4. Bir PR aç. Tartışma PR üzerinde gerçekleşir; merge edildikten sonra ADR'in durumu `Accepted` olur ve kayıt tarihsel olarak ele alınır (sonraki kararları yerini alma yoluyla düzenle, geçmişi yeniden yazarak değil).
+4. Bir PR aç. Tartışma PR üzerinde gerçekleşir; karar PR'da verildiyse merge edildikten sonra ADR'in durumu `Kabul edildi` olur ve kayıt tarihsel olarak ele alınır (sonraki kararları yerini alma yoluyla düzenle, geçmişi yeniden yazarak değil). Karar henüz verilmemişse ADR `Önerildi` durumuyla merge edilebilir (0033 ve 0034 böyle) ve karar verildiğinde durumu hem ADR'de hem dizinde `Kabul edildi` yapılır.
 
 ## Şablon
 
@@ -62,8 +63,7 @@ Bir durum daha sonra, kendisinin yerini alan ADR'e bir bağlantıyla **Supersede
 
 **Durum:** Önerildi | Kabul edildi | [NNNN](NNNN-file.md) tarafından yerini aldı
 **Tarih:** YYYY-AA-GG
-
-> 🌐 [English (kanonik)](../../decisions/NNNN-kebab-title.md) | Türkçe (bu çeviri güncel olmayabilir; kanonik kaynak İngilizce'dir)
+**Güncellendi:** YYYY-AA-GG — ne değişti, tek cümle (opsiyonel: yalnız kayıt merge'den sonra düzeltilirse)
 
 ## Bağlam
 

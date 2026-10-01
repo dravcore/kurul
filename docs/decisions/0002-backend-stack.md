@@ -11,6 +11,14 @@ hatasında açık kalmak yerine sınırlı, süreç başına bellek-içi bir say
 SEC-03). Kalan nüans şu: Nest `ThrottlerModule`'ün kendisi hâlâ Redis kullanmıyor — sayaçları
 kütüphanenin varsayılan bellek-içi deposu, yani yalnızca Better Auth'un kendi limiter'ı bir Redis
 işi, API'nin genel amaçlı olanı değil.
+**Güncellendi:** 2026-10-01 — Sonuçlar'daki iki ifade artık geçerli değil. `PrismaService` havuzun yaşam
+döngüsünü `OnModuleInit`/`OnModuleDestroy` içinde sahiplenmiyor: tek sahibi `apps/api/src/prisma/database.ts`'tir,
+istemciler `registerPoolConsumer` ile kaydolur ve havuz `onApplicationShutdown`'da kapanır
+([architecture.md §9.1](../architecture.md#91-kapanış-sırası-fazı-nest-seçer-havuzun-sahibi-tek-modüldür)).
+Redis de "katı bir runtime bağımlılığı" değil, opsiyoneldir: `REDIS_URL` tanımsızsa API tek instance olarak
+açılır, ama Socket.io adaptörü bağlanmaz, due-soon ve saklama zamanlayıcıları başlamaz, auth rate-limit
+sayaçları ve upload byte bütçesi süreç belleğinde tutulur (`apps/api/src/health/health.service.ts`,
+`apps/api/src/notification/due-soon.worker.ts`, `apps/api/src/retention/cleanup.worker.ts`).
 
 ## Bağlam
 
@@ -27,7 +35,7 @@ Backend'in; solo/küçük ekip tarafından geliştirilen, realtime'a eğilimli, 
 - Frontend ile aynı dil, `packages/shared-types`'ı mümkün kılıyor — task/board tipleri bir kez tanımlanıp her iki tarafça da tüketiliyor, bu da veri modeli her değiştiğinde gerçek zaman kazandırıyor.
 - OSS PM alternatiflerinin çoğu (Plane, Taiga) hızlı CRUD ve ücretsiz bir admin paneli için Django kullanıyor; realtime senkronizasyon öncelik haline geldiğinde — ki burada durum bu — uçtan uca TypeScript daha güçlü seçim haline geliyor.
 - **Drizzle yerine Prisma:** ikisi de 2026'da üretime hazır. Drizzle SQL'e yakın kontrol ve en küçük footprint'i (~7.4kb) sunuyor; Prisma ise şema-öncelikli bir akış, olgun bir ekosistem ve zengin tooling (Prisma Studio) sunuyor. Prisma 7, Rust engine bağımlılığını kaldırarak tarihsel bundle boyutu şikayetini büyük ölçüde çözdü. Prisma'nın rehberli migration'ları ve kapsamlı dokümantasyonu solo çalışırken hata ayıklama süresinden tasarruf sağlıyor — Drizzle'ın performans avantajı ORM katmanında yaşıyor ve pratikte DB round-trip'i (5–50ms) bu farkı gölgede bırakıyor.
-- **Postgres + Redis** neredeyse tartışmasız bir tercih: hem ticari emsaller (ClickUp, Linear) hem de OSS emsaller (Plane, Taiga, Focalboard) Postgres kullanıyor — JSON alanları esnek metadata'yı (custom field'lar) karşılıyor, ilişkisel bütünlük task/board ilişkilerini karşılıyor. Redis, dört ihtiyacı karşılayan tek bir araç: bildirim kuyruğu, session store, rate limiting ve Socket.io pub/sub adapter'ı.
+- **Postgres + Redis** neredeyse tartışmasız bir tercih: hem ticari emsaller (ClickUp, Linear) hem de OSS emsaller (Plane, Taiga, Focalboard) Postgres kullanıyor — JSON alanları esnek metadata'yı (custom field'lar) karşılıyor, ilişkisel bütünlük task/board ilişkilerini karşılıyor. Redis, Socket.io pub/sub adapter'ını ve BullMQ tabanlı due-soon bildirim kuyruğunu karşılıyor. Session'lar PostgreSQL'de yaşıyor (Better Auth); HTTP rate limiting henüz bağlanmadı — bu ikisi karar anında öngörülen Redis işleriydi ve bugünkü runtime kullanımları değil.
 - **PostgreSQL 18, mevcut major sürüm.** Bir önceki major'ı sabitlemek yıllarca desteklenebilir olurdu, ama sessizce: greenfield bir projenin bir sürüm geride başlamak için hiçbir nedeni yok. Burada asıl mesele deadline — resmi `postgres` imajı, farklı bir major tarafından initialize edilmiş bir `PGDATA` volume'üne karşı başlamayı reddediyor, yani v0.1 çıktıktan sonraki her major atlama her self-hoster için bir `pg_dump`/restore işi demek. Şimdi yapılırsa hiçbir maliyeti yok. PostgreSQL 19 beta aşamasında ve kasıtlı olarak atlanıyor.
 - **Redis 8, lisans için.** Redis 7.4–7.8 yalnızca RSALv2/SSPLv1 — source-available, OSI açık kaynak değil. Redis 8, OSI onaylı bir seçeneği geri getirdi: **AGPLv3** — Kurul'un kendisinin de altında dağıtıldığı lisans (bkz. [0007](0007-license-agpl.md)) — böylece self-hoster'ın çektiği stack uçtan uca lisans-uyumlu oluyor. Valkey (BSD-3-Clause, Linux Foundation'ın Redis 7.2.4 fork'u) protokol uyumlu ve aşağı akışta izinli bir lisans gerekirse tek satırlık bir imaj değişikliği olarak duruyor. Postgres pininin aksine, Redis 7 → 8 geçişi yerinde, RDB/AOF uyumlu bir upgrade ve deadline taşımıyor.
 

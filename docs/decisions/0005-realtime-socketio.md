@@ -3,6 +3,12 @@
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-08
 **Güncellendi:** 2026-08-08 — "standart seçim" gerekçesine dayanmak yerine, Redis adapter'ın ne zaman gerçekten gerekli olduğunu belirtir.
+**Güncellendi:** 2026-10-01 — Gerekçe'deki "zaten katı bir bağımlılık olan bir Redis" artık geçerli değil,
+Sonuçlar'daki "kanıtlanmış bir yatay ölçekleme yolu mevcut" ise eksik: Redis adapter yalnız `REDIS_URL`
+tanımlıyken bağlanır, tanımsızsa API uyarıyla ve tek instance olarak açılır
+(`apps/api/src/realtime/realtime.gateway.ts`); istemci önce `websocket`, olmazsa `polling` dener
+(`apps/web/lib/socket.ts`), bu yüzden birden fazla instance'ta polling isteklerinin aynı instance'a gitmesi
+için yük dengeleyicide yapışkan oturum gerekir.
 
 ## Bağlam
 

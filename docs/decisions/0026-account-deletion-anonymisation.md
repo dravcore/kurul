@@ -5,15 +5,22 @@
 **Güncellendi:** 2026-08-18 — silme akışı artık ayrılan kullanıcıya gönderilmiş her `WorkspaceInvitation` satırını da — hangi durumda olursa olsun — kaldırıyor: `email` düz bir sütun ve `User` satırını anonimleştirmek ona hiç dokunmuyordu, yani gerçek adres silme talebinden sağ çıkıyordu (denetim bulgusu DB-01).
 **Güncellendi:** 2026-08-18 — `session.cookieCache.maxAge` (`api/src/auth/auth.ts`) 5 dakikadan 60 saniyeye indi; aşağıda silinen hesabın çerez penceresini anlatan "beş dakika" rakamları artık tarihsel: bu ADR'ın kabul ettiği gerçek pencere şu an 60 saniyeye kadar (denetim bulgusu SEC-01).
 **Güncellendi:** 2026-08-26: parola sıfırlama artık yapılandırıldı (`emailAndPassword.sendResetPassword`), yani `reset-password:<token>` gerçekten yazılan bir `Verification` satırı. Silme işlemindeki `Verification` silmesi, adres koşulunun yanına bir kullanıcı id'si koşulu kazandı; aşağıdaki sonuç maddesi de buna göre yeniden yazıldı (denetim bulgusu SEC-01, özellik boşluğu).
+**Güncellendi:** 2026-10-01 — (1) Karar'daki "Yalnızca o kişiye ait olan her şey ... hard delete
+edilir" listesi personal access token'ları saymıyordu: 2026-08-23'ten beri silme akışı kullanıcının
+bütün workspace'lerdeki token satırlarını da iptal etmeden siler (log satırında
+`accessTokensDeleted`; `apps/api/src/account/account-deletion.service.ts`). (2) Karar'ın 3. ve 4.
+bölümleri yalnız `GET /me/deletion-preview`'ı anıyor; instance yöneticisi için aynı önizleme
+`GET /instance/users/:userId/deletion-preview` olarak da var
+(`apps/api/src/account/instance-account.controller.ts`).
 
 ## Bağlam
 
 [ADR 0020](0020-data-retention.md), bu kararı adıyla anan ve vermeyi reddeden bir cümleyle
 kapanıyordu:
 
-> Bu ADR, **talep üzerine silmeyi** (GDPR md. 17 / KVKK md. 7) ele almıyor. Hesabının silinmesini
-> isteyen bir kullanıcının hâlâ hiçbir yolu yok, çünkü `Restrict` foreign key'ler çıplak bir
-> `DELETE FROM "User"` ifadesini tasarım gereği imkânsız kılıyor.
+> Bu ADR talep üzerine silmeyi (GDPR md. 17 / KVKK md. 7) **kapsamıyor**. Hesabının silinmesini
+> isteyen bir kullanıcının hâlâ bir yolu yok, çünkü `Restrict` yabancı anahtarlar tasarım gereği
+> çıplak bir `DELETE FROM "User"`'ı imkânsız kılıyor.
 
 Problemin tamamı bu ve "bir düğme yok" demekten daha kötü. Denetim bulgusu DB-05 bunu ölçtü:
 `grep -rn 'deleteUser' apps/` hiçbir şey döndürmüyor, Better Auth konfigürasyonunda
@@ -248,12 +255,12 @@ gereken iki şey var:
 ## Sonuçlar
 
 - **Bir GDPR/KVKK silme talebi, kullanıcı ya da operatör tarafından, tek bir istekte
-  uygulanabilir.** 5 000 task, 5 000 yorum ve 20 000 aktivite satırı olan bir workspace'e karşı
-  ölçüldü: 5 000 task, 5 000 yorum (2 500'ü ayrılan kullanıcıyı adıyla anıyor), 20 000 aktivite
-  satırı (4 000'i `targetName` taşıyor) ve 1 000 atamalı bir workspace'e karşı `DELETE /me` uçtan
-  uca **1 050 ms**'de döndü — istek girdi, `204` çıktı, her şey commit'lendi. ≤30 dakikalık
-  metriği sınırlayan şey veritabanı değil, preview'ı okuyan insan. Apple M3 Max, loopback API ve
-  Postgres; arada proxy ve konteyner yok — yani bunu bir deployment rakamı değil, taban kabul edin.
+  uygulanabilir.** Ölçüldü: 5 000 task, 5 000 yorum (2 500'ü ayrılan kullanıcıyı adıyla anıyor),
+  20 000 aktivite satırı (4 000'i `targetName` taşıyor) ve 1 000 atamalı bir workspace'e karşı
+  `DELETE /me` uçtan uca **1 050 ms**'de döndü — istek girdi, `204` çıktı, her şey
+  commit'lendi. ≤30 dakikalık metriği sınırlayan şey veritabanı değil, preview'ı okuyan insan.
+  Apple M3 Max, loopback API ve Postgres; arada proxy ve konteyner yok — yani bunu bir deployment
+  rakamı değil, taban kabul edin.
 - **`DELETE FROM "User"` hâlâ imkânsız ve hâlâ bilinçli olarak öyle.** Bu ADR'de hiçbir şey bir
   operatörün elle yazdığı `DELETE`'i çalışır kılmıyor. Desteklenen yol endpoint.
 - **Bir yorum thread'i yapısı bozulmadan, yazarı adsız olarak ayakta kalır.** Yanıtlar hâlâ anlam

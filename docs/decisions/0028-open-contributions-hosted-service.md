@@ -8,6 +8,11 @@
 > `docs/cla.md`'yi `docs/archive/cla-draft.md`'ye taşıyan sonuç uygulandı ve bir gün sonra geçersiz
 > kaldı; taslak artık yalnızca git geçmişinde.
 
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Sonuçlar'daki "iki README" ifadesi
+kaldırılan İngilizce asıl + Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir kopyası
+var; bkz. [ADR 0036](0036-turkish-only-documentation.md). Doküman katkıları artık Türkçe yazılır;
+arayüz dil kataloglarına çeviri katkıları bundan etkilenmez.
+
 ## Bağlam
 
 [ADR 0007](0007-license-agpl.md) AGPL-3.0'ı seçti. [ADR 0014](0014-dual-licensing-cla.md) bunun

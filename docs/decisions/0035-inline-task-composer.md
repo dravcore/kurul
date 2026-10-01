@@ -2,12 +2,23 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-26
+**Güncellendi:** 2026-10-01 — (1) Karar §5'teki "Guard, `/` kısayolunun zaten kullandığı guard'dır"
+ifadesi bugünkü kodla örtüşmüyor: `c` guard'ı `/`'ninkinden geniştir, açık bir dialog'un ya da task
+panelinin içinde de döner ve panel 768 px altında board'u örterken kısayol kapalıdır
+(`apps/web/components/board/use-create-task-shortcut.ts`). Board'da açık bir composer varsa `c` onu
+odaklar; ilk column'un composer'ı yalnız hiçbiri açık değilken açılır, çünkü yazılmış bir başlık §2
+gereği kaybolmamalıdır (`apps/web/components/board/board-canvas.tsx`). (2) Sonuçlar'daki "arrow'ların
+onun içinde hareket ettiği" ifadesi de bugünkü davranışı anlatmıyor: board'un roving tab durağı
+column başlıkları arasındadır ve `Home`, `End` ile `Ctrl` + ok tuşlarıyla gezilir; çıplak ok
+tuşlarını board hiç bağlamaz, onlar bir column içindeki klavye sürüklemesine ve composer'daki imlece
+aittir (`board-canvas.tsx`). Bkz. [design.md](../design.md) §5.
 
 ## Bağlam
 
 [design.md](../design.md) §5, board'u bloklamasına izin verilen etkileşimleri sayıyor:
-"Confirmations, board creation, and destructive actions stay **dialogs**; those genuinely need to
-block." Task oluşturmak bu listede yok, hiçbir zaman da olmadı. Yine de bir dialog'u var.
+"Confirmation'lar, board oluşturma ve destructive aksiyonlar **dialog** olarak kalır; onların
+gerçekten block etmesi gerekir." Task oluşturmak bu listede yok, hiçbir zaman da olmadı. Yine de bir
+dialog'u var.
 
 `apps/web/components/task/create-task-dialog.tsx` 68 satır. Tek bir `Input`'u `title`'a bağlayan
 bir `FormDialog` render ediyor, `{ title, columnId }` gövdesini
@@ -136,8 +147,8 @@ hızlı ekleme dialog'una ihtiyacı var" cümlesidir.
 
 - **Composer'daki bir regresyon task oluşturmayı imkânsız kılar.** Geri düşülecek bir dialog
   kalmadı ve hata kısmi değil tam bir hatadır. Bu yüzden iki yol da
-  `e2e/tests/board-composer.spec.ts` ile kapsanır (`pnpm test:browser`): klavye yolu (`Add
-task`'a ulaş, `Enter`, yaz, `Enter`, iki kez üst üste; focus hâlâ boşalmış alandadır ve
+  `e2e/tests/board-composer.spec.ts` ile kapsanır (`pnpm test:browser`): klavye yolu
+  (`Add task`'a ulaş, `Enter`, yaz, `Enter`, iki kez üst üste; focus hâlâ boşalmış alandadır ve
   `Escape` onu butona geri verir) ve imleç yolu (`Add task`'a tıkla, yaz, `Open details`, panel
   yeni task üzerinde açılır). İkisi de bir reload ile biter, yani doğrulanan şey sunucunun
   sakladığıdır. Bileşen testleri bunun yerine geçemez, çünkü bozulan şey gerçek bir tarayıcıdaki

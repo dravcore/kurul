@@ -2,6 +2,14 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-14
+**Güncellendi:** 2026-10-01 — Karar'daki "Kimler okuyabilir" ve Sonuçlar'daki "altı toplama
+taraması" bugün farklı. `INSTANCE_ADMIN_EMAILS` artık yalnız huniyi okuma yetkisi vermiyor: aynı
+`InstanceAdminGuard`, bir başkasının hesabını anonimleştiren `DELETE /instance/users/:userId`'i de
+koruyor ([ADR 0026](0026-account-deletion-anonymisation.md),
+`apps/api/src/account/instance-account.controller.ts`); yani listeye bir adres yazmak salt okunur
+bir ekrandan fazlasını, yıkıcı bir yetkiyi de verir. Huni sorgusu `Activity` üzerinde altı ayrı
+tarama değil, `FILTER`'lı tek bir geçiştir (`apps/api/src/activation/activation.service.ts`);
+cache'lenmemesi geçerli.
 
 ## Bağlam
 

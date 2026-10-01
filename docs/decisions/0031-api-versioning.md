@@ -43,7 +43,7 @@ kurallar yürürlükte kalır, ve şimdi görünecek bir versiyon segmenti, proj
 kaydın önemli olan kısmıdır: önek yaygın bir seçimdir, ve bunu yazıya dökmenin sebebi kimsenin
 alternatifleri bir PR yorumunda yeniden açmamasını sağlamaktır.
 
-**Sıralama: önce kişisel erişim token'ları, sonra `/v1`, sonra webhook'lar.** Token'lar önekiz
+**Sıralama: önce kişisel erişim token'ları, sonra `/v1`, sonra webhook'lar.** Token'lar öneksiz
 route'lara karşı ilk gönderilir. Önek 1.0'da gelir, tarayıcı olmayan ve kararlı bir path'in bir
 değer taşıdığı bir çağıran ortaya çıktığında. Webhook'lar en sona kalır, çünkü imzalı teslimat ve
 bir başarısızlık politikası kendi ADR'lerini ve işaret edecekleri bir kontratı hak eder. Her adım
@@ -82,7 +82,7 @@ yok saymayı öğretir, ve kontrat hareket ederken `v1`'e pinlenmiş bir önek d
 gelmelidir.
 
 **Neden önekten önce token'lar.** Web uygulaması olmayan bir çağıran ortaya çıkana kadar önek
-kimseyi korumaz. Kişisel erişim token'ları bu ilk çağırandır, ve bugünün önekiz route'larına karşı
+kimseyi korumaz. Kişisel erişim token'ları bu ilk çağırandır, ve bugünün öneksiz route'larına karşı
 çalışırlar çünkü token'ı geçerli kılan versiyon değildir; dolayısıyla bağımlılık önce token'lar
 sonra önek şeklinde işler, asla tersi değil. Webhook'lar tam tersi sebeple en sondadır: bunlar
 API'nin dışarıyı çağırmasıdır, teslimat formatı kendi başına bir kontrattır, ve bu kontrat önek
@@ -98,7 +98,7 @@ tarafından yeniden kırılmak yerine `/v1`'in şekillerine karşı yazılmalıd
   karar verilir; bu kayıt bir tanesinin olacağına söz verir, ne kadar süreceğine değil.
 - [api-conventions.md](../api-conventions.md#versiyonlama)'nin 1.0-öncesi bölümü, öneki ekleyen
   release'e kadar yürürlükte kalır, ve o release'in changelog girdisi migration notudur.
-- Kişisel erişim token'ları önekiz route'lara karşı gönderilir ve önek geldikten sonra da çalışmaya
+- Kişisel erişim token'ları öneksiz route'lara karşı gönderilir ve önek geldikten sonra da çalışmaya
   devam eder: token bir kullanıcıyı ve bir workspace'i tanımlar, ve ikisi de yerinden oynamaz.
 - ROADMAP'ın "API 1.0" bölümü kapsamı korur ve sıra için buraya link verir; bu kayıt gerekçedir, o
   bölüm ise durumdur.

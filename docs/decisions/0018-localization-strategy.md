@@ -5,6 +5,17 @@
 **Güncellendi:** 2026-08-21: aşağıdaki iki key sayısı farklı anların fotoğrafı ve o zamandan beri
 birlikte ilerledi: `en.json` ve `tr.json` bugün her biri 514 yaprak key taşıyor, katalog-parity
 kapısının şart koştuğu gibi hâlâ birbirine eşit.
+**Güncellendi:** 2026-10-01 — dokümantasyon artık yalnız Türkçe; Bağlam'daki "İngilizce kanonik + `docs/tr`
+aynası" ve Sonuçlar'daki "`docs/tr/**` içinde ise İngilizce kalır" ifadeleri kaldırılan İngilizce asıl +
+Türkçe ayna düzenine aittir, anılan dokümanların artık tek bir kopyası var; bkz.
+[ADR 0036](0036-turkish-only-documentation.md). Rol adlarının dokümanda İngilizce kalması kuralı `docs/**`
+için sürüyor. Ürün yerelleştirme kararı (arayüzde `en` ve `tr`, `messages/en.json` kanonik) değişmedi.
+**Güncellendi:** 2026-10-01 — Başlıktaki 2026-08-21 notunun key sayıları anlık görüntüdür: `en.json` ve
+`tr.json` bugün her biri 603 yaprak key taşıyor, eşitliği `apps/web/messages/catalog.test.ts` korumaya
+devam ediyor. Gerekçe'deki `apps/web/middleware.ts` Next 16 ile `apps/web/proxy.ts` oldu ve `PUBLIC_PATHS`
+bugün `/forgot-password` ile `/reset-password`'ü de tutuyor. Çözümleme zinciri `apps/web/i18n/user-locale.ts`'te
+(`resolveRequestLocale`) yaşar ve `i18n/request.ts` onu çağırır; dil çerezi istemcide
+`apps/web/lib/locale-cookie.ts` ile yazılır.
 
 ## Bağlam
 

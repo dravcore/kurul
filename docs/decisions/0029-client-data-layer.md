@@ -2,6 +2,16 @@
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-08-23
+**Güncellendi:** 2026-10-01 — (1) Karar'daki tetikleyici komutun bugünkü ölçümü, `apps/web` kaynak
+ağacında (derleme çıktısı `.next` ve `node_modules` hariç; yani
+`--include='*.ts' --include='*.tsx' --exclude-dir=.next --exclude-dir=node_modules` ile):
+`grep -rn "GenerationRef" apps/web` sekiz satır döndürür (iki dosya, iki sayaç: `moveGenerationRef`
+ve `switchGenerationRef`; ADR'nin eklendiği commit'in kaynak ağacında da sekiz satırdı);
+`grep -rln "GenerationRef" apps/web` iki dosya, `grep -rn "GenerationRef = useRef" apps/web` iki
+satır döndürür. `.next` derleme çıktısı olan bir checkout'ta aynı komutlar o çıktıyı da taradığı
+için daha fazla satır sayar. (2) Kural 4'ün ("Socket payload'ları id'dir; istemci yeniden çeker")
+tek istisnası `task:moved`'dır: payload `columnId` ve `position` da taşır ve istemci bunları
+doğrudan yerel satıra yazar (`apps/web/components/board/use-board-realtime.ts`).
 
 ## Bağlam
 
@@ -155,7 +165,7 @@ query kütüphanesiyle de bedava değil; bunlar migration'dan değişmeden çık
 ## Sonuçlar
 
 - **Aktivite akışının önü açıldı.** Beyond MVP satırındaki
-  [Realtime push of the activity feed](../../ROADMAP.md#beyond-mvp) bu ADR'yi bekliyordu, ve
+  [Realtime push of the activity feed](../../ROADMAP.md#mvp-ötesi) bu ADR'yi bekliyordu, ve
   beklediği şey "bunu hangi katmanda inşa edeceğim" sorusunun cevabıydı. Artık zaten var olan ve
   yeni bir state eklemeyen deyimle inşa edilebilir: panelin yorum yolu bunu zaten yapıyor.
   `use-board-realtime.ts`'in `onCommentAdded`'ı seçili görev için `metaRefreshKey`'i artırır, bu
@@ -165,9 +175,9 @@ query kütüphanesiyle de bedava değil; bunlar migration'dan değişmeden çık
   sunucu tarafından sıralanan bir akış için dördüncü bir optimistic yazım ya da üçüncü bir
   generation sayacı getirmektir; eğer buna ihtiyacı olduğu ortaya çıkarsa, bu tetikleyicinin
   ateşlenmesi demektir ve akış migration'ı bekler.
-- 1. kural, `useApiResource`'ı yeni okuma ekranları için varsayılan cevap yapar; bu bir kolaylık
-     olduğu kadar katkıcılar üzerinde bir kısıtlamadır: incelemede özel bir fetch üçlüsü artık
-     karşılaştırılacağı bir belgeye sahip.
+- Kural 1, `useApiResource`'ı yeni okuma ekranları için varsayılan cevap yapar; bu bir kolaylık
+  olduğu kadar katkıcılar üzerinde bir kısıtlamadır: incelemede özel bir fetch üçlüsü artık
+  karşılaştırılacağı bir belgeye sahip.
 - Katman bilinen boşluklarını korur; sonradan keşfedilmek yerine adlandırılmış: bileşenler arası
   istek dedupe'u yok, pencere odaklandığında refetch yok, arka plan staleness'ı yok. Bunlardan
   herhangi biri istendiğinde yerel ve dar kapsamlı olarak çözüldü; `lib/use-poll-fallback.ts`'in
@@ -190,6 +200,3 @@ query kütüphanesiyle de bedava değil; bunlar migration'dan değişmeden çık
 | Şimdiden genel, iç kaynaklı bir `useMutation` sarmalayıcısı            | Optimistic şekilleri farklı olan üç çağrı noktası (bir liste yeniden sıralama, iki alan patch'i, yeniden sayılan bir özet) her biri için bir kaçış kapısına ihtiyaç duyar; geriye soyutlama artı özel durumlar kalır                                     |
 | Bunun yerine bir dosya boyutu ya da çağrı noktası sayısı tetikleyicisi | Katmanlaşmanın belirtilerini sayar, zorluğun belirtilerini değil; `use-board-data.ts` bu aynı PR'de mantık değişmeden %58 küçüldü                                                                                                                        |
 | Tetikleyici yok, "acıttığında" yeniden gözden geçir                    | Bu ADR'nin sona erdirmek için var olduğu durum tam olarak bu: soru ekran başına yeniden tartışıldı ve soranın cevabı geçerli oldu                                                                                                                        |
-
-</content>
-</invoke>
