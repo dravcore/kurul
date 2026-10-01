@@ -1,66 +1,66 @@
-# Anonymised real Trello exports
+# Anonimleştirilmiş gerçek Trello export'ları
 
-Every `*.json` file in this directory is a **real** Trello board export that went through
-`scripts/anonymise-trello-export.mjs` before it was committed. Nothing here is hand-written:
-the point of the directory is that its structure came from Trello, not from this repository's
-memory of Trello (see [`../README.md`](../README.md) and
+Bu dizindeki her `*.json` dosyası, commit edilmeden önce `scripts/anonymise-trello-export.mjs`
+betiğinden geçmiş **gerçek** bir Trello board export'udur. Burada hiçbir şey elle yazılmış değildir:
+dizinin amacı, yapısının Trello'dan gelmesi, bu repository'nin Trello hakkındaki hafızasından
+gelmemesidir (bkz. [`../README.md`](../README.md) ve
 [ADR 0025](../../../../../../docs/decisions/0025-trello-import-mapping.md)).
 
-The anonymiser keeps the export's shape byte for byte (keys, key order, array lengths, nulls,
-booleans, numbers, dates, colours, `closed` flags, every id relationship) and replaces every
-piece of text with deterministic pseudonyms of the same length and shape. What the importer
-reads is unchanged; what a person wrote is gone.
+Anonimleştirici export'un şeklini bayt bayt korur (anahtarlar, anahtar sırası, dizi uzunlukları,
+null'lar, boolean'lar, sayılar, tarihler, renkler, `closed` bayrakları, her id ilişkisi) ve her
+metin parçasını aynı uzunlukta ve şekilde deterministik takma adlarla değiştirir. Importer'ın
+okuduğu şey değişmez; bir insanın yazdığı şey gider.
 
-## Fixtures
+## Fixture'lar
 
-| Fixture                    | Board                                                                  | Seed    | Exported   | Counts                                                                                   |
-| -------------------------- | ---------------------------------------------------------------------- | ------- | ---------- | ---------------------------------------------------------------------------------------- |
-| `starter-guide-board.json` | Trello's own default "Starter Guide" board                             | `kurul` | 2026-08-22 | 4 lists, 7 cards, 6 labels, 7 checklists / 22 items, 6 attachments, 1 member, 0 comments |
-| `eleven-list-board.json`   | An eleven-list board, exported the same day to widen the shape covered | —       | 2026-08-22 | 11 lists, 11 cards, 6 labels, 0 checklists, 14 actions                                   |
+| Fixture                    | Board                                                                            | Seed    | Export edildi | Sayılar                                                              |
+| -------------------------- | -------------------------------------------------------------------------------- | ------- | ------------- | -------------------------------------------------------------------- |
+| `starter-guide-board.json` | Trello'nun kendi varsayılan "Starter Guide" board'u                              | `kurul` | 2026-08-22    | 4 liste, 7 kart, 6 label, 7 checklist / 22 öğe, 6 ek, 1 üye, 0 yorum |
+| `eleven-list-board.json`   | On bir listeli bir board, kapsanan şekli genişletmek için aynı gün export edildi | —       | 2026-08-22    | 11 liste, 11 kart, 6 label, 0 checklist, 14 action                   |
 
-Both import cleanly end to end through `trello-import-real.e2e-spec.ts`; the field-mapping diffs
-they turned up (none on a field the reader uses) are recorded in
-[`../README.md`](../README.md#field-mapping-diffs).
+İkisi de `trello-import-real.e2e-spec.ts` üzerinden uçtan uca temiz şekilde import edilir; ortaya
+çıkardıkları alan eşleme farkları (hiçbiri okuyucunun kullandığı bir alanda değil)
+[`../README.md`](../README.md#alan-eşleme-farkları) içinde kayıtlıdır.
 
-## Adding one
+## Yenisini eklemek
 
-1. In Trello: board menu, **More**, **Print and export**, **Export as JSON**. Save the file.
-2. Run the anonymiser, with a seed of your own if you do not want the pseudonyms to be
-   reproducible from the original:
+1. Trello'da: board menüsü, **More**, **Print and export**, **Export as JSON**. Dosyayı kaydedin.
+2. Anonimleştiriciyi çalıştırın; takma adların orijinalden yeniden üretilebilir olmasını
+   istemiyorsanız kendi seed'inizle:
 
    ```bash
    node scripts/anonymise-trello-export.mjs ~/Downloads/board.json \
      apps/api/test/fixtures/trello/real/<short-name>.json --seed <anything>
    ```
 
-3. Read the summary it prints. An unrecognised top-level key or a string replaced under a key
-   the script did not know to carry text is worth a look before committing: the value was
-   anonymised (the safe default), but a non-text value may have lost its shape. Numbers are
-   kept verbatim, so a board that used the Map power-up carries its `coordinates` across.
-4. Skim the output for anything the script could not have known was personal. The file is
-   public once it is pushed.
-5. Add a row to the fixture table in [`../README.md`](../README.md) and, after the first run,
-   fill in the **Field-mapping diffs** table there.
+3. Yazdırdığı özeti okuyun. Tanınmayan bir üst düzey anahtar ya da betiğin metin taşıdığını
+   bilmediği bir anahtar altında değiştirilmiş bir string, commit etmeden önce göz atmaya değer:
+   değer anonimleştirildi (güvenli varsayılan), ama metin olmayan bir değer şeklini kaybetmiş
+   olabilir. Sayılar olduğu gibi korunur, bu yüzden Map power-up'ını kullanmış bir board
+   `coordinates` alanını da olduğu gibi taşır.
+4. Çıktıya, betiğin kişisel olduğunu bilemeyeceği herhangi bir şey için göz gezdirin. Dosya push
+   edildiği anda herkese açıktır.
+5. [`../README.md`](../README.md) içindeki fixture tablosuna bir satır ekleyin ve ilk koşudan sonra
+   oradaki **Alan eşleme farkları** tablosunu doldurun.
 
-Keep the file under `TRELLO_IMPORT_MAX_BYTES` (20 MiB by default): the harness imports it
-through the real endpoint with the production limit and does not raise it, because a real
-export that does not fit is a finding, not a test-setup problem. A board with a few hundred
-cards is a few megabytes. The script writes the output the way the input was formatted, so
-Trello's minified single line stays a single line; do not pretty-print the export first, that
-alone grows it by half.
+Dosyayı `TRELLO_IMPORT_MAX_BYTES` altında tutun (varsayılan 20 MiB): harness onu gerçek endpoint
+üzerinden production limitiyle import eder ve limiti yükseltmez, çünkü sığmayan bir gerçek export
+bir bulgudur, test kurulumu sorunu değil. Birkaç yüz kartlı bir board birkaç megabayttır. Betik
+çıktıyı girdinin biçimlendirildiği şekilde yazar, bu yüzden Trello'nun minify edilmiş tek satırı tek
+satır kalır; export'u önce pretty-print etmeyin, bu tek başına boyutunu yarısı kadar artırır.
 
-## What reads it
+## Onu ne okuyor
 
-`apps/api/test/trello-import-real.e2e-spec.ts` picks up every `*.json` here at module load and
-imports each one end to end through `POST /workspaces/:id/imports/trello` as an admin. The
-expected counts are derived from the file itself by the rules ADR 0025 states (archived lists
-and cards are skipped, unnamed ones are malformed, attachments become links when their scheme
-is `http` or `https`, comments and members are counted and dropped), and compared with both the
-import report and the rows in the database. A failure is not necessarily a bug in the test: it
-is the first place a difference between Trello's schema and this repository's idea of it shows
-up, and the export wins. Record what you found in the diffs table and fix the importer.
+`apps/api/test/trello-import-real.e2e-spec.ts`, buradaki her `*.json` dosyasını modül yüklenirken
+alır ve her birini bir admin olarak `POST /workspaces/:id/imports/trello` üzerinden uçtan uca import
+eder. Beklenen sayılar dosyanın kendisinden ADR 0025'in belirttiği kurallarla türetilir (arşivlenmiş
+listeler ve kartlar atlanır, isimsiz olanlar malformed sayılır, ekler şemaları `http` ya da `https`
+olduğunda link'e dönüşür, yorumlar ve üyeler sayılır ve düşürülür) ve hem import raporuyla hem de
+veritabanındaki satırlarla karşılaştırılır. Bir başarısızlık mutlaka testteki bir bug değildir:
+Trello'nun şeması ile bu repository'nin onun hakkındaki fikri arasındaki farkın ilk göründüğü
+yerdir ve kazanan export'tur. Bulduğunuzu farklar tablosuna kaydedin ve importer'ı düzeltin.
 
-If this directory ever holds no `*.json` again, that spec reports exactly one skipped test named
-`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)`, so an open gate
-stays visible in every CI run rather than showing nothing at all. With the two files above in
-place, it runs one test per file instead.
+Bu dizin bir gün yeniden hiç `*.json` içermezse, o spec
+`no anonymised real Trello exports in fixtures/trello/real yet (v0.3.0 gate)` adlı tam olarak bir
+atlanmış test bildirir; böylece açık bir kapı, hiçbir şey göstermemek yerine her CI koşusunda görünür
+kalır. Yukarıdaki iki dosya yerindeyken ise dosya başına bir test koşar.
