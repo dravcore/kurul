@@ -13,7 +13,8 @@ import { validationExceptionFactory, type ValidationDetail } from './validation-
  *
  * These tests are the only mechanical guard that each field is on the side it belongs to;
  * flipping a decorator by hand compiles, passes typecheck, and silently changes the contract
- * in `docs/api-conventions.md` ("sending `null` explicitly clears a nullable field").
+ * in `docs/api-conventions.md` ("HTTP verb'leri ve status kodları": a `PATCH` that sends
+ * `null` explicitly clears a nullable field).
  */
 
 type Metatype = new () => object;

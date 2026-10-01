@@ -1802,7 +1802,7 @@
             }
           }
         },
-        "summary": "Deletes the caller's account: `204`, and the session it was sent with is over.\n\nThe cookies are cleared on the way out because Better Auth's `session.cookieCache` answers\nfrom a signed cookie for up to 60 seconds without consulting the database, so deleting\nthe `Session` rows does not by itself stop this browser presenting a valid session. Clearing\nthem here closes that window for the browser that asked — which is every browser on this\npath (ADR 0026 §\"Consequences\" covers the administrator path, where it cannot be closed).\n\n`403` on a demo instance: the demo is one shared account, and deleting it empties the demo\nfor every other visitor until the next reset. `DemoRestrictedGuard` carries the full list\nof what a demo refuses and why.",
+        "summary": "Deletes the caller's account: `204`, and the session it was sent with is over.\n\nThe cookies are cleared on the way out because Better Auth's `session.cookieCache` answers\nfrom a signed cookie for up to 60 seconds without consulting the database, so deleting\nthe `Session` rows does not by itself stop this browser presenting a valid session. Clearing\nthem here closes that window for the browser that asked — which is every browser on this\npath (ADR 0026 covers the administrator path, where it cannot be closed).\n\n`403` on a demo instance: the demo is one shared account, and deleting it empties the demo\nfor every other visitor until the next reset. `DemoRestrictedGuard` carries the full list\nof what a demo refuses and why.",
         "tags": ["Account"],
         "security": [
           {

@@ -477,7 +477,8 @@ export function planTrelloImport(
   // ## Checklists
   //
   // One `Checklist` row per Trello checklist, never flattened — the reason ADR 0023 chose a
-  // multi-list model in the first place (`0023-checklist-data-model.md:122-127`).
+  // multi-list model in the first place (`docs/decisions/0023-checklist-data-model.md`,
+  // "Gerekçe": "Neden tek düzey yerine çoklu liste.").
   const checklistsByTaskId = new Map<string, TrelloChecklist[]>();
   for (const checklist of source.checklists) {
     const taskId =

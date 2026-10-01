@@ -50,7 +50,7 @@ export class AccountController {
    * from a signed cookie for up to 60 seconds without consulting the database, so deleting
    * the `Session` rows does not by itself stop this browser presenting a valid session. Clearing
    * them here closes that window for the browser that asked — which is every browser on this
-   * path (ADR 0026 §"Consequences" covers the administrator path, where it cannot be closed).
+   * path (ADR 0026 covers the administrator path, where it cannot be closed).
    *
    * `403` on a demo instance: the demo is one shared account, and deleting it empties the demo
    * for every other visitor until the next reset. `DemoRestrictedGuard` carries the full list

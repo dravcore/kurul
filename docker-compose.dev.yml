@@ -13,7 +13,7 @@
 # never create, recreate, or drop anything the other owns, and both can run at once. This is a
 # one-time rename for anyone with an existing dev-loop database under the old shared name — its
 # containers/volumes are simply orphaned, not migrated; recreate with `pnpm bootstrap` (the dev
-# database has always been throwaway by design, see "Full stack in Docker" in
+# database has always been throwaway by design, see "Docker'da tam stack" in
 # docs/development.md). scripts/bootstrap.mjs needed no change: it already invokes compose with
 # only `-f`, never `-p`, so it picks up this project name automatically.
 name: kurul-dev

@@ -226,13 +226,13 @@ describe('dead animation utility classes', () => {
 });
 
 /**
- * Tailwind's own size and weight scale, the half of "no gap left for a Tailwind default to fill
- * unnoticed" (docs/design.md §3) the scan above cannot see: `text-sm` resolves to real CSS, so
- * the "resolves every scanned class" check above is satisfied by it, and only a denylist can
- * still catch it. Kurul's scale is `text-display`/`stat`/`title-lg`/`title`/`read`/`body`/
- * `small`/`micro` (each a `@theme inline` step with its own line-height, and the heading and
- * stat steps their own weight); a raw Tailwind size or weight class is always a Kurul step
- * recreated by hand instead of named, off the theme's own line-height and unable to move with it.
+ * Tailwind's own size and weight scale, the half of docs/design.md §3's closed-scale rule (no gap
+ * for a Tailwind default to fill unnoticed) the scan above cannot see: `text-sm` resolves to real
+ * CSS, so the "resolves every scanned class" check above is satisfied by it, and only a denylist
+ * can still catch it. Kurul's scale is `text-display`/`stat`/`title-lg`/`title`/`read`/`body`/
+ * `small`/`micro` (each a `@theme inline` step with its own line-height, and the heading and stat
+ * steps their own weight); a raw Tailwind size or weight class is always a Kurul step recreated by
+ * hand instead of named, off the theme's own line-height and unable to move with it.
  *
  * `font-semibold` (600) is in this set too, per the brief's literal "font-thin through
  * font-black": Tailwind's own weight-scale order places `semibold` inside that range. Every call

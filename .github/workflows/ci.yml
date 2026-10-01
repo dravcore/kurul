@@ -226,7 +226,7 @@ jobs:
         run: pnpm openapi:check
 
   # -----------------------------------------------------------------------------------
-  # ROADMAP.md, Hardening track: every PR builds the images this project ships and fails on a
+  # ROADMAP.md, "Sağlamlaştırma hattı": every PR builds the images this project ships and fails on a
   # HIGH/CRITICAL CVE. Until now the only thing that ever built a Dockerfile was
   # release-images.yml, which runs on a tag push, so a broken build or a vulnerable base image
   # was discovered at release time, by the workflow whose whole job is to publish it.

@@ -65,9 +65,9 @@ afterEach(() => {
 
 describe('ImportTrelloDialog', () => {
   /**
-   * The user-facing half of "there is no idempotency" (ADR 0025). Said afterwards it explains a
-   * mess; said here it prevents one — so the assertion is that it is on screen *before* anything
-   * has been sent, not merely that the string exists somewhere.
+   * The user-facing half of the no-idempotency decision (ADR 0025, "İdempotans neden yok"). Said
+   * afterwards it explains a mess; said here it prevents one — so the assertion is that it is on
+   * screen *before* anything has been sent, not merely that the string exists somewhere.
    */
   it('warns that a second import makes a second board, before the file is sent', () => {
     renderDialog();

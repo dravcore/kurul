@@ -12,7 +12,7 @@ import {
  *
  * ADR 0035 removed the create dialog: the inline composer at the foot of a column is now the
  * only way a task comes into being, so a regression there is total rather than degraded, and
- * the ADR's own Consequences section says both paths are covered here.
+ * the ADR's own "Sonuçlar" section says both paths are covered here.
  *
  * What only a browser can answer is where the caret is. The composer's contract is a sequence
  * of focus moves (Enter creates and *leaves* focus in an emptied field so the next title can be

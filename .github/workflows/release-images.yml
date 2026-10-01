@@ -391,9 +391,8 @@ jobs:
       # pointers only for a release. `v{{version}}` is the odd one out and it is a bug fix, not
       # a preference. `{{version}}` strips the `v` — upstream's own table has git tag `v1.2.3`
       # producing `1.2.3` — while every place in this repository that tells an operator how to
-      # pin a release says `TAG=vX.Y.Z`: README.md, README.tr.md, docs/self-hosting.md,
-      # docs/development.md (three times), their Turkish mirrors, and the comment beside
-      # `image:` in docker-compose.yml.
+      # pin a release says `TAG=vX.Y.Z`: README.md, docs/self-hosting.md,
+      # docs/development.md (three times) and the comment beside `image:` in docker-compose.yml.
       #
       # `enable=` on the last two is what keeps a rehearsal from being mistaken for a release.
       # `{{major}}.{{minor}}` and `latest` are moving pointers: an operator who follows

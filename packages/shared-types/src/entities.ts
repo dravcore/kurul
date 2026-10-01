@@ -30,10 +30,10 @@ export interface InstanceConfigDto {
   /**
    * Whether this deployment stores attachments at all — i.e. whether `STORAGE_PATH` is set.
    *
-   * A capability, like `mailEnabled`, never tenant state (`docs/api-conventions.md:175-177`).
-   * The web reads it to decide whether to render the upload control. The *link* control does
-   * not depend on it: a LINK needs no storage, so an instance with no `STORAGE_PATH` can still
-   * attach links.
+   * A capability, like `mailEnabled`, never tenant state (`docs/api-conventions.md`, "Instance
+   * yapılandırması"). The web reads it to decide whether to render the upload control. The *link*
+   * control does not depend on it: a LINK needs no storage, so an instance with no `STORAGE_PATH`
+   * can still attach links.
    */
   attachmentsEnabled: boolean;
   /**

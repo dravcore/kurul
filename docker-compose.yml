@@ -149,18 +149,19 @@ services:
     # next boot, value intact after `GET`, capability set never touching DAC_OVERRIDE.
     cap_add: [SETUID, SETGID]
     # OPS-05 (2026-08-18 audit) — see postgres's mem_limit above for why a ceiling exists at all.
-    # 128m: this instance holds cache entries, sessions, rate-limit counters and the notification
-    # queue (see REDIS_PASSWORD below), never board data, so its working set is small and bounded
-    # by what the app puts in it rather than by request-sized client input the way api's is.
+    # 128m: this instance holds the auth rate-limit and upload-budget counters, the BullMQ job
+    # schedulers and the Socket.io pub/sub fan-out (see REDIS_PASSWORD below), never board data or
+    # sessions, so its working set is small and bounded by what the app puts in it rather than by
+    # request-sized client input the way api's is.
     mem_limit: 128m
     environment:
-      # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds cache entries,
-      # sessions, rate-limit counters and the notification queue — no board data (see
-      # "Redis is not backed up" in docs/development.md#yükseltme-ve-yedekleme) — so requiring
-      # a password here would break every existing deployment's docker-compose.yml on upgrade
-      # for comparatively little gain. Leave it unset and redis keeps behaving exactly as
-      # before; set it in .env to add defense in depth against another container reachable on
-      # the same Docker network.
+      # Optional, unlike POSTGRES_PASSWORD above: this Redis instance holds the auth rate-limit and
+      # upload-budget counters, the BullMQ job schedulers and the Socket.io pub/sub fan-out — no
+      # board data and no sessions (see "Redis yedeklenmez." in
+      # docs/development.md#yedekten-geri-dönme) — so requiring a password here would break every
+      # existing deployment's docker-compose.yml on upgrade for comparatively little gain. Leave it
+      # unset and redis keeps behaving exactly as before; set it in .env to add defense in depth
+      # against another container reachable on the same Docker network.
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     # Exec form, and substituted by Compose itself (`${REDIS_PASSWORD:-}`, not the
     # `$$REDIS_PASSWORD` escape used elsewhere in this file for values read inside a
@@ -172,16 +173,16 @@ services:
     # same trap this replaces) and a string with a trailing blank argument silently loses
     # it, whereas the array passes an explicit empty element through to `redis-server`.
     #
-    # `--maxmemory ${REDIS_MAXMEMORY:-100mb}` under the 128m `mem_limit` above, for the reason
-    # api's NODE_OPTIONS pins V8's heap under its own ceiling: a limit Redis knows about ends in
-    # a logged `OOM command not allowed when used memory > 'maxmemory'` that the API already
-    # survives (its rate limiters fall back to process memory while Redis is erroring, and a
-    # cache miss is a cache miss), where the cgroup's ends in a bare exit 137 that `restart:
-    # unless-stopped` turns into a loop. `noeviction` rather than an LRU policy because BullMQ's
-    # queues (the notification and retention workers in apps/api) live here, BullMQ requires it,
-    # and an evicted job is a job that silently never runs: a full Redis must refuse writes, not
-    # drop keys. The 28m between the two, at the default, is for what maxmemory does not count,
-    # mostly the RDB save fork's copy-on-write pages and client buffers.
+    # `--maxmemory ${REDIS_MAXMEMORY:-100mb}` under the 128m `mem_limit` above, for the reason api's
+    # NODE_OPTIONS pins V8's heap under its own ceiling: a limit Redis knows about ends in a logged
+    # `OOM command not allowed when used memory > 'maxmemory'` that the API already survives (its
+    # auth and upload-budget rate limiters fall back to process memory while Redis is erroring),
+    # where the cgroup's ends in a bare exit 137 that `restart: unless-stopped` turns into a loop.
+    # `noeviction` rather than an LRU policy because the BullMQ job schedulers behind the due-soon
+    # and cleanup workers (apps/api) live here, BullMQ requires it, and an evicted scheduler record
+    # is a job that silently never runs: a full Redis must refuse writes, not drop keys. The 28m
+    # between the two, at the default, is for what maxmemory does not count, mostly the RDB save
+    # fork's copy-on-write pages and client buffers.
     #
     # `REDIS_MAXMEMORY` in `.env` raises the ceiling without editing this file; raise `mem_limit`
     # above alongside it. Check `used_memory_human` first on an instance that is already running
@@ -268,8 +269,8 @@ services:
       # Where the read-only attachments mount lands. Blank would skip the file archive
       # entirely; it is set unconditionally because the volume exists on every deployment and
       # an instance with attachments off simply archives an empty directory. ADR 0020 rejected
-      # cold-storage archiving as "a file on the same disk that nobody reads and nobody
-      # restores" — the answer here is not that the files are visible to users, but that this
+      # cold-storage archiving as a file on the same disk that nobody reads and nobody
+      # restores — the answer here is not that the files are visible to users, but that this
       # copy is read and restored on the same rehearsed schedule as the dump beside it.
       ATTACHMENT_DIR: /attachments
       # The off-host target, blank by default: an rclone remote path such as

@@ -96,7 +96,7 @@ describe('planTrelloImport', () => {
 
       // Ids ascend ...310 (Backlog) < ...311 (In Progress) < ...312 (Shipped); ...313 is the
       // archived one. A Trello id's leading hex digits are its creation time, so this is
-      // "the order they were made", which is the fallback ADR 0025 chose over a coin flip.
+      // the order they were made, which is the fallback ADR 0025 chose over a coin flip.
       expect(plan.columns.map((column) => column.name)).toEqual([
         'Backlog',
         'In Progress',
@@ -843,7 +843,8 @@ describe('planTrelloImport', () => {
 
     it('issues a fresh set of ids on every run, so two imports are two boards', () => {
       // The control half of the test above: stripping ids would also make two *identical* plans
-      // compare equal, and ADR 0025's "no idempotency" decision says they must not be.
+      // compare equal, and ADR 0025's no-idempotency decision ("İdempotans neden yok") says
+      // they must not be.
       const read = readFixture('synthetic-full-board');
       const first = planTrelloImport(read, CONTEXT);
       const second = planTrelloImport(read, CONTEXT);

@@ -162,8 +162,9 @@ type TextDeclaration = (typeof TEXT_DECLARATIONS)[number];
  *
  * And the second layer holds regardless: the file is stored and served with
  * `charset=utf-8`, `Content-Disposition: attachment` and `nosniff`, so even a document that
- * slipped past all four is downloaded rather than rendered. That is the defence
- * ADR 0022:118-126 already names; this function keeps it from being the *only* one.
+ * slipped past all four is downloaded rather than rendered. That is the defence ADR 0022
+ * ("Gerekçe", "Neden API origin'i, web origin'i değil.") already names; this function keeps it
+ * from being the *only* one.
  *
  * **Accepted cost:** the whole buffer is decoded, up to `ATTACHMENT_MAX_BYTES`. Reading only a
  * prefix would be cheaper and would defeat condition 3 — a NUL a megabyte in is exactly the case

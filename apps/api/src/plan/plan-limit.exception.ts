@@ -7,10 +7,10 @@ import { PLAN_LIMIT_ERROR, type PlanLimitCode, type PlanLimitDetail } from '@kur
  * **403, with its own `error`.** That is the ADR 0027 move, one status along: the quota reused
  * `413` (already taken by the per-file size limit) and told the two apart by the envelope's
  * `error` field, because the status alone cannot say which fix to suggest. Here `403` is
- * already taken by "your role is too low" (`docs/api-conventions.md`), and a ceiling needs the
- * opposite advice: no role change helps, somebody has to free a seat or raise a number. So the
- * status stays the honest one (authenticated, understood, refused) and `PLAN_LIMIT_ERROR`
- * carries the distinction.
+ * already taken by a role that is too low (`docs/api-conventions.md`, "HTTP verb'leri ve status
+ * kodları"), and a ceiling needs the opposite advice: no role change helps, somebody has to
+ * free a seat or raise a number. So the status stays the honest one (authenticated,
+ * understood, refused) and `PLAN_LIMIT_ERROR` carries the distinction.
  *
  * `402 Payment Required` was the other candidate and is wrong for the code as it stands: this
  * layer ships to self-hosters who have no payment relationship with anybody, and a self-hoster

@@ -441,9 +441,10 @@ describe('Attachments (e2e)', () => {
       // (`busboy/lib/types/multipart.js:476`), so a busboy limit of `maxBytes` would refuse a
       // file of exactly the number both layers publish, while the proxy half passes that same
       // body (#215). That gap is a 413 nobody configured and nobody can trace, which is the
-      // failure ADR 0022:170-176 exists to prevent. Under multer 2.2.0 `attachment.module.ts`
-      // closed it with `storage.maxBytes + 1`; multer 2.3.0 adds that byte itself, so the module
-      // now passes `storage.maxBytes` as it is.
+      // failure ADR 0022 ("Gerekçe", "Proxy sözleşmesinin neden bir gövde-boyutu satırına
+      // ihtiyacı var.") exists to prevent. Under multer 2.2.0 `attachment.module.ts` closed it
+      // with `storage.maxBytes + 1`; multer 2.3.0 adds that byte itself, so the module now
+      // passes `storage.maxBytes` as it is.
       //
       // Hand busboy the bare limit again (multer 2.2.0 without the `+ 1`) and this is the one
       // test that turns red; add the `+ 1` back on 2.3.0 and the 413 case above does.
