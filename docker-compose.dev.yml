@@ -125,7 +125,7 @@ services:
   # verification links and invitation mail from the web UI instead of a real inbox — see
   # docs/development.md#smtp-and-mailpit.
   mailpit:
-    image: axllent/mailpit:v1.31.1@sha256:98b916bd3c8d61f7633a52d3ea2f58d00620cb01ca57ab59edde68c347a95365
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     restart: unless-stopped
     logging: *logging
     <<: *hardened
